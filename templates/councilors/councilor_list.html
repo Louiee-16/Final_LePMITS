@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+
+    <!-- HEADER SECTION -->
+    <div class="md:flex md:items-center md:justify-between mb-10 border-b border-slate-200 pb-6">
+        <div class="flex-1 min-w-0">
+            <h2 class="text-3xl font-extrabold leading-7 text-slate-900 sm:text-4xl sm:truncate tracking-tight">
+                Council Registry
+            </h2>
+            <div class="mt-2 flex flex-col sm:flex-row sm:flex-wrap sm:space-x-6">
+                <div class="mt-2 flex items-center text-sm text-slate-500 font-medium">
+                    <svg class="flex-shrink-0 mr-1.5 h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    Managing all active members
+                </div>
+            </div>
+        </div>
+        <div class="mt-5 flex lg:mt-0 lg:ml-4">
+            <a href="{% url 'add' %}" 
+               class="inline-flex items-center px-5 py-2.5 border border-transparent rounded-lg shadow-sm text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all">
+                <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                ADD COUNCILOR
+            </a>
+        </div>
+    </div>
+
+    <!-- GRID SECTION -->
+    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {% for councilor in councilor %}
+        <div class="relative group bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col overflow-hidden">
+            
+            <!-- Top Card Content -->
+            <div class="p-6 flex-grow">
+                <div class="flex items-start justify-between">
+                    <!-- Profile Picture -->
+                    <div class="relative">
+                        <div class="h-20 w-20 rounded-2xl overflow-hidden bg-slate-100 ring-4 ring-slate-50">
+                            {% if councilor.profile_picture %}
+                                <img src="{{ councilor.profile_picture.url }}" class="h-full w-full object-cover">
+                            {% else %}
+                                <div class="h-full w-full flex items-center justify-center bg-indigo-100 text-indigo-600">
+                                    <span class="text-2xl font-bold">{{ councilor.name|slice:":1" }}</span>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- District Badge -->
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 uppercase tracking-wider">
+                        District {{ councilor.district }}
+                    </span>
+                </div>
+
+                <div class="mt-5">
+                    <h3 class="text-lg font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                        {{ councilor.name }}
+                    </h3>
+                    <div class="mt-1 flex items-center text-sm text-slate-500">
+                        <svg class="flex-shrink-0 mr-1.5 h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        {{ councilor.email }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer Actions -->
+            <div class="bg-slate-50 px-6 py-4 flex items-center justify-between border-t border-slate-100">
+                <a href="{% url 'edit_councilor' councilor_id=councilor.id %}" 
+                   class="inline-flex items-center text-sm font-semibold text-slate-600 hover:text-indigo-600 transition-colors">
+                    <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    Edit
+                </a>
+                <a href="{% url 'end_term' councilor_id=councilor.id %}" 
+                   class="inline-flex items-center text-sm font-semibold text-rose-500 hover:text-rose-700 transition-colors">
+                    <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    End Term
+                </a>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-span-full py-20 bg-white border-2 border-dashed border-slate-200 rounded-3xl flex flex-col items-center justify-center">
+            <div class="bg-slate-50 p-4 rounded-full mb-4">
+                <svg class="h-12 w-12 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+            </div>
+            <p class="text-slate-500 font-medium">No councilors registered in the system.</p>
+            <a href="{% url 'add' %}" class="mt-4 text-indigo-600 font-bold hover:underline">Add your first councilor</a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-10">
+
+    <!-- BREADCRUMB / BACK LINK -->
+    <nav class="mb-6">
+        <a href="{% url 'councilors_list' %}" class="inline-flex items-center text-sm font-semibold text-indigo-600 hover:text-indigo-700 transition-colors">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+            Back to Councilor Registry
+        </a>
+    </nav>
+
+    <!-- HEADER -->
+    <div class="mb-10">
+        <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">Edit Councilor Profile</h1>
+        <p class="mt-2 text-slate-500 font-medium">Update account information and administrative details for this member.</p>
+    </div>
+
+    <!-- MAIN FORM CARD -->
+    <div class="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
+        <form method="POST" enctype="multipart/form-data" class="divide-y divide-slate-100">
+            {% csrf_token %}
+
+            <!-- SECTION 1: Profile Image -->
+            <div class="p-8 bg-slate-50/50">
+                <div class="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-8">
+                    <div class="relative group">
+                        <div class="w-28 h-28 rounded-3xl overflow-hidden ring-4 ring-white shadow-lg bg-white">
+                            {% if councilor.profile_picture %}
+                                <img id="imagePreview" src="{{ councilor.profile_picture.url }}" class="w-full h-full object-cover">
+                            {% else %}
+                                <div id="imagePlaceholder" class="w-full h-full flex items-center justify-center bg-indigo-100 text-indigo-600">
+                                    <span class="text-3xl font-bold">{{ councilor.name|slice:":1" }}</span>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="flex-1 text-center sm:text-left">
+                        <h3 class="text-lg font-bold text-slate-800">Profile Photo</h3>
+                        <p class="text-sm text-slate-500 mb-4">Upload a high-resolution headshot. PNG or JPG preferred.</p>
+                        <label for="profile_picture" class="cursor-pointer inline-flex items-center px-4 py-2 bg-white border border-slate-300 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-50 shadow-sm transition-all">
+                            <svg class="w-4 h-4 mr-2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                            Choose New File
+                        </label>
+                        <input type="file" name="profile_picture" id="profile_picture" class="hidden" onchange="previewFile()">
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 2: Information Fields -->
+            <div class="p-8 space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Name Input -->
+                    <div class="space-y-2">
+                        <label for="name" class="block text-sm font-bold text-slate-700 ml-1">Full Name</label>
+                        <input type="text" id="name" name="name" value="{{ councilor.name }}" 
+                               placeholder="e.g. John Doe"
+                               class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all outline-none text-slate-700 bg-white shadow-sm font-medium">
+                    </div>
+
+                    <!-- District Input -->
+                    <div class="space-y-2">
+                        <label for="district" class="block text-sm font-bold text-slate-700 ml-1">District Assigned</label>
+                        <input type="text" id="district" name="district" value="{{ councilor.district }}" 
+                               placeholder="e.g. District 1"
+                               class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all outline-none text-slate-700 bg-white shadow-sm font-medium">
+                    </div>
+
+                    <!-- Email Input (Span 2) -->
+                    <div class="space-y-2 md:col-span-2">
+                        <label for="email" class="block text-sm font-bold text-slate-700 ml-1">Email Address</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                            </span>
+                            <input type="email" id="email" name="email" value="{{ councilor.email }}" 
+                                   class="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all outline-none text-slate-700 bg-white shadow-sm font-medium">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FOOTER: Form Actions -->
+            <div class="px-8 py-6 bg-slate-50 flex items-center justify-between">
+                <p class="text-xs text-slate-400 font-medium italic">Last edited: Just now</p>
+                <div class="flex space-x-3">
+                    <a href="{% url 'councilors_list' %}" class="px-6 py-3 text-sm font-bold text-slate-600 hover:text-slate-800 transition-colors">
+                        Cancel
+                    </a>
+                    <button type="submit" 
+                            class="px-8 py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm uppercase tracking-widest shadow-lg hover:bg-indigo-700 hover:-translate-y-0.5 transition-all">
+                        Save Changes
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Simple JS for Image Preview -->
+<script>
+    function previewFile() {
+        const preview = document.getElementById('imagePreview');
+        const file = document.querySelector('input[type=file]').files[0];
+        const reader = new FileReader();
+
+        reader.onloadend = function () {
+            if(preview) {
+                preview.src = reader.result;
+            } else {
+                location.reload(); // Quick way to handle placeholder swap if needed
+            }
+        }
+
+        if (file) {
+            reader.readAsDataURL(file);
+        }
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LePMITS — Sign In | Sangguniang Panlungsod ng San Juan City</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=Source+Sans+3:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --ph-blue:   #0038A8;
+            --ph-red:    #CE1126;
+            --ph-yellow: #FCD116;
+            --navy:      #0d1f3c;
+            --navy-mid:  #152a50;
+            --accent:    #0038A8;
+            --gold:      #b8960c;
+            --gold-lt:   #fef3c7;
+            --border:    #d1d5db;
+            --border-lt: #e9ecef;
+            --text:      #1a1f2e;
+            --muted:     #4b5563;
+            --faint:     #9ca3af;
+            --bg:        #eef0f4;
+        }
+
+        html, body {
+            min-height: 100vh;
+            font-family: 'Source Sans 3', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        /* ═══════════════════════════════════
+           PH GOV TOP STRIPE
+        ═══════════════════════════════════ */
+        .gov-stripe {
+            height: 5px;
+            background: linear-gradient(90deg,
+                var(--ph-blue)   0%   33.33%,
+                var(--ph-red)    33.33% 66.66%,
+                var(--ph-yellow) 66.66% 100%
+            );
+        }
+
+        /* ═══════════════════════════════════
+           OFFICIAL GOVERNMENT HEADER
+        ═══════════════════════════════════ */
+        .gov-header {
+            background: var(--navy);
+            border-bottom: 3px solid var(--ph-yellow);
+            padding: 0 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 72px;
+            animation: fadeDown 0.45s ease both;
+        }
+
+        .gov-header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        /* Seal placeholder — replace src with actual seal image */
+        .seal-wrap {
+            width: 52px; height: 52px;
+            background: rgba(255,255,255,0.08);
+            border: 1.5px solid rgba(255,255,255,0.18);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .seal-wrap i { font-size: 22px; color: rgba(255,255,255,0.80); }
+
+        .gov-titles {}
+        .gov-lgu {
+            font-family: 'Source Serif 4', serif;
+            font-size: 15px; font-weight: 600;
+            color: #fff;
+            letter-spacing: 0.01em;
+            line-height: 1.2;
+        }
+        .gov-region {
+            font-size: 10.5px; font-weight: 400;
+            letter-spacing: 0.12em; text-transform: uppercase;
+            color: rgba(255,255,255,0.45);
+            margin-top: 2px;
+        }
+
+        /* vertical rule */
+        .hdr-rule {
+            width: 1px; height: 36px;
+            background: rgba(255,255,255,0.12);
+            flex-shrink: 0;
+        }
+
+        .sys-name {
+            font-family: 'Source Serif 4', serif;
+            font-size: 13px; font-weight: 300;
+            font-style: italic;
+            color: rgba(255,255,255,0.55);
+            max-width: 260px;
+            line-height: 1.4;
+        }
+
+        /* right: official badge */
+        .official-badge {
+            display: flex; align-items: center; gap: 7px;
+            font-size: 10px; font-weight: 600;
+            letter-spacing: 0.14em; text-transform: uppercase;
+            color: var(--ph-yellow);
+            background: rgba(252,209,22,0.08);
+            border: 1px solid rgba(252,209,22,0.22);
+            padding: 6px 14px; border-radius: 4px;
+        }
+        .official-badge i { font-size: 11px; }
+
+        /* ═══════════════════════════════════
+           BODY
+        ═══════════════════════════════════ */
+        .page-body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: calc(100vh - 80px);
+            padding: 48px 20px 60px;
+        }
+
+        /* system identity block above card */
+        .sys-identity {
+            text-align: center;
+            margin-bottom: 28px;
+            animation: fadeUp 0.45s 0.05s ease both;
+        }
+
+        .sys-acronym {
+            font-family: 'Source Serif 4', serif;
+            font-size: 36px; font-weight: 700;
+            color: var(--navy);
+            letter-spacing: -1px;
+            line-height: 1;
+        }
+
+        .sys-full {
+            font-size: 11.5px; font-weight: 400;
+            color: var(--muted);
+            letter-spacing: 0.06em;
+            margin-top: 6px;
+            line-height: 1.5;
+        }
+
+        .sys-divider {
+            display: flex; align-items: center; justify-content: center;
+            gap: 12px; margin: 14px 0 0;
+        }
+        .sys-divider-line {
+            width: 48px; height: 1px;
+            background: var(--ph-yellow);
+        }
+        .sys-divider-dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: var(--ph-blue);
+        }
+
+        /* ═══════════════════════════════════
+           LOGIN CARD
+        ═══════════════════════════════════ */
+        .login-card {
+            background: #fff;
+            border: 1px solid var(--border-lt);
+            border-top: 3px solid var(--ph-blue);
+            border-radius: 4px;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06), 0 16px 48px rgba(0,0,0,0.08);
+            animation: fadeUp 0.45s 0.12s ease both;
+            overflow: hidden;
+        }
+
+        .card-header-bar {
+            background: #f8f9fb;
+            border-bottom: 1px solid var(--border-lt);
+            padding: 18px 32px;
+            display: flex; align-items: center; gap: 10px;
+        }
+
+        .card-header-bar i {
+            font-size: 13px;
+            color: var(--ph-blue);
+        }
+
+        .card-header-title {
+            font-size: 12px; font-weight: 600;
+            letter-spacing: 0.1em; text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .card-body { padding: 34px 32px 32px; }
+
+        .login-heading {
+            font-family: 'Source Serif 4', serif;
+            font-size: 21px; font-weight: 600;
+            color: var(--navy);
+            margin-bottom: 4px;
+            line-height: 1.2;
+        }
+
+        .login-sub {
+            font-size: 12.5px; color: var(--muted);
+            margin-bottom: 28px;
+            line-height: 1.5;
+        }
+
+        /* Fields */
+        .field { margin-bottom: 16px; }
+
+        .field label {
+            display: block;
+            font-size: 11.5px; font-weight: 600;
+            letter-spacing: 0.05em; text-transform: uppercase;
+            color: var(--text);
+            margin-bottom: 6px;
+        }
+
+        .input-wrap { position: relative; }
+
+        .input-icon {
+            position: absolute;
+            left: 13px; top: 50%; transform: translateY(-50%);
+            font-size: 12px; color: var(--faint);
+            pointer-events: none; transition: color 0.15s;
+        }
+
+        .input-wrap:focus-within .input-icon { color: var(--ph-blue); }
+
+        .field input {
+            width: 100%;
+            padding: 10px 13px 10px 38px;
+            border: 1.5px solid var(--border);
+            border-radius: 3px;
+            font-family: 'Source Sans 3', sans-serif;
+            font-size: 14px; color: var(--text);
+            background: #fff; outline: none;
+            transition: border-color 0.15s, box-shadow 0.15s;
+            -webkit-appearance: none;
+        }
+
+        .field input::placeholder { color: #c4cad4; }
+
+        .field input:focus {
+            border-color: var(--ph-blue);
+            box-shadow: 0 0 0 3px rgba(0,56,168,0.09);
+        }
+
+        .pw-toggle {
+            position: absolute;
+            right: 12px; top: 50%; transform: translateY(-50%);
+            background: none; border: none;
+            color: var(--faint); font-size: 12px;
+            cursor: pointer; padding: 4px; transition: color 0.15s;
+        }
+        .pw-toggle:hover { color: var(--muted); }
+
+        /* Error banner */
+        .error-banner {
+            display: flex; align-items: flex-start; gap: 9px;
+            background: #fef2f2; border: 1px solid #fecaca;
+            border-left: 3px solid var(--ph-red);
+            border-radius: 3px;
+            padding: 10px 14px;
+            font-size: 12.5px; color: #991b1b;
+            margin-bottom: 16px;
+            line-height: 1.5;
+        }
+        .error-banner i { margin-top: 1px; flex-shrink: 0; }
+
+        /* Warning notice */
+        .warning-notice {
+            display: flex; align-items: flex-start; gap: 9px;
+            background: var(--gold-lt);
+            border: 1px solid #fde68a;
+            border-left: 3px solid var(--gold);
+            border-radius: 3px;
+            padding: 10px 14px;
+            font-size: 11.5px; color: #78350f;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+        .warning-notice i { margin-top: 1px; flex-shrink: 0; font-size: 11px; }
+
+        /* Submit */
+        .btn-submit {
+            width: 100%;
+            padding: 12px 16px;
+            margin-top: 8px;
+            background: var(--ph-blue);
+            color: #fff;
+            font-family: 'Source Sans 3', sans-serif;
+            font-size: 13.5px; font-weight: 600;
+            letter-spacing: 0.06em; text-transform: uppercase;
+            border: none; border-radius: 3px;
+            cursor: pointer;
+            transition: background 0.15s, transform 0.1s;
+            display: flex; align-items: center; justify-content: center; gap: 9px;
+        }
+        .btn-submit:hover { background: #002d8a; }
+        .btn-submit:active { transform: scale(0.99); }
+        .btn-submit i { font-size: 11px; opacity: 0.8; }
+
+        /* Card footer */
+        .card-footer-bar {
+            background: #f8f9fb;
+            border-top: 1px solid var(--border-lt);
+            padding: 14px 32px;
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 12px;
+        }
+
+        .card-footer-bar a {
+            font-size: 11.5px; font-weight: 500;
+            color: var(--ph-blue); text-decoration: none;
+        }
+        .card-footer-bar a:hover { text-decoration: underline; }
+
+        .card-footer-bar .help-text {
+            font-size: 11px; color: var(--faint);
+        }
+
+        /* ═══════════════════════════════════
+           BOTTOM LEGAL
+        ═══════════════════════════════════ */
+        .legal-notice {
+            margin-top: 28px;
+            max-width: 420px;
+            text-align: center;
+            font-size: 10.5px; color: var(--faint);
+            line-height: 1.7;
+            animation: fadeUp 0.45s 0.2s ease both;
+        }
+
+        .legal-notice strong {
+            color: var(--muted);
+            font-weight: 600;
+        }
+
+        /* ═══════════════════════════════════
+           PAGE FOOTER
+        ═══════════════════════════════════ */
+        .page-footer {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background: #fff;
+            border-top: 1px solid var(--border-lt);
+            padding: 10px 40px;
+            display: flex; align-items: center; justify-content: space-between;
+            font-size: 10.5px; color: var(--faint);
+        }
+
+        .page-footer .footer-flags {
+            display: flex; align-items: center; gap: 0;
+            border-radius: 2px; overflow: hidden;
+            width: 24px; height: 14px;
+        }
+        .flag-b { background: var(--ph-blue); flex: 1; height: 100%; }
+        .flag-r { background: var(--ph-red);  flex: 1; height: 100%; }
+
+        /* ═══════════════════════════════════
+           ANIMATIONS
+        ═══════════════════════════════════ */
+        @keyframes fadeDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ═══════════════════════════════════
+           RESPONSIVE
+        ═══════════════════════════════════ */
+        @media (max-width: 540px) {
+            .gov-header { padding: 0 20px; }
+            .official-badge { display: none; }
+            .card-body { padding: 28px 22px 24px; }
+            .card-footer-bar { padding: 12px 22px; }
+            .page-footer { padding: 10px 20px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Gov stripe -->
+    <div class="gov-stripe"></div>
+
+    <!-- Official Header -->
+    <header class="gov-header">
+        <div class="gov-header-left">
+            <!-- Swap this div with an <img> tag for the actual San Juan City seal -->
+            <div class="seal-wrap">
+                <i class="fas fa-landmark"></i>
+            </div>
+            <div class="gov-titles">
+                <div class="gov-lgu">Sangguniang Panlungsod ng San Juan City</div>
+                <div class="gov-region">Metro Manila &nbsp;·&nbsp; National Capital Region</div>
+            </div>
+            <div class="hdr-rule"></div>
+            <div class="sys-name">Legislative Process &amp; Management<br>Information &amp; Tracking System</div>
+        </div>
+        <div class="official-badge">
+            <i class="fas fa-shield-halved"></i>
+            Official Portal
+        </div>
+    </header>
+
+    <!-- Page body -->
+    <div class="page-body">
+
+        <!-- System identity -->
+        <div class="sys-identity">
+            <div class="sys-acronym">LePMITS</div>
+            <div class="sys-full">Legislative Process Management Information &amp; Tracking System</div>
+            <div class="sys-divider">
+                <div class="sys-divider-line"></div>
+                <div class="sys-divider-dot"></div>
+                <div class="sys-divider-line"></div>
+            </div>
+        </div>
+
+        <!-- Login card -->
+        <div class="login-card">
+
+            <div class="card-header-bar">
+                <i class="fas fa-lock"></i>
+                <span class="card-header-title">Authorized Personnel Access</span>
+            </div>
+
+            <div class="card-body">
+
+                <h2 class="login-heading">System Sign In</h2>
+                <p class="login-sub">Enter your official credentials to access the system.</p>
+
+                <!-- Unauthorized access warning -->
+                <div class="warning-notice">
+                    <i class="fas fa-triangle-exclamation"></i>
+                    <span>This system is for <strong>authorized government personnel only.</strong> Unauthorized access attempts are monitored and subject to legal action.</span>
+                </div>
+
+                <form method="post" novalidate>
+                    {% csrf_token %}
+
+                    <div class="field">
+                        <label for="id_username">Username</label>
+                        <div class="input-wrap">
+                            <i class="fas fa-user input-icon"></i>
+                            <input
+                                type="text"
+                                name="username"
+                                id="id_username"
+                                placeholder="Official username"
+                                autocomplete="username"
+                                autofocus
+                            >
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label for="id_password">Password</label>
+                        <div class="input-wrap">
+                            <i class="fas fa-lock input-icon"></i>
+                            <input
+                                type="password"
+                                name="password"
+                                id="id_password"
+                                placeholder="Password"
+                                autocomplete="current-password"
+                            >
+                            <button type="button" class="pw-toggle" onclick="togglePw()" aria-label="Show/hide password">
+                                <i class="fas fa-eye" id="pw-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    {% if form.non_field_errors %}
+                    <div class="error-banner">
+                        <i class="fas fa-circle-exclamation"></i>
+                        <span>{{ form.non_field_errors|striptags }}</span>
+                    </div>
+                    {% endif %}
+
+                    <button type="submit" class="btn-submit">
+                        <i class="fas fa-right-to-bracket"></i>
+                        Sign In to System
+                    </button>
+                </form>
+            </div>
+
+            <div class="card-footer-bar">
+                <a href="mailto:secretariat@sanjuan.gov.ph">
+                    <i class="fas fa-envelope" style="font-size:10px; margin-right:4px;"></i>
+                    Contact Secretariat
+                </a>
+                <span class="help-text">For access issues only</span>
+            </div>
+
+        </div>
+
+        <!-- Legal notice -->
+        <div class="legal-notice">
+            By signing in, you confirm that you are an <strong>authorized officer</strong> of the
+            Sangguniang Panlungsod ng San Juan City and agree to use this system solely for
+            official legislative purposes. All activities are logged and audited.
+        </div>
+
+    </div>
+
+    <!-- Page footer -->
+    <footer class="page-footer">
+        <span>© 2025 Sangguniang Panlungsod ng San Juan City. All rights reserved.</span>
+        <div style="display:flex; align-items:center; gap:10px;">
+            <div class="footer-flags">
+                <div class="flag-b"></div>
+                <div class="flag-r"></div>
+            </div>
+            <span>Republic of the Philippines</span>
+        </div>
+    </footer>
+
+    <script>
+        function togglePw() {
+            var inp = document.getElementById('id_password');
+            var eye = document.getElementById('pw-eye');
+            if (inp.type === 'password') {
+                inp.type = 'text';
+                eye.classList.replace('fa-eye', 'fa-eye-slash');
+            } else {
+                inp.type = 'password';
+                eye.classList.replace('fa-eye-slash', 'fa-eye');
+            }
+        }
+    </script>
+
+</body>
+</html>

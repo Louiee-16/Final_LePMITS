@@ -1,0 +1,198 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-10">
+    
+    <!-- BREADCRUMBS & HEADER -->
+    <nav class="mb-6 flex items-center space-x-2 text-[10px] font-black uppercase tracking-[0.2em]">
+        <a href="{% url 'committee_list' %}" class="text-slate-400 hover:text-indigo-600 transition-colors">Committees</a>
+        <span class="text-slate-300">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span class="text-indigo-600">New Registry</span>
+    </nav>
+
+    <div class="mb-10">
+        <h1 class="text-4xl font-extrabold text-slate-900 tracking-tight">Create Standing Committee</h1>
+        <p class="mt-2 text-slate-500 font-medium text-lg">Establish a new legislative body and assign leadership roles.</p>
+    </div>
+
+    <form method="POST" class="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden modern-committee-form">
+        {% csrf_token %}
+
+        <!-- SECTION 1: IDENTITY -->
+        <div class="p-10 border-b border-slate-100">
+            <div class="flex items-center gap-3 mb-8">
+                <div class="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-sm">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+                </div>
+                <div>
+                    <h3 class="text-sm font-black uppercase tracking-widest text-slate-800">General Identity</h3>
+                    <p class="text-xs text-slate-400 font-bold">The official designation of the body</p>
+                </div>
+            </div>
+            
+            <div class="space-y-2">
+                <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Full Committee Name</label>
+                {{ form.name }}
+                {% if form.name.errors %}
+                    <p class="text-rose-500 text-xs mt-2 font-bold">{{ form.name.errors.0 }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- SECTION 2: LEADERSHIP -->
+        <div class="p-10 bg-slate-50/40 border-b border-slate-100">
+            <div class="flex items-center gap-3 mb-8">
+                <div class="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 shadow-sm">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
+                </div>
+                <div>
+                    <h3 class="text-sm font-black uppercase tracking-widest text-slate-800">Executive Leadership</h3>
+                    <p class="text-xs text-slate-400 font-bold">Appoint presiding officers</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="space-y-2">
+                    <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Chairman</label>
+                    <div class="relative custom-select-wrapper">
+                        {{ form.chairman }}
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Vice-Chairman</label>
+                    <div class="relative custom-select-wrapper">
+                        {{ form.vice_chairman }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 3: MEMBER (SINGLE CHOICE) -->
+        <div class="p-10">
+            <div class="flex items-center gap-3 mb-8">
+                <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 shadow-sm">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                </div>
+                <div>
+                    <h3 class="text-sm font-black uppercase tracking-widest text-slate-800">Primary Member</h3>
+                    <p class="text-xs text-slate-400 font-bold">Select the principal legislative member</p>
+                </div>
+            </div>
+
+            <div class="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 custom-member-radios">
+                    {{ form.member }}
+                </div>
+            </div>
+        </div>
+
+        <!-- ACTIONS -->
+        <div class="p-10 bg-slate-50/50 border-t border-slate-100 flex flex-col-reverse sm:flex-row gap-4 justify-end">
+            <a href="{% url 'committee_list' %}" class="w-full sm:w-auto px-8 py-4 text-center text-sm font-bold text-slate-500 hover:text-slate-800 transition-colors">
+                Discard Entry
+            </a>
+            <button type="submit" class="w-full sm:w-auto px-12 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-indigo-200 hover:bg-indigo-700 hover:-translate-y-1 transition-all">
+                Finalize Committee
+            </button>
+        </div>
+    </form>
+</div>
+
+<style>
+    /* GLOBAL FORM ELEMENTS */
+    .modern-committee-form input[type="text"], 
+    .modern-committee-form select {
+        width: 100%;
+        padding: 1rem 1.25rem;
+        border: 2px solid #f1f5f9;
+        border-radius: 1.25rem;
+        background-color: white;
+        font-weight: 600;
+        font-size: 0.95rem;
+        color: #1e293b;
+        outline: none;
+        transition: all 0.2s ease;
+        appearance: none;
+    }
+
+    .modern-committee-form input:focus, 
+    .modern-committee-form select:focus {
+        border-color: #6366f1;
+        box-shadow: 0 0 0 5px rgba(99, 102, 241, 0.08);
+    }
+
+    /* CUSTOM SELECT ARROW */
+    .custom-select-wrapper::after {
+        content: '▼';
+        font-size: 10px;
+        position: absolute;
+        right: 20px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #94a3b8;
+        pointer-events: none;
+    }
+
+    /* RADIO BUTTON CARD STYLE */
+    .custom-member-radios ul {
+        list-style: none;
+        padding: 0;
+        display: contents; /* Allows the li to use the grid of the parent div */
+    }
+
+    .custom-member-radios li {
+        display: flex;
+    }
+
+    .custom-member-radios label {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        padding: 1rem 1.25rem;
+        background: white;
+        border: 2px solid #f1f5f9;
+        border-radius: 1.25rem;
+        cursor: pointer;
+        font-size: 0.875rem;
+        font-weight: 700;
+        color: #475569;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    }
+
+    .custom-member-radios input[type="radio"] {
+        margin-right: 12px;
+        width: 1.25rem;
+        height: 1.25rem;
+        accent-color: #6366f1;
+        cursor: pointer;
+    }
+
+    /* Selection Highlight */
+    .custom-member-radios label:hover {
+        border-color: #e2e8f0;
+        background-color: #fff;
+    }
+
+    .custom-member-radios input[type="radio"]:checked + label,
+    .custom-member-radios label:has(input[type="radio"]:checked) {
+        border-color: #6366f1;
+        background-color: #f5f3ff;
+        color: #4f46e5;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1);
+    }
+</style>
+
+<script>
+    // Ensure the radio logic handles clicks on the entire card label
+    document.querySelectorAll('.custom-member-radios label').forEach(label => {
+        label.addEventListener('click', function() {
+            const radio = this.querySelector('input[type="radio"]');
+            if(radio) radio.checked = true;
+        });
+    });
+</script>
+{% endblock %}

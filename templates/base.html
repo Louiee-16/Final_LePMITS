@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LePMITS | Legislative Tracking System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #fcfcfd; }
+        .sidebar-item { transition: all 0.2s; border-radius: 10px; margin-bottom: 4px; border: 1px solid transparent; }
+        
+        /* Fixed Active Class logic */
+        .sidebar-active { 
+            background-color: #f1f5f9 !important; 
+            color: #4f46e5 !important; 
+            font-weight: 700; 
+            border: 1px solid #e2e8f0 !important; 
+        }
+        .sidebar-active i { color: #4f46e5 !important; }
+
+        .dot { height: 8px; width: 8px; border-radius: 50%; display: inline-block; margin-right: 14px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden text-slate-900">
+
+    <!-- SIDEBAR -->
+    <aside class="w-72 bg-white border-r border-slate-200 flex flex-col shrink-0">
+        <div class="p-8">
+            <div class="flex items-center gap-3">
+                <div class="bg-indigo-600 p-2.5 rounded-xl shadow-lg shadow-indigo-200">
+                    <i class="fas fa-university text-white text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-extrabold tracking-tight text-slate-800">LePMITS</h1>
+                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">San Juan City</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Added ID for Scroll Persistence -->
+        <nav id="sidebar-nav" class="flex-1 px-6 overflow-y-auto custom-scrollbar">
+            <div class="mb-8">
+                <p class="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] px-3 mb-4">Main</p>
+                <a href="{%url 'dashboard'%}" class="sidebar-item flex items-center px-4 py-3 text-sm {% if request.resolver_match.url_name == 'dashboard' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
+                    <i class="fas fa-columns w-5 mr-3"></i> Dashboard
+                </a>
+            </div>
+
+            {% if user.role == 'SECRETARIAT' or user.role == 'STAFF'%}
+            <div class="mb-8">
+                <p class="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] px-3 mb-4">Secretariat</p>
+                <a href="{%url 'incoming_docs'%}" class="sidebar-item flex items-center px-4 py-3 text-sm {% if request.resolver_match.url_name == 'incoming_docs' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
+                    <i class="fas fa-folder-open w-5 mr-3"></i> Incoming Docs
+                </a>
+                <a href="{%url 'agenda_list'%}" class="sidebar-item flex items-center px-4 py-3 text-sm {% if request.resolver_match.url_name == 'agenda_list' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
+                    <i class="fas fa-calendar-check w-5 mr-3"></i> Agenda
+                </a>
+                <a href="{%url 'committee_list'%}" class="sidebar-item flex items-center px-4 py-3 text-sm {% if request.resolver_match.url_name == 'committee_list' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
+                    <i class="fas fa-users-rectangle w-5 mr-3"></i> Committees
+                </a>
+                <a href="#" class="sidebar-item flex items-center px-4 py-3 text-sm text-slate-500 hover:text-slate-900 hover:bg-slate-50">
+                    <i class="fas fa-comment-alt-lines w-5 mr-3"></i> Draft Remarks
+                </a>
+                <a href="{%url 'councilors_list'%}" class="sidebar-item flex items-center px-4 py-3 text-sm {% if request.resolver_match.url_name == 'councilors_list' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
+                    <i class="fas fa-comment-alt-lines w-5 mr-3"></i> Councilors
+                </a>
+            </div>
+            {%endif%}
+
+            <div class="mb-8">
+                <p class="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] px-3 mb-4">Tracking Stages</p>
+                <a href="{%url 'first_reading'%}" class="sidebar-item flex items-center px-4 py-3 text-sm {% if request.resolver_match.url_name == 'first_reading' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
+                    <span class="dot bg-blue-500 ring-4 ring-blue-50"></span> First Reading
+                </a>
+                <a href="{%url 'view_committee'%}" class="sidebar-item flex items-center px-4 py-3 text-sm text-slate-500 hover:text-slate-900 hover:bg-slate-50">
+                    <span class="dot bg-purple-500 ring-4 ring-purple-50"></span> Committee
+                </a>
+                <a href="#" class="sidebar-item flex items-center px-4 py-3 text-sm text-slate-500 hover:text-slate-900 hover:bg-slate-50">
+                    <span class="dot bg-rose-500 ring-4 ring-rose-50"></span> Unfinished Business
+                </a>
+                <a href="#" class="sidebar-item flex items-center px-4 py-3 text-sm text-slate-500 hover:text-slate-900 hover:bg-slate-50">
+                    <span class="dot bg-orange-500 ring-4 ring-orange-50"></span> Second Reading
+                </a>
+                <a href="#" class="sidebar-item flex items-center px-4 py-3 text-sm text-slate-500 hover:text-slate-900 hover:bg-slate-50">
+                    <span class="dot bg-amber-500 ring-4 ring-amber-50"></span> Third Reading
+                </a>
+                <a href="#" class="sidebar-item flex items-center px-4 py-3 text-sm text-slate-500 hover:text-slate-900 hover:bg-slate-50">
+                    <span class="dot bg-emerald-500 ring-4 ring-emerald-50"></span> Approved
+                </a>
+            </div>
+        </nav>
+
+        <div class="p-6 m-4 bg-slate-50 rounded-2xl border border-slate-100">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center text-indigo-600 font-bold border border-slate-200 uppercase">
+                    {{ user.username|slice:":1" }}
+                </div>
+                
+                <div class="min-w-0">
+                    <p class="text-sm font-bold text-slate-800 truncate">{{ user.username }}</p>
+                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{{ user.role }}</p>
+                </div>
+            </div>
+            <form action="{% url 'logout' %}" method="post">
+                {% csrf_token %}
+                <button type="submit" class="flex items-center justify-center w-full py-2.5 bg-white border border-slate-200 text-[11px] font-bold text-rose-500 hover:bg-rose-50 hover:border-rose-100 transition-all rounded-xl uppercase tracking-widest">
+                    <i class="fas fa-sign-out-alt mr-2"></i> Log Out
+                </button>
+            </form>
+        </div>
+    </aside>
+
+    <!-- MAIN AREA -->
+    <main class="flex-1 flex flex-col min-w-0">
+        <header class="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-10 shrink-0">
+            <div class="flex items-center gap-4">
+                <span class="text-slate-300">|</span>
+                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Legislative Tracking System</h2>
+            </div>
+            <div class="flex items-center gap-6">
+                <div class="text-right">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase">Current Date</p>
+                    <p class="text-sm font-bold text-slate-700">{% now "F d, Y" %}</p>
+                </div>
+            </div>
+        </header>
+
+        <section class="flex-1 overflow-y-auto custom-scrollbar p-10">
+            {% block content %}{% endblock %}
+        </section>
+    </main>
+
+    <script>
+        // SIDEBAR SCROLL PERSISTENCE
+        document.addEventListener("DOMContentLoaded", function() {
+            const sidebarNav = document.getElementById('sidebar-nav');
+            const savedScroll = sessionStorage.getItem('sidebar-scroll');
+            if (savedScroll) sidebarNav.scrollTop = savedScroll;
+
+            sidebarNav.addEventListener('scroll', () => {
+                sessionStorage.setItem('sidebar-scroll', sidebarNav.scrollTop);
+            });
+        });
+
+        // PREVENT PAGE CACHE / BACK BUTTON ISSUES
+        window.addEventListener("pageshow", function (event) {
+            var historyTraversal = event.persisted || 
+                                   (typeof window.performance != "undefined" && 
+                                    window.performance.navigation.type === 2);
+            if (historyTraversal) {
+                window.location.reload();
+            }
+        });
+    </script>
+</body>
+</html>

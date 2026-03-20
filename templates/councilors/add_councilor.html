@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-10">
+
+    <!-- BREADCRUMB & HEADER -->
+    <nav class="mb-6 flex items-center space-x-2 text-sm font-semibold uppercase tracking-wider">
+        <a href="{% url 'councilors_list' %}" class="text-slate-400 hover:text-indigo-600 transition-colors">Councilors</a>
+        <span class="text-slate-300">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span class="text-indigo-600">New Entry</span>
+    </nav>
+
+    <div class="mb-10">
+        <h1 class="text-4xl font-extrabold text-slate-900 tracking-tight">Add New Councilor</h1>
+        <p class="mt-2 text-slate-500 font-medium text-lg">Onboard a new member to the legislative council registry.</p>
+    </div>
+
+    <!-- MAIN FORM CARD -->
+    <div class="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
+        <form method="POST" enctype="multipart/form-data" class="modern-form">
+            {% csrf_token %}
+
+            <!-- SECTION: Profile Media -->
+            <div class="p-8 border-b border-slate-100 bg-slate-50/30">
+                <div class="flex flex-col md:flex-row items-center gap-8">
+                    <div class="relative group">
+                        <div class="w-32 h-32 rounded-3xl overflow-hidden ring-4 ring-white shadow-2xl bg-white flex items-center justify-center border border-slate-100">
+                            <img id="profilePreview" src="{% static 'images/default-avatar.png' %}" 
+                                 class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity">
+                        </div>
+                    </div>
+                    
+                    <div class="flex-1 text-center md:text-left">
+                        <h3 class="text-lg font-bold text-slate-800">Identify Photo</h3>
+                        <p class="text-sm text-slate-500 mb-5">Upload a professional headshot. Max size 2MB.</p>
+                        
+                        <label for="{{ form.profile_picture.id_for_label }}" class="cursor-pointer inline-flex items-center px-5 py-2.5 bg-indigo-50 border border-indigo-100 rounded-xl text-sm font-bold text-indigo-700 hover:bg-indigo-100 transition-all">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                            Upload Headshot
+                        </label>
+                        <div class="hidden">{{ form.profile_picture }}</div>
+                        {% if form.profile_picture.errors %}
+                            <p class="text-rose-500 text-xs mt-2 font-bold">{{ form.profile_picture.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION: Fields -->
+            <div class="p-8 space-y-8">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                    
+                    <!-- Name -->
+                    <div class="space-y-2">
+                        <label class="block text-xs font-black text-slate-400 uppercase tracking-[0.15em] ml-1">Full Legal Name</label>
+                        {{ form.name }}
+                        {% if form.name.errors %}
+                            <p class="text-rose-500 text-xs mt-1 font-bold">{{ form.name.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- District -->
+                    <div class="space-y-2">
+                        <label class="block text-xs font-black text-slate-400 uppercase tracking-[0.15em] ml-1">Assigned District</label>
+                        {{ form.district }}
+                        {% if form.district.errors %}
+                            <p class="text-rose-500 text-xs mt-1 font-bold">{{ form.district.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Email -->
+                    <div class="md:col-span-2 space-y-2">
+                        <label class="block text-xs font-black text-slate-400 uppercase tracking-[0.15em] ml-1">Contact Email</label>
+                        {{ form.email }}
+                        {% if form.email.errors %}
+                            <p class="text-rose-500 text-xs mt-1 font-bold">{{ form.email.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- ACTIONS -->
+            <div class="px-8 py-6 bg-slate-50 border-t border-slate-100 flex flex-col-reverse sm:flex-row items-center justify-end gap-4">
+                <a href="{% url 'councilors_list' %}" class="w-full sm:w-auto text-center px-6 py-3 text-sm font-bold text-slate-500 hover:text-slate-800 transition-colors">
+                    Discard Draft
+                </a>
+                <button type="submit" class="w-full sm:w-auto px-10 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-indigo-200 hover:bg-indigo-700 hover:-translate-y-1 active:translate-y-0 transition-all">
+                    Register Councilor
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- INJECTED STYLES FOR DJANGO FORM FIELDS -->
+<style>
+    /* This targets the Django {{ form.field }} inputs specifically */
+    .modern-form input[type="text"], 
+    .modern-form input[type="email"], 
+    .modern-form select, 
+    .modern-form textarea {
+        width: 100%;
+        padding: 0.875rem 1.25rem;
+        background-color: #ffffff;
+        border: 2px solid #f1f5f9;
+        border-radius: 1rem;
+        font-weight: 500;
+        color: #1e293b;
+        transition: all 0.2s ease;
+        outline: none;
+    }
+
+    .modern-form input:focus {
+        border-color: #6366f1;
+        background-color: #fff;
+        box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+    }
+
+    .modern-form input::placeholder {
+        color: #cbd5e1;
+    }
+</style>
+
+<script>
+    // Live Image Preview Logic
+    const fileInput = document.querySelector('input[type="file"]');
+    const preview = document.getElementById('profilePreview');
+
+    if(fileInput) {
+        fileInput.addEventListener('change', function() {
+            const file = this.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    preview.src = e.target.result;
+                    preview.classList.remove('opacity-80');
+                }
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+</script>
+{% endblock %}
