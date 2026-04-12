@@ -9,9 +9,14 @@
             <h1 class="text-4xl font-[1000] text-slate-900 tracking-tight">Councilor Portfolio</h1>
             <p class="text-slate-500 mt-1 font-medium text-lg">Welcome, Hon. {{ user.get_full_name|default:user.username }}.</p>
         </div>
+        <div class = "flex gap-2">
+        <a href="{% url 'referrals-from-other-matters' %}" class=" relative px-8 py-4 bg-red-600 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-red-100 hover:bg-indigo-700 hover:-translate-y-1 transition-all flex items-center gap-3">
+            <i class="fas fa-plus-circle text-lg"></i> Pending Referrals {%if referred_other_matters%}<span class="absolute -top-2 -right-2 bg-white text-red-600 text-[20px] font-bold px-2 py-2 rounded-full shadow">{{ referred_other_matters.count }}{%endif%}</span>
+        </a>
         <a href="{% url 'create_draft' %}" class="px-8 py-4 bg-indigo-600 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-indigo-100 hover:bg-indigo-700 hover:-translate-y-1 transition-all flex items-center gap-3">
             <i class="fas fa-plus-circle text-lg"></i> Create New Draft
         </a>
+    </div>
     </div>
 
     <!-- STATS GRID -->
@@ -24,7 +29,7 @@
                     <i class="fas fa-edit text-white"></i>
                 </div>
                 <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Saved Drafts</p>
-                <h3 class="text-5xl font-black text-slate-900 mt-2">{{ drafts_count }}</h3>
+                <h3 class="text-5xl font-black text-slate-900 mt-2">{{ draft_measures.count }}</h3>
             </div>
         </div>
 
@@ -35,8 +40,8 @@
                 <div class="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center mb-6 shadow-lg shadow-indigo-200">
                     <i class="fas fa-spinner text-white"></i>
                 </div>
-                <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Filed in Review</p>
-                <h3 class="text-5xl font-black text-slate-900 mt-2">{{ filed_count }}</h3>
+                <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Referrals from Other Matters</p>
+                <h3 class="text-5xl font-black text-slate-900 mt-2">{{ referred_other_matters.count }}</h3>
             </div>
         </div>
 
@@ -47,8 +52,8 @@
                 <div class="w-12 h-12 rounded-2xl bg-emerald-500 flex items-center justify-center mb-6 shadow-lg shadow-emerald-200">
                     <i class="fas fa-check-double text-white"></i>
                 </div>
-                <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Approved Laws</p>
-                <h3 class="text-5xl font-black text-slate-900 mt-2">{{ approved_count }}</h3>
+                <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Referred to my committees</p>
+                <h3 class="text-5xl font-black text-slate-900 mt-2">{{ referred_to_my_committees.count}}</h3>
             </div>
         </div>
     </div>
@@ -111,43 +116,43 @@
         </div>
 
         <!-- SIDEBAR: NOTIFICATIONS & HEARINGS -->
-        <div class="col-span-12 xl:col-span-4 space-y-8">
-            <!-- HEARING NOTIFICATION WIDGET -->
-            <div class="bg-indigo-950 rounded-[2.5rem] p-10 text-white shadow-2xl relative overflow-hidden">
-                <div class="absolute -right-10 -top-10 w-40 h-40 bg-indigo-500 opacity-20 rounded-full blur-2xl"></div>
+        <div class="col-span-12 xl:col-span-4 space-y-6 flex flex-col">
+            <div class="bg-[#1e1b4b] rounded-[2.5rem] p-10 text-white shadow-2xl shadow-indigo-200 relative overflow-hidden h-full flex flex-col justify-between">
+                <div class="absolute -right-20 -top-20 w-64 h-64 bg-indigo-500 opacity-20 rounded-full blur-3xl"></div>
                 
-                <h3 class="text-xs font-black uppercase tracking-[0.2em] text-indigo-300 mb-8 flex items-center gap-2">
-                    <i class="fas fa-bell animate-pulse text-indigo-400"></i> Hearing Alerts
-                </h3>
-                
-                <div class="space-y-6">
-                    {% for hearing in upcoming_hearings %}
-                    <div class="bg-white/5 border border-white/10 p-5 rounded-2xl">
-                        <p class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1">{{ hearing.date|date:"M d, Y" }}</p>
-                        <p class="font-bold text-sm leading-tight">{{ hearing.document.title }}</p>
-                        <p class="text-xs text-indigo-300 mt-3"><i class="fas fa-map-marker-alt mr-1"></i> Session Hall, 2nd Floor</p>
-                    </div>
-                    {% empty %}
-                    <div class="text-center py-4">
-                        <div class="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <i class="fas fa-calendar-check text-indigo-400/50"></i>
-                        </div>
-                        <p class="text-indigo-400 text-xs italic">No scheduled hearings today.</p>
-                    </div>
-                    {% endfor %}
+            <div class="relative z-10">
+                <p class="text-indigo-300 text-xs font-bold uppercase tracking-[0.3em] mb-8">
+                    Next Council Session
+                </p>
+
+                <div class="space-y-2">
+                    <h4 class="text-3xl font-light text-indigo-100">{{ month }}</h4>
+                    <h2 class="text-9xl font-[1000] leading-none tracking-tighter drop-shadow-2xl">
+                        {{ day }}
+                    </h2>
                 </div>
             </div>
 
-            <!-- DIGITAL PEN PROMO -->
-            <div class="bg-slate-50 border border-slate-100 rounded-[2rem] p-8">
-                <div class="flex items-center gap-4 mb-4">
-                    <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-indigo-600 shadow-sm border border-slate-100">
-                        <i class="fas fa-tablet-screen"></i>
+            <div class="relative z-10 space-y-6">
+                <div class="flex items-center gap-4 py-4 px-6 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-md">
+                    <div class="w-10 h-10 rounded-lg bg-indigo-500/20 flex items-center justify-center">
+                        <i class="fas fa-clock text-indigo-300"></i>
                     </div>
-                    <h4 class="font-bold text-slate-800 text-sm">Markup System Ready</h4>
+                    <p class="text-lg font-bold">
+                        {{ weekday }} @ {{ time }}
+                    </p>
                 </div>
-                <p class="text-xs text-slate-500 leading-relaxed">During committee hearings, use the <span class="font-bold text-indigo-600 italic">Digital Pen</span> to mark up your filed drafts. Your notes will be instantly visible to the Secretariat staff for official encoding.</p>
             </div>
+                    
+                   <!--<button class="w-full py-5 bg-white text-indigo-950 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-indigo-50 hover:scale-[1.02] transition-all flex items-center justify-center gap-3">
+                        <i class="fas fa-calendar-plus text-indigo-600"></i> 
+                        View/Generate Agenda-->
+                    </button>
+                </div>
+            </div>
+        </div>
+
+  
         </div>
 
     </div>

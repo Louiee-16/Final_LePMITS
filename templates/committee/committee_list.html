@@ -57,7 +57,7 @@
                     </div>
                     <div>
                         <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Chairman</p>
-                        <p class="text-sm font-bold text-slate-800">Hon. {{ committee.chairman.user.get_full_name }}</p>
+                        <p class="text-sm font-bold text-slate-800">Hon. {{ committee.chairman.name }}</p>
                     </div>
                 </div>
 
@@ -68,7 +68,7 @@
                     </div>
                     <div>
                         <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Vice-Chairman</p>
-                        <p class="text-sm font-bold text-slate-800">Hon. {{ committee.vice_chairman.user.get_full_name }}</p>
+                        <p class="text-sm font-bold text-slate-800">Hon. {{ committee.vice_chairman.name }}</p>
                     </div>
                 </div>
             </div>
@@ -77,12 +77,12 @@
             <div class="px-8 py-6 flex justify-between items-center bg-white">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-full bg-emerald-50 border-2 border-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-xs">
-                        {{ committee.member.user.first_name|first }}{{ committee.member.user.last_name|first }}
+                        {{ committee.member.name|first}}
                     </div>
                     <div>
                         <p class="text-[8px] font-black text-slate-400 uppercase tracking-tighter">Assigned Member</p>
                         <p class="text-xs font-bold text-slate-600 truncate max-w-[120px]">
-                            {{ committee.member.user.get_full_name }}
+                            {{ committee.member.name }}
                         </p>
                     </div>
                 </div>

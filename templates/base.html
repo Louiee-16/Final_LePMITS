@@ -9,106 +9,372 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #fcfcfd; }
-        .sidebar-item { transition: all 0.2s; border-radius: 10px; margin-bottom: 4px; border: 1px solid transparent; }
-        
-        /* Fixed Active Class logic */
-        .sidebar-active { 
-            background-color: #f1f5f9 !important; 
-            color: #4f46e5 !important; 
-            font-weight: 700; 
-            border: 1px solid #e2e8f0 !important; 
+
+        /* ── Sidebar transition ── */
+        #sidebar {
+            width: 272px;
+            transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+        }
+        #sidebar.collapsed {
+            width: 68px;
+        }
+
+        /* Hide text labels when collapsed */
+        #sidebar.collapsed .sidebar-label,
+        #sidebar.collapsed .sidebar-section-label,
+        #sidebar.collapsed .sidebar-logo-text,
+        #sidebar.collapsed .sidebar-user-info,
+        #sidebar.collapsed .sidebar-logout-text,
+        #sidebar.collapsed #committeeDropdown {
+            opacity: 0;
+            pointer-events: none;
+            width: 0;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        /* Center icons when collapsed */
+        #sidebar.collapsed .sidebar-item {
+            justify-content: center;
+            padding-left: 0;
+            padding-right: 0;
+        }
+        #sidebar.collapsed .sidebar-item i.nav-icon {
+            margin-right: 0;
+        }
+        #sidebar.collapsed .dot-wrap {
+            margin-right: 0;
+        }
+
+        /* User card collapsed */
+        #sidebar.collapsed #userCard {
+            padding: 12px 8px;
+            align-items: center;
+            justify-content: center;
+        }
+        #sidebar.collapsed #userCard .user-avatar {
+            margin: 0 auto;
+        }
+
+        /* Sidebar item base */
+        .sidebar-item {
+            transition: all 0.2s;
+            border-radius: 10px;
+            margin-bottom: 4px;
+            border: 1px solid transparent;
+            display: flex;
+            align-items: center;
+            padding: 10px 14px;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+        .sidebar-active {
+            background-color: #f1f5f9 !important;
+            color: #4f46e5 !important;
+            font-weight: 700;
+            border: 1px solid #e2e8f0 !important;
         }
         .sidebar-active i { color: #4f46e5 !important; }
+        .sidebar-active .dot { background-color: inherit; }
 
-        .dot { height: 8px; width: 8px; border-radius: 50%; display: inline-block; margin-right: 14px; }
+        .dot {
+            height: 8px;
+            width: 8px;
+            min-width: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .dot-wrap {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            margin-right: 14px;
+            flex-shrink: 0;
+        }
+
+        .nav-icon {
+            width: 20px;
+            text-align: center;
+            flex-shrink: 0;
+            margin-right: 12px;
+            transition: margin 0.25s;
+        }
+
+        .sidebar-label {
+            transition: opacity 0.2s, width 0.25s;
+            overflow: hidden;
+        }
+
+        .sidebar-section-label {
+            transition: opacity 0.2s;
+            overflow: hidden;
+        }
+
+        /* Tooltip on collapsed */
+        #sidebar.collapsed .sidebar-item {
+            position: relative;
+        }
+        #sidebar.collapsed .sidebar-item:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            left: 68px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #1e293b;
+            color: white;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            padding: 6px 12px;
+            border-radius: 8px;
+            white-space: nowrap;
+            z-index: 100;
+            pointer-events: none;
+        }
+
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+
+        /* Sidebar label transitions */
+        .sidebar-logo-text,
+        .sidebar-label,
+        .sidebar-section-label,
+        .sidebar-user-info,
+        .sidebar-logout-text {
+            transition: opacity 0.15s ease, width 0.25s ease;
+        }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden text-slate-900">
 
     <!-- SIDEBAR -->
-    <aside class="w-72 bg-white border-r border-slate-200 flex flex-col shrink-0">
-        <div class="p-8">
-            <div class="flex items-center gap-3">
-                <div class="bg-indigo-600 p-2.5 rounded-xl shadow-lg shadow-indigo-200">
-                    <i class="fas fa-university text-white text-xl"></i>
+    <aside id="sidebar" class="bg-white border-r border-slate-200 flex flex-col shrink-0 relative">
+
+        <!-- Logo + collapse toggle -->
+        <div class="p-5 flex items-center justify-between">
+            <div class="flex items-center gap-3 min-w-0">
+                <div class="bg-indigo-600 p-2.5 rounded-xl shadow-lg shadow-indigo-200 shrink-0">
+                    <i class="fas fa-university text-white text-lg"></i>
                 </div>
-                <div>
-                    <h1 class="text-xl font-extrabold tracking-tight text-slate-800">LePMITS</h1>
-                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">San Juan City</p>
+                <div class="sidebar-logo-text min-w-0">
+                    <h1 class="text-lg font-extrabold tracking-tight text-slate-800 whitespace-nowrap">LePMITS</h1>
+                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest whitespace-nowrap">San Juan City</p>
                 </div>
             </div>
+            <button id="collapseBtn" onclick="toggleSidebar()"
+                class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-all shrink-0 ml-2">
+                <i class="fas fa-chevron-left text-[10px]" id="collapseIcon"></i>
+            </button>
         </div>
 
-        <!-- Added ID for Scroll Persistence -->
-        <nav id="sidebar-nav" class="flex-1 px-6 overflow-y-auto custom-scrollbar">
-            <div class="mb-8">
-                <p class="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] px-3 mb-4">Main</p>
-                <a href="{%url 'dashboard'%}" class="sidebar-item flex items-center px-4 py-3 text-sm {% if request.resolver_match.url_name == 'dashboard' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
-                    <i class="fas fa-columns w-5 mr-3"></i> Dashboard
+        <!-- Nav -->
+        <nav id="sidebar-nav" class="flex-1 px-3 overflow-y-auto custom-scrollbar space-y-6 pb-4">
+
+            <!-- MAIN -->
+            <div>
+                <!-- SYSTEM ADMIN SECTION -->
+            {% if user.role == 'ADMIN' %}
+            <div>
+                <p class="sidebar-section-label text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] px-3 mb-2">
+                    System Administration
+                </p>
+                <a href="{% url 'admin-dashboard' %}" data-tooltip="Dashboard"
+                   class="sidebar-item {% if request.resolver_match.url_name == 'admin-dashboard' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
+                    <i class="fas fa-columns nav-icon"></i>
+                    <span class="sidebar-label">Dashboard</span>
+                </a>
+                <!-- User Management -->
+                <a href="{%url 'user-management'%}" data-tooltip="User Accounts"
+                class="sidebar-item {% if 'user' in request.path %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
+                    <i class="fas fa-user-gear nav-icon"></i>
+                    <span class="sidebar-label">User Accounts</span>
+                </a>
+
+                <!-- Activity / Audit Logs -->
+                <a href="{%url 'audit-logs'%}" data-tooltip="Audit Logs"
+                class="sidebar-item {% if 'logs' in request.path %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
+                    <i class="fas fa-shield-halved nav-icon"></i>
+                    <span class="sidebar-label">Audit Logs</span>
+                </a>
+
+                <!-- Global Settings -->
+                <a href="{%url 'general-settings'%}" data-tooltip="System Settings"
+                class="sidebar-item {% if 'settings' in request.path %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
+                    <i class="fas fa-sliders nav-icon"></i>
+                    <span class="sidebar-label">General Settings</span>
+                </a>
+
+                <!-- Council Term Setup -->
+                <a href="{%url 'council-setup'%}" data-tooltip="Council Setup"
+                class="sidebar-item {% if 'setup' in request.path %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
+                    <i class="fas fa-sitemap nav-icon"></i>
+                    <span class="sidebar-label">Council Setup</span>
+                </a>
+
+                <!-- Database / Maintenance -->
+                <a href="{%url 'backend-database'%}"  data-tooltip="Django Admin"
+                class="sidebar-item text-slate-500 hover:text-indigo-600 hover:bg-indigo-50">
+                    <i class="fas fa-database nav-icon"></i>
+                    <span class="sidebar-label">Backend Database</span>
                 </a>
             </div>
+            {% endif %}
+                {%if user.role != 'ADMIN'%}
+                <p class="sidebar-section-label text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] px-3 mb-2">
+                    Main
+                </p>
+                <a href="{% url 'dashboard' %}" data-tooltip="Dashboard"
+                   class="sidebar-item {% if request.resolver_match.url_name == 'dashboard' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
+                    <i class="fas fa-columns nav-icon"></i>
+                    <span class="sidebar-label">Dashboard</span>
+                </a>
+                {%endif%}
+                {% if user.role == 'COUNCILOR' %}
+                <a href="{% url 'filed-measures' %}" data-tooltip="Filed Drafts"
+                   class="sidebar-item {% if request.resolver_match.url_name == 'filed-measures' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
+                    <i class="fas fa-file-alt nav-icon"></i>
+                    <span class="sidebar-label">Filed Measures</span>
+                </a>
+                <a href="{%url 'draft-measures'%}" data-tooltip="Draft Measures"
+                   class="sidebar-item {% if request.resolver_match.url_name == 'draft-measures' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
+                    <i class="fas fa-file-alt nav-icon"></i>
+                    <span class="sidebar-label">Draft Measures</span>
+                </a>
 
-            {% if user.role == 'SECRETARIAT' or user.role == 'STAFF'%}
-            <div class="mb-8">
-                <p class="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] px-3 mb-4">Secretariat</p>
-                <a href="{%url 'incoming_docs'%}" class="sidebar-item flex items-center px-4 py-3 text-sm {% if request.resolver_match.url_name == 'incoming_docs' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
-                    <i class="fas fa-folder-open w-5 mr-3"></i> Incoming Docs
+                <!-- My Committees dropdown -->
+                <button onclick="toggleDropdown('committeeDropdown')"
+                    data-tooltip="My Committees"
+                    class="sidebar-item w-full text-left text-slate-500 hover:text-slate-900 hover:bg-slate-50">
+                    <i class="fas fa-users nav-icon"></i>
+                    <span class="sidebar-label flex-1">My Committees</span>
+                    <i class="fas fa-chevron-down text-[10px] sidebar-label transition-transform duration-200" id="chevronIcon"></i>
+                </button>
+                <div id="committeeDropdown" class="hidden ml-3 mt-1 bg-slate-50 rounded-xl border border-slate-100 overflow-hidden">
+                    {% for committee in committees %}
+                    <a href="{%url 'referred-to-committee' committee.id%}" class="block px-4 py-2 text-xs text-slate-600 hover:bg-slate-100 font-medium">
+                        {{ committee.name }}
+                    </a>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                {% if user.role == 'BARANGAY' %}
+                <a href="{% url 'dashboard' %}" data-tooltip="Filed Measures"
+                   class="sidebar-item text-slate-500 hover:text-slate-900 hover:bg-slate-50">
+                    <i class="fas fa-file-invoice nav-icon"></i>
+                    <span class="sidebar-label">Filed Measures</span>
                 </a>
-                <a href="{%url 'agenda_list'%}" class="sidebar-item flex items-center px-4 py-3 text-sm {% if request.resolver_match.url_name == 'agenda_list' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
-                    <i class="fas fa-calendar-check w-5 mr-3"></i> Agenda
+                {% endif %}
+            </div>
+
+            <!-- SECRETARIAT -->
+            {% if user.role == 'SECRETARIAT' or user.role == 'STAFF' %}
+            <div>
+                <p class="sidebar-section-label text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] px-3 mb-2">
+                    Secretariat
+                </p>
+                <a href="{% url 'incoming_docs' %}" data-tooltip="Incoming Docs"
+                   class="sidebar-item {% if request.resolver_match.url_name == 'incoming_docs' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
+                    <i class="fas fa-folder-open nav-icon"></i>
+                    <span class="sidebar-label">Incoming Docs</span>
                 </a>
-                <a href="{%url 'committee_list'%}" class="sidebar-item flex items-center px-4 py-3 text-sm {% if request.resolver_match.url_name == 'committee_list' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
-                    <i class="fas fa-users-rectangle w-5 mr-3"></i> Committees
+                <a href="{% url 'session_list' %}" data-tooltip="Agenda"
+                   class="sidebar-item {% if request.resolver_match.url_name == 'agenda_list' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
+                    <i class="fas fa-calendar-check nav-icon"></i>
+                    <span class="sidebar-label">Agenda</span>
                 </a>
-                <a href="#" class="sidebar-item flex items-center px-4 py-3 text-sm text-slate-500 hover:text-slate-900 hover:bg-slate-50">
-                    <i class="fas fa-comment-alt-lines w-5 mr-3"></i> Draft Remarks
+                <a href="{% url 'committee_list' %}" data-tooltip="Committees"
+                   class="sidebar-item {% if request.resolver_match.url_name == 'committee_list' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
+                    <i class="fas fa-users-rectangle nav-icon"></i>
+                    <span class="sidebar-label">Committees</span>
                 </a>
-                <a href="{%url 'councilors_list'%}" class="sidebar-item flex items-center px-4 py-3 text-sm {% if request.resolver_match.url_name == 'councilors_list' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
-                    <i class="fas fa-comment-alt-lines w-5 mr-3"></i> Councilors
+                <a href="{% url 'councilors_list' %}" data-tooltip="Councilor Registry"
+                   class="sidebar-item {% if request.resolver_match.url_name == 'councilors_list' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
+                    <i class="fas fa-id-badge nav-icon"></i>
+                    <span class="sidebar-label">Councilor's Registry</span>
+                </a>
+                <a href="{% url 'barangay-list' %}" data-tooltip="Barangay Registry"
+                   class="sidebar-item {% if request.resolver_match.url_name == 'barangay-list' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
+                    <i class="fas fa-map-marker-alt nav-icon"></i>
+                    <span class="sidebar-label">Barangay's Registry</span>
+                </a>
+
+            </div>
+            {% endif %}
+
+            <!-- TRACKING STAGES -->
+             {%if user.role != 'ADMIN'%}
+            <div>
+                <p class="sidebar-section-label text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] px-3 mb-2">
+                    Tracking Stages
+                </p>
+                <a href="{% url 'first_reading' %}" data-tooltip="First Reading"
+                   class="sidebar-item {% if request.resolver_match.url_name == 'first_reading' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
+                    <span class="dot-wrap"><span class="dot bg-blue-500 ring-4 ring-blue-50"></span></span>
+                    <span class="sidebar-label">First Reading</span>
+                </a>
+                {% if user.role == 'SECRETARIAT' or user.role == 'STAFF' %}
+                <a href="{% url 'view-committee' %}" data-tooltip="Committee Referrals"
+                   class="sidebar-item {% if request.resolver_match.url_name == 'view-committee' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
+                    <span class="dot-wrap"><span class="dot bg-purple-500 ring-4 ring-purple-50"></span></span>
+                    <span class="sidebar-label">Committee Referrals</span>
+                </a>
+                {%endif%}
+                <a href="{% url 'second-reading' %}" data-tooltip="Second Reading"
+                   class="sidebar-item {% if request.resolver_match.url_name == 'second-reading' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
+                    <span class="dot-wrap"><span class="dot bg-orange-500 ring-4 ring-orange-50"></span></span>
+                    <span class="sidebar-label">Second Reading</span>
+                </a>
+                <a href="{% url 'third-reading' %}" data-tooltip="Third Reading"
+                   class="sidebar-item {% if request.resolver_match.url_name == 'third-reading' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
+                    <span class="dot-wrap"><span class="dot bg-amber-500 ring-4 ring-amber-50"></span></span>
+                    <span class="sidebar-label">Third Reading</span>
+                </a>
+                <a href="{%url 'other-matters'%}" data-tooltip="Other Matters"
+                   class="sidebar-item {% if request.resolver_match.url_name == 'other-matters' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
+                    <span class="dot-wrap"><span class="dot bg-rose-500 ring-4 ring-rose-50"></span></span>
+                    <span class="sidebar-label">Other Matters</span>
+                </a>
+                <a href="{%url 'unfinished-business' %}" data-tooltip="Unfinished Business"
+                   class="sidebar-item {% if request.resolver_match.url_name == 'unfinished-business' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
+                    <span class="dot-wrap"><span class="dot bg-rose-500 ring-4 ring-rose-50"></span></span>
+                    <span class="sidebar-label">Unfinished Business</span>
+                </a>
+                <a href="{% url 'approved' %}" data-tooltip="Approved"
+                   class="sidebar-item {% if request.resolver_match.url_name == 'approved' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
+                    <span class="dot-wrap"><span class="dot bg-emerald-500 ring-4 ring-emerald-50"></span></span>
+                    <span class="sidebar-label">Approved</span>
+                </a>
+                <a href="{%url 'disapproved-docs'%}" data-tooltip="disapproved"
+                   class="sidebar-item {% if request.resolver_match.url_name == 'disapproved-docs' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
+                    <span class="dot-wrap"><span class="dot bg-emerald-500 ring-4 ring-emerald-50"></span></span>
+                    <span class="sidebar-label">Disapproved</span>
                 </a>
             </div>
             {%endif%}
 
-            <div class="mb-8">
-                <p class="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] px-3 mb-4">Tracking Stages</p>
-                <a href="{%url 'first_reading'%}" class="sidebar-item flex items-center px-4 py-3 text-sm {% if request.resolver_match.url_name == 'first_reading' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
-                    <span class="dot bg-blue-500 ring-4 ring-blue-50"></span> First Reading
-                </a>
-                <a href="{%url 'view_committee'%}" class="sidebar-item flex items-center px-4 py-3 text-sm text-slate-500 hover:text-slate-900 hover:bg-slate-50">
-                    <span class="dot bg-purple-500 ring-4 ring-purple-50"></span> Committee
-                </a>
-                <a href="#" class="sidebar-item flex items-center px-4 py-3 text-sm text-slate-500 hover:text-slate-900 hover:bg-slate-50">
-                    <span class="dot bg-rose-500 ring-4 ring-rose-50"></span> Unfinished Business
-                </a>
-                <a href="#" class="sidebar-item flex items-center px-4 py-3 text-sm text-slate-500 hover:text-slate-900 hover:bg-slate-50">
-                    <span class="dot bg-orange-500 ring-4 ring-orange-50"></span> Second Reading
-                </a>
-                <a href="#" class="sidebar-item flex items-center px-4 py-3 text-sm text-slate-500 hover:text-slate-900 hover:bg-slate-50">
-                    <span class="dot bg-amber-500 ring-4 ring-amber-50"></span> Third Reading
-                </a>
-                <a href="#" class="sidebar-item flex items-center px-4 py-3 text-sm text-slate-500 hover:text-slate-900 hover:bg-slate-50">
-                    <span class="dot bg-emerald-500 ring-4 ring-emerald-50"></span> Approved
-                </a>
-            </div>
         </nav>
 
-        <div class="p-6 m-4 bg-slate-50 rounded-2xl border border-slate-100">
-            <div class="flex items-center gap-3 mb-4">
-                <div class="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center text-indigo-600 font-bold border border-slate-200 uppercase">
+        <!-- USER CARD -->
+        <div id="userCard" class="p-4 m-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-3 transition-all">
+            <div class="flex items-center gap-3 min-w-0">
+                <div class="user-avatar w-9 h-9 rounded-xl bg-indigo-600 shadow-sm flex items-center justify-center text-white text-sm font-black border border-indigo-500 uppercase shrink-0">
                     {{ user.username|slice:":1" }}
                 </div>
-                
-                <div class="min-w-0">
-                    <p class="text-sm font-bold text-slate-800 truncate">{{ user.username }}</p>
-                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{{ user.role }}</p>
+                <div class="sidebar-user-info min-w-0">
+                    <p class="text-sm font-bold text-slate-800 truncate whitespace-nowrap">{{ user.username }}</p>
+                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider whitespace-nowrap">{{ user.role }}</p>
                 </div>
             </div>
-            <form action="{% url 'logout' %}" method="post">
+            <form action="{% url 'logout' %}" method="post" class="sidebar-label">
                 {% csrf_token %}
-                <button type="submit" class="flex items-center justify-center w-full py-2.5 bg-white border border-slate-200 text-[11px] font-bold text-rose-500 hover:bg-rose-50 hover:border-rose-100 transition-all rounded-xl uppercase tracking-widest">
-                    <i class="fas fa-sign-out-alt mr-2"></i> Log Out
+                <button type="submit"
+                    class="flex items-center justify-center w-full py-2 bg-white border border-slate-200 text-[11px] font-bold text-rose-500 hover:bg-rose-50 hover:border-rose-100 transition-all rounded-xl uppercase tracking-widest whitespace-nowrap">
+                    <i class="fas fa-sign-out-alt mr-2"></i>
+                    <span class="sidebar-logout-text">Log Out</span>
                 </button>
             </form>
         </div>
@@ -116,7 +382,7 @@
 
     <!-- MAIN AREA -->
     <main class="flex-1 flex flex-col min-w-0">
-        <header class="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-10 shrink-0">
+        <header class="h-16 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-10 shrink-0">
             <div class="flex items-center gap-4">
                 <span class="text-slate-300">|</span>
                 <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Legislative Tracking System</h2>
@@ -135,26 +401,49 @@
     </main>
 
     <script>
-        // SIDEBAR SCROLL PERSISTENCE
-        document.addEventListener("DOMContentLoaded", function() {
-            const sidebarNav = document.getElementById('sidebar-nav');
-            const savedScroll = sessionStorage.getItem('sidebar-scroll');
-            if (savedScroll) sidebarNav.scrollTop = savedScroll;
+        // ── Collapse toggle ──────────────────────────────────────
+        const sidebar    = document.getElementById('sidebar');
+        const icon       = document.getElementById('collapseIcon');
+        const STORAGE_KEY = 'sidebar-collapsed';
 
-            sidebarNav.addEventListener('scroll', () => {
-                sessionStorage.setItem('sidebar-scroll', sidebarNav.scrollTop);
+        function toggleSidebar() {
+            const isCollapsed = sidebar.classList.toggle('collapsed');
+            icon.style.transform = isCollapsed ? 'rotate(180deg)' : 'rotate(0deg)';
+            localStorage.setItem(STORAGE_KEY, isCollapsed ? '1' : '0');
+        }
+
+        // Restore state on load
+        document.addEventListener('DOMContentLoaded', function () {
+            if (localStorage.getItem(STORAGE_KEY) === '1') {
+                sidebar.classList.add('collapsed');
+                icon.style.transform = 'rotate(180deg)';
+            }
+
+            // Scroll persistence
+            const nav = document.getElementById('sidebar-nav');
+            const savedScroll = sessionStorage.getItem('sidebar-scroll');
+            if (savedScroll) nav.scrollTop = parseInt(savedScroll);
+            nav.addEventListener('scroll', () => {
+                sessionStorage.setItem('sidebar-scroll', nav.scrollTop);
             });
         });
 
-        // PREVENT PAGE CACHE / BACK BUTTON ISSUES
-        window.addEventListener("pageshow", function (event) {
-            var historyTraversal = event.persisted || 
-                                   (typeof window.performance != "undefined" && 
-                                    window.performance.navigation.type === 2);
-            if (historyTraversal) {
+        // ── Back button fix ──────────────────────────────────────
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted || (typeof window.performance !== 'undefined' &&
+                window.performance.navigation.type === 2)) {
                 window.location.reload();
             }
         });
+
+        // ── Committee dropdown ───────────────────────────────────
+        function toggleDropdown(id) {
+            const dropdown = document.getElementById(id);
+            const chevron  = document.getElementById('chevronIcon');
+            dropdown.classList.toggle('hidden');
+            if (chevron) chevron.style.transform = dropdown.classList.contains('hidden')
+                ? 'rotate(0deg)' : 'rotate(180deg)';
+        }
     </script>
 </body>
 </html>

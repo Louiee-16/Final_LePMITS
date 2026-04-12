@@ -1,0 +1,484 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
+
+<div class="max-w-[1800px] mx-auto px-4 py-6">
+
+    <!-- HEADER -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-slate-100 pb-5 gap-4">
+        <div class="flex items-center gap-4">
+            <a href="javascript:history.back()" class="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-all shadow-sm">
+                <i class="fas fa-arrow-left text-xs"></i>
+            </a>
+            <div>
+                <nav class="flex text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 gap-2 mb-1">
+                    <a href="{% url 'dashboard' %}" class="hover:text-indigo-600 transition-colors">Legislative</a>
+                    <span class="text-slate-200">/</span>
+                    <span class="text-indigo-600">Draft from Barangay Document</span>
+                </nav>
+                <h1 class="text-xl font-extrabold text-slate-900 tracking-tight leading-tight max-w-2xl">{{ doc.title }}</h1>
+                <p class="text-[10px] text-slate-400 font-medium mt-1">
+                    Submitted by <span class="font-black text-slate-600">{{ doc.origin_barangay.barangay_name }}</span>
+                    — {{ doc.created_at|date:"M d, Y" }}
+                </p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3 shrink-0">
+            <span id="autosaveStatus" class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest hidden">
+                <i class="fas fa-check-circle mr-1"></i> Synced
+            </span>
+            <span id="autosaveSaving" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden">
+                <i class="fas fa-circle-notch fa-spin mr-1"></i> Saving...
+            </span>
+            <button form="draftForm" type="submit" name="action" value="save"
+                class="px-5 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-50 hover:text-indigo-600 transition-all shadow-sm">
+                <i class="fas fa-save mr-2"></i> Save Draft
+            </button>
+            <button type="button" onclick="openSubmitModal()"
+                class="px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all">
+                <i class="fas fa-paper-plane mr-2"></i> File Official Draft
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN SPLIT PANEL -->
+    <form id="draftForm" method="POST" action="{%url 'create-referred-draft' doc.id%}">
+        {% csrf_token %}
+        <input type="hidden" name="action" id="formAction" value="save">
+        <input type="hidden" name="doc_id" id="doc_id_field" value="{{ existing_draft.id|default:'' }}">
+
+        <!-- Panel wrapper — CSS grid driven by JS class -->
+        <div id="panelWrapper"
+             class="grid rounded-[2rem] overflow-hidden border border-slate-200 shadow-sm panel-normal"
+             style="height: calc(100vh - 210px); min-height: 580px;">
+
+            <!-- ── LEFT: PDF PANEL ───────────────────────────── -->
+            <div id="pdfPanel" class="flex flex-col border-r border-slate-200 bg-white overflow-hidden transition-all duration-300">
+
+                <!-- PDF panel header -->
+                <div class="px-5 py-3.5 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between shrink-0">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <div class="w-2 h-2 rounded-full bg-slate-300 shrink-0"></div>
+                        <span id="pdfLabel" class="text-[10px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap overflow-hidden">
+                            Barangay Source Document
+                        </span>
+                    </div>
+
+                    <!-- Controls -->
+                    <div id="pdfControls" class="flex items-center gap-1.5 shrink-0 ml-2">
+                        <!-- Collapse -->
+                        <button type="button" onclick="collapsePanel()"
+                            title="Collapse PDF panel"
+                            class="panel-btn text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                            id="collapseBtn">
+                            <i class="fas fa-chevron-left text-[10px]"></i>
+                        </button>
+                        <!-- Expand -->
+                        <button type="button" onclick="expandPanel()"
+                            title="Expand PDF panel"
+                            class="panel-btn text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                            id="expandBtn">
+                            <i class="fas fa-chevron-right text-[10px]"></i>
+                        </button>
+                        <!-- Open in new tab -->
+                        <a href="{% url 'barangay-document-modal' barangay_doc_id=doc.id %}"
+                            target="_blank"
+                            title="Open full screen"
+                            class="panel-btn text-slate-400 hover:text-indigo-600 hover:bg-indigo-50">
+                            <i class="fas fa-arrow-up-right-from-square text-[10px]"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Collapsed state — just a restore button -->
+                <div id="collapsedState" class="hidden flex-1 flex flex-col items-center justify-center gap-4 py-8 px-2">
+                    <div class="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center">
+                        <i class="fas fa-file-pdf text-slate-400 text-sm"></i>
+                    </div>
+                    <p class="text-[9px] font-black uppercase tracking-widest text-slate-400 [writing-mode:vertical-lr] rotate-180">
+                        Barangay PDF
+                    </p>
+                    <button type="button" onclick="restorePanel()"
+                        class="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-500 hover:bg-indigo-100 transition-all"
+                        title="Restore PDF panel">
+                        <i class="fas fa-chevron-right text-[10px]"></i>
+                    </button>
+                </div>
+
+                <!-- PDF iframe -->
+                <div id="pdfContent" class="flex-1 overflow-hidden bg-slate-50">
+                    <iframe
+                        src="{% url 'barangay-document-modal' barangay_doc_id=doc.id %}"
+                        class="w-full h-full border-0"
+                        title="Barangay source document">
+                    </iframe>
+                </div>
+            </div>
+
+            <!-- ── RIGHT: EDITOR PANEL ───────────────────────── -->
+            <div class="flex flex-col bg-white overflow-hidden">
+
+                <!-- Editor header -->
+                <div class="px-6 py-3.5 border-b border-slate-100 flex items-center justify-between shrink-0">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-2 h-2 rounded-full bg-indigo-400"></div>
+                        <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">Legislative Draft</span>
+                    </div>
+                    <span id="wordCount" class="text-[9px] font-bold text-slate-300 uppercase tracking-widest">0 words</span>
+                </div>
+
+                <!-- Title -->
+                <div class="px-6 pt-5 pb-3 border-b border-slate-50 shrink-0">
+                    <label class="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">Legislative Title</label>
+                    <textarea name="title" id="titleInput" rows="2"
+                        placeholder="An Ordinance/Resolution providing for..."
+                        class="title-textarea w-full px-4 py-3 border border-slate-200 rounded-xl font-extrabold text-slate-800 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 transition-all resize-none overflow-hidden leading-snug placeholder:font-normal placeholder:text-slate-300"
+                        >{{ existing_draft.title|default:'' }}</textarea>
+                </div>
+
+                <!-- Doc type -->
+                <div class="px-6 py-3 border-b border-slate-50 flex items-center gap-3 shrink-0">
+
+                    <label class="doc-type-label">
+                        <input type="radio" name="type" value="RESOLUTION"
+                            {% if existing_draft.doc_type == 'RESOLUTION' %}checked{% endif %} class="hidden">
+                        <span class="type-pill {% if existing_draft.doc_type == 'RESOLUTION' %}active{% endif %}">
+                            <i class="fas fa-file-circle-check text-[9px] mr-1"></i> Resolution
+                        </span>
+                    </label>
+
+                    <!-- Committee selector -->
+                    <select name="referred_committee"
+                        class="ml-auto px-3 py-1.5 border border-slate-200 rounded-xl text-[10px] font-bold text-slate-600 bg-white outline-none focus:border-indigo-300 transition-all">
+                        <option value="">— No Committee —</option>
+                        {% for committee in committees %}
+                            <option value="{{ committee.id }}"
+                                {% if existing_draft.referred_committee_id == committee.id %}selected{% endif %}>
+                                {{ committee.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Quill -->
+                <div class="flex-1 overflow-hidden flex flex-col">
+                    <div id="draftEditor" style="flex:1; min-height: 0;"></div>
+                    <textarea name="content" id="contentField" class="hidden">{{ existing_draft.content|default:'' }}</textarea>
+                </div>
+            </div>
+
+        </div>
+    </form>
+</div>
+
+
+<!-- SUBMIT MODAL -->
+<div id="submitModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+    <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="closeSubmitModal()"></div>
+    <div class="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-md p-8 modal-card">
+
+        <div class="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center mb-6">
+            <i class="fas fa-paper-plane text-emerald-500 text-xl"></i>
+        </div>
+
+        <h2 class="text-lg font-black text-slate-900 tracking-tight mb-2">File as Official Draft</h2>
+        <p class="text-sm text-slate-500 font-medium leading-relaxed mb-6">
+            This will officially file the draft and assign it a reference number.
+            <span class="text-slate-700 font-bold">This action cannot be undone.</span>
+        </p>
+
+        <div class="bg-slate-50 rounded-2xl border border-slate-100 p-5 mb-6 space-y-3">
+            <p class="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-3">Before proceeding, confirm:</p>
+            <label class="flex items-start gap-3 cursor-pointer group">
+                <input type="checkbox" id="scheck1" class="mt-0.5 w-4 h-4 accent-emerald-500 shrink-0" onchange="checkSubmitReady()">
+                <span class="text-xs text-slate-600 font-medium group-hover:text-slate-800 transition-colors">The legislative title has been properly written.</span>
+            </label>
+            <label class="flex items-start gap-3 cursor-pointer group">
+                <input type="checkbox" id="scheck2" class="mt-0.5 w-4 h-4 accent-emerald-500 shrink-0" onchange="checkSubmitReady()">
+                <span class="text-xs text-slate-600 font-medium group-hover:text-slate-800 transition-colors">The draft content is complete and reviewed.</span>
+            </label>
+            <label class="flex items-start gap-3 cursor-pointer group">
+                <input type="checkbox" id="scheck3" class="mt-0.5 w-4 h-4 accent-emerald-500 shrink-0" onchange="checkSubmitReady()">
+                <span class="text-xs text-slate-600 font-medium group-hover:text-slate-800 transition-colors">The document type is correctly selected.</span>
+            </label>
+        </div>
+
+        <div class="flex gap-3">
+            <button type="button" onclick="closeSubmitModal()"
+                class="flex-1 px-5 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-all">
+                Cancel
+            </button>
+            <button type="button" id="submitConfirmBtn" disabled onclick="confirmSubmit()"
+                class="flex-1 px-5 py-3 bg-emerald-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none">
+                <i class="fas fa-paper-plane mr-2"></i> Confirm & File
+            </button>
+        </div>
+    </div>
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
+<script>
+    // ── Panel state ──────────────────────────────────────────────
+    // States: 'normal' (50/50), 'collapsed' (pdf ~56px), 'expanded' (pdf 65%)
+    const wrapper       = document.getElementById('panelWrapper');
+    const pdfContent    = document.getElementById('pdfContent');
+    const collapsedState = document.getElementById('collapsedState');
+    const pdfLabel      = document.getElementById('pdfLabel');
+    const collapseBtn   = document.getElementById('collapseBtn');
+    const expandBtn     = document.getElementById('expandBtn');
+
+    let panelState = localStorage.getItem('barangay-panel-state') || 'normal';
+
+    function applyState(state) {
+        panelState = state;
+        localStorage.setItem('barangay-panel-state', state);
+
+        wrapper.classList.remove('panel-normal', 'panel-collapsed', 'panel-expanded');
+        wrapper.classList.add(`panel-${state}`);
+
+        if (state === 'collapsed') {
+            pdfContent.classList.add('hidden');
+            collapsedState.classList.remove('hidden');
+            collapsedState.classList.add('flex');
+            pdfLabel.classList.add('hidden');
+            collapseBtn.classList.add('opacity-30', 'pointer-events-none');
+            expandBtn.classList.remove('opacity-30', 'pointer-events-none');
+        } else {
+            pdfContent.classList.remove('hidden');
+            collapsedState.classList.add('hidden');
+            collapsedState.classList.remove('flex');
+            pdfLabel.classList.remove('hidden');
+            collapseBtn.classList.remove('opacity-30', 'pointer-events-none');
+
+            if (state === 'expanded') {
+                expandBtn.classList.add('opacity-30', 'pointer-events-none');
+            } else {
+                expandBtn.classList.remove('opacity-30', 'pointer-events-none');
+            }
+        }
+    }
+
+    function collapsePanel() {
+        applyState(panelState === 'normal' ? 'collapsed' : 'normal');
+    }
+    function expandPanel() {
+        applyState(panelState === 'normal' ? 'expanded' : 'normal');
+    }
+    function restorePanel() {
+        applyState('normal');
+    }
+
+    // Apply saved state on load
+    applyState(panelState);
+
+
+    // ── Quill ────────────────────────────────────────────────────
+    const quill = new Quill('#draftEditor', {
+        theme: 'snow',
+        placeholder: 'WHEREAS, ...',
+        modules: {
+            toolbar: [
+                [{ 'header': [1, 2, 3, false] }],
+                ['bold', 'italic', 'underline', 'strike'],
+                [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                [{ 'indent': '-1' }, { 'indent': '+1' }],
+                ['blockquote'], ['clean']
+            ]
+        }
+    });
+
+    const existingContent = document.getElementById('contentField').value;
+    if (existingContent) quill.root.innerHTML = existingContent;
+
+    document.getElementById('draftForm').addEventListener('submit', function () {
+        document.getElementById('contentField').value = quill.root.innerHTML;
+    });
+
+    // Word count
+    quill.on('text-change', () => {
+        const text  = quill.getText().trim();
+        const words = text ? text.split(/\s+/).filter(w => w).length : 0;
+        document.getElementById('wordCount').textContent = `${words} word${words !== 1 ? 's' : ''}`;
+        triggerAutosave();
+    });
+
+    // ── Auto-grow title ──────────────────────────────────────────
+    const titleInput = document.getElementById('titleInput');
+    function autoGrow(el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+    titleInput.addEventListener('input', () => { autoGrow(titleInput); triggerAutosave(); });
+    autoGrow(titleInput);
+
+    // ── Autosave ─────────────────────────────────────────────────
+    const docIdField   = document.getElementById('doc_id_field');
+    const statusSaved  = document.getElementById('autosaveStatus');
+    const statusSaving = document.getElementById('autosaveSaving');
+    let autosaveTimer  = null;
+
+    function triggerAutosave() {
+        clearTimeout(autosaveTimer);
+        autosaveTimer = setTimeout(serverSync, 3000);
+    }
+
+    function serverSync() {
+        const title   = titleInput.value.trim();
+        const content = quill.root.innerHTML.trim();
+        if (!title && content === '<p><br></p>') return;
+
+        statusSaving.classList.remove('hidden');
+        statusSaved.classList.add('hidden');
+
+        fetch("{% url 'autosave_draft' %}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({
+                title: title || 'Untitled Draft',
+                content: content,
+                doc_id: docIdField.value || null
+            })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'saved') {
+                docIdField.value = data.doc_id;
+                statusSaving.classList.add('hidden');
+                statusSaved.classList.remove('hidden');
+                setTimeout(() => statusSaved.classList.add('hidden'), 3000);
+            }
+        })
+        .catch(() => statusSaving.classList.add('hidden'));
+    }
+
+    // ── Doc type pills ───────────────────────────────────────────
+    document.querySelectorAll('.doc-type-label input').forEach(radio => {
+        radio.addEventListener('change', () => {
+            document.querySelectorAll('.type-pill').forEach(p => p.classList.remove('active'));
+            radio.nextElementSibling.classList.add('active');
+            triggerAutosave();
+        });
+    });
+    document.querySelector('.doc-type-label input:checked')?.nextElementSibling.classList.add('active');
+
+    // ── Submit modal ─────────────────────────────────────────────
+    function openSubmitModal() {
+        ['scheck1','scheck2','scheck3'].forEach(id => document.getElementById(id).checked = false);
+        document.getElementById('submitConfirmBtn').disabled = true;
+        document.getElementById('submitModal').classList.replace('hidden', 'flex');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeSubmitModal() {
+        document.getElementById('submitModal').classList.replace('flex', 'hidden');
+        document.body.style.overflow = '';
+    }
+    function checkSubmitReady() {
+        const all = ['scheck1','scheck2','scheck3'].every(id => document.getElementById(id).checked);
+        document.getElementById('submitConfirmBtn').disabled = !all;
+    }
+    function confirmSubmit() {
+        document.getElementById('contentField').value = quill.root.innerHTML;
+        document.getElementById('formAction').value = 'submit';
+        document.getElementById('draftForm').submit();
+    }
+
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') closeSubmitModal();
+    });
+</script>
+
+<style>
+    /* ── Panel grid states ───────────────────────────── */
+    #panelWrapper {
+        display: grid;
+        transition: grid-template-columns 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Normal — 50/50 */
+    .panel-normal  { grid-template-columns: 1fr 1fr; }
+
+    /* Collapsed — PDF strip ~56px */
+    .panel-collapsed { grid-template-columns: 56px 1fr; }
+
+    /* Expanded — PDF takes 65% */
+    .panel-expanded  { grid-template-columns: 65fr 35fr; }
+
+    /* ── Panel control buttons ───────────────────────── */
+    .panel-btn {
+        width: 26px;
+        height: 26px;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s ease;
+        flex-shrink: 0;
+    }
+
+    /* ── Quill ───────────────────────────────────────── */
+    .ql-toolbar.ql-snow {
+        border: none !important;
+        border-bottom: 1px solid #f1f5f9 !important;
+        background: #f8fafc;
+        padding: 8px 16px !important;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    .ql-container.ql-snow {
+        border: none !important;
+        font-size: 13px;
+        font-family: Georgia, serif;
+        overflow-y: auto;
+        flex: 1;
+    }
+    #draftEditor {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        overflow: hidden;
+    }
+    #draftEditor .ql-editor {
+        padding: 24px 32px !important;
+        line-height: 1.9;
+        color: #1e293b;
+        min-height: 100%;
+    }
+    #draftEditor > .ql-container { flex: 1; overflow-y: auto; }
+    .ql-editor.ql-blank::before { color: #94a3b8; font-style: italic; }
+
+    /* ── Title textarea ──────────────────────────────── */
+    .title-textarea {
+        font-size: 1rem;
+        min-height: 56px;
+        transition: border-color 0.15s, box-shadow 0.15s, height 0s;
+    }
+
+    /* ── Doc type pills ──────────────────────────────── */
+    .type-pill {
+        display: inline-block;
+        padding: 5px 12px;
+        border-radius: 10px;
+        font-size: 10px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        cursor: pointer;
+        border: 1.5px solid #e2e8f0;
+        color: #94a3b8;
+        transition: all 0.15s ease;
+        background: white;
+        white-space: nowrap;
+    }
+    .type-pill:hover { border-color: #c7d2fe; color: #6366f1; }
+    .type-pill.active { background: #eef2ff; border-color: #6366f1; color: #4f46e5; }
+
+    /* ── Modal ───────────────────────────────────────── */
+    .modal-card { animation: modalIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
+    @keyframes modalIn {
+        from { opacity: 0; transform: scale(0.92) translateY(12px); }
+        to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+</style>
+{% endblock %}

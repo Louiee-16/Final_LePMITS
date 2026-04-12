@@ -1,0 +1,344 @@
+{% load static %} 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LePMITS | San Juan City Citizen Portal</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --brand-red: #b31d1d;
+            --dark-blue: #002b5c;
+            --accent-orange: #f39c12;
+            --bg-light: #f8fafc;
+            --text-main: #1e293b;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-light);
+            color: var(--text-main);
+            line-height: 1.6;
+        }
+
+        /* 1. Utility Bar */
+        .utility-bar {
+            background-color: #001f42;
+            color: rgba(255,255,255,0.8);
+            height: 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 5%;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .utility-links a {
+            color: white;
+            text-decoration: none;
+            margin-left: 20px;
+            transition: 0.3s;
+        }
+
+        .utility-links a:hover { color: var(--accent-orange); }
+
+        /* 2. Navigation */
+        nav {
+            background-color: var(--dark-blue);
+            height: 90px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 5%;
+            color: white;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+
+        .nav-logo { height: 60px; width: auto; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); }
+
+        .brand-text {
+            border-left: 2px solid rgba(255,255,255,0.3);
+            padding-left: 20px;
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            line-height: 1;
+        }
+
+        .brand-text span {
+            display: block;
+            font-size: 10px;
+            color: var(--accent-orange);
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            margin-top: 5px;
+        }
+
+        .nav-menu a {
+            color: white;
+            text-decoration: none;
+            margin-left: 25px;
+            text-transform: uppercase;
+            font-size: 13px;
+            font-weight: 700;
+            transition: 0.3s;
+        }
+
+        .nav-menu a:hover { color: var(--accent-orange); }
+
+        /* 3. Hero Section */
+    .hero {
+        position: relative;
+        height: 80vh;
+        /* Using the variable correctly */
+        background: linear-gradient(rgba(0,43,92,0.7), rgba(0,43,92,0.8)), 
+                    url("{%static 'images/gavel.png'%}") no-repeat center center;
+        background-size: cover;
+        display: flex;
+        align-items: center;
+        padding: 0 5%;
+    }
+
+        .hero-content {
+            max-width: 800px;
+            color: white;
+            animation: fadeInUp 1s ease-out;
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .hero-content h1 {
+            font-family: 'Libre Baskerville', serif;
+            font-size: clamp(32px, 5vw, 64px);
+            line-height: 1.1;
+            margin-bottom: 25px;
+            text-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        .hero-content p {
+            font-size: 1.2rem;
+            margin-bottom: 40px;
+            opacity: 0.9;
+            font-weight: 300;
+            max-width: 600px;
+        }
+
+        /* Improved Search Bar */
+        .search-box {
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(10px);
+            padding: 10px;
+            border-radius: 15px;
+            display: flex;
+            max-width: 600px;
+            border: 1px solid rgba(255,255,255,0.2);
+            margin-bottom: 30px;
+        }
+
+        .search-box input {
+            flex: 1;
+            padding: 15px 20px;
+            border: none;
+            background: white;
+            border-radius: 10px 0 0 10px;
+            font-size: 16px;
+            font-family: inherit;
+        }
+
+        .search-box button {
+            background: var(--accent-orange);
+            border: none;
+            padding: 0 30px;
+            border-radius: 0 10px 10px 0;
+            color: white;
+            font-weight: 800;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .search-box button:hover { background: #d6890a; }
+
+        /* Buttons */
+        .btn-group { display: flex; gap: 15px; align-items: center; }
+
+        .cta-primary {
+            background: var(--brand-red);
+            color: white;
+            padding: 16px 32px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 14px;
+            letter-spacing: 1px;
+            transition: 0.3s;
+            box-shadow: 0 10px 20px rgba(179,29,29,0.3);
+        }
+
+        .cta-primary:hover { transform: translateY(-3px); box-shadow: 0 15px 25px rgba(179,29,29,0.4); }
+
+        .cta-secondary {
+            color: white;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 14px;
+            text-transform: uppercase;
+            border-bottom: 2px solid var(--accent-orange);
+            padding-bottom: 4px;
+        }
+
+        /* 4. Quick Services Section */
+        .services-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+            padding: 80px 5%;
+            margin-top: -60px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .service-card {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            transition: 0.3s;
+            text-align: center;
+            border: 1px solid #f1f5f9;
+        }
+
+        .service-card:hover { transform: translateY(-10px); border-color: var(--accent-orange); }
+
+        .service-card i {
+            font-size: 40px;
+            color: var(--dark-blue);
+            margin-bottom: 20px;
+        }
+
+        .service-card h3 { margin-bottom: 15px; font-weight: 800; color: var(--dark-blue); }
+
+        /* 5. Chat Widget */
+        .chat-toggle {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 60px;
+            height: 60px;
+            background: var(--dark-blue);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            z-index: 1000;
+        }
+
+        @media (max-width: 768px) {
+            nav { padding: 0 20px; height: 70px; }
+            .nav-menu { display: none; }
+            .brand-text { font-size: 16px; }
+            .hero { height: auto; padding: 100px 20px; }
+            .services-grid { margin-top: 0; padding-top: 40px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="utility-bar">
+        <div>
+            <i class="fas fa-wheelchair"></i> Accessibility 
+            <span style="margin: 0 15px; opacity: 0.3">|</span>
+            <i class="fas fa-globe"></i> English
+        </div>
+        <div class="utility-links">
+            <a href="#">Track Status</a>
+            <a href="#">Contact Us</a>
+            <a href="/login" style="color: var(--accent-orange);">LePMITS Login <i class="fas fa-lock"></i></a>
+        </div>
+    </div>
+
+    <nav>
+        <div class="nav-left">
+            <img src="{% static 'images/makabagongsanjuan.png' %}" alt="San Juan Seal" class="nav-logo">
+            <div class="brand-text">
+                SAN JUAN CITY
+                <span>Makabago at Progresibo</span>
+        
+            </div>
+        </div>
+        <div class="nav-menu">
+            <a href="#">Government</a>
+            <a href="#">Legislative</a>
+            <a href="#">E-Services</a>
+            <a href="#">Transparency</a> 
+        </div>
+    </nav>
+
+    <section class="hero">
+        <div class="hero-content">
+            <h1>San Juan Legislative <br>& Permits Portal</h1>
+            <p>Empowering citizens with real-time access to legislative records, document tracking, and digital city services.</p>
+            
+            <div class="search-box">
+                <input type="text" placeholder="Search Ordinances, Resolutions, or Permits...">
+                <button><i class="fas fa-search"></i> Search</button>
+            </div>
+
+            <div class="btn-group">
+                <a href="#" class="cta-primary">Register Account</a>
+                <a href="#" class="cta-secondary">Learn How it Works</a>
+            </div>
+        </div>
+    </section>
+
+    <div class="services-grid">
+        <div class="service-card">
+            <i class="fas fa-gavel"></i>
+            <h3>Ordinance Tracking</h3>
+            <p>Browse and search through the latest city ordinances and local resolutions.</p>
+        </div>
+        <div class="service-card">
+            <i class="fas fa-file-invoice"></i>
+            <h3>E-Permits</h3>
+            <p>Apply for and monitor the status of your barangay and city business permits.</p>
+        </div>
+        <div class="service-card">
+            <i class="fas fa-users-viewfinder"></i>
+            <h3>Public Engagement</h3>
+            <p>View the city council's session agenda and find your elected officials.</p>
+        </div>
+    </div>
+
+    <footer style="background: #00152e; color: white; padding: 60px 5%; text-align: center;">
+        <img src="{% static '/images/gavel.png' %}" style="height: 50px; margin-bottom: 20px;">
+        <p style="font-size: 14px; opacity: 0.6;">&copy; 2023 City Government of San Juan - LePMITS System. All Rights Reserved.</p>
+    </footer>
+
+    <div class="chat-toggle">
+        <i class="fas fa-comment-dots"></i>
+    </div>
+
+</body>
+</html>

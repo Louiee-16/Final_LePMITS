@@ -1,0 +1,231 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+    
+    <!-- ── BREADCRUMBS & TITLE ── -->
+    <div class="mb-10">
+        <nav class="flex text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 gap-2 mb-3">
+            <a href="{% url 'dashboard' %}" class="hover:text-indigo-600 transition-colors">Infrastructure</a>
+            <span>/</span>
+            <a href="" class="hover:text-indigo-600 transition-colors">Identity Management</a>
+            <span>/</span>
+            <span class="text-indigo-600">Provision Account</span>
+        </nav>
+        <div class="flex justify-between items-end">
+            <div>
+                <h1 class="text-4xl font-[900] text-slate-900 tracking-tight">New System Identity</h1>
+                <p class="text-slate-500 mt-2 font-medium">Provision a new verified account for the San Juan Legislative Portal.</p>
+            </div>
+            <div class="hidden md:block text-right">
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Security Level</p>
+                <div class="flex items-center gap-1.5 justify-end">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span class="text-xs font-bold text-slate-700">Standard SSL Encryption</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <form method="POST" action="{%url 'create-user'%}" class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {% csrf_token %}
+
+        <!-- ── LEFT COLUMN: ACCOUNT CONFIGURATION (4/12) ── -->
+        <div class="lg:col-span-4 space-y-6">
+            
+            <!-- Account Portrait Section -->
+            <div class="bg-white rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50 p-8 text-center relative overflow-hidden group">
+                <div class="absolute top-0 left-0 w-full h-2 bg-indigo-600"></div>
+                
+                <div class="relative inline-block group">
+                    <div class="w-32 h-32 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 flex items-center justify-center text-slate-300 mb-4 transition-all group-hover:border-indigo-300 group-hover:bg-indigo-50/30">
+                        <i class="fas fa-user-plus text-3xl transition-transform group-hover:scale-110"></i>
+                    </div>
+                    <label for="avatar" class="absolute bottom-6 right-0 w-8 h-8 bg-indigo-600 text-white rounded-xl flex items-center justify-center shadow-lg cursor-pointer hover:bg-indigo-700 transition-all">
+                        <i class="fas fa-camera text-[10px]"></i>
+                    </label>
+                    <input type="file" id="avatar" class="hidden">
+                </div>
+                
+                <h3 class="font-bold text-slate-800">Identity Image</h3>
+                <p class="text-[10px] text-slate-400 uppercase font-black tracking-widest mt-1">Optional Portrait</p>
+            </div>
+
+            <!-- Role & Permission Section -->
+            <div class="bg-white rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50 p-8 space-y-6">
+                <div class="flex items-center gap-3 border-b border-slate-50 pb-4">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <h3 class="font-bold text-slate-800">Authorization</h3>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Administrative Role</label>
+                        <select name="role" id="roleSelect" onchange="toggleCouncilFields()" 
+                            class="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-600 transition-all appearance-none cursor-pointer">
+                            <option value="STAFF">Administrative Staff</option>
+                            <option value="SECRETARIAT">Legislative Secretariat</option>
+                            <option value="COUNCILOR">City Councilor</option>
+                            <option value="BARANGAY">Barangay Administrator</option>
+                            <option value="ADMIN">System Administrator</option>
+                        </select>
+                    </div>
+
+                    <!-- San Juan Specific: District Toggle -->
+                    <div id="districtField" class="hidden animate-in fade-in slide-in-from-top-2 duration-300">
+                        <div class="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 space-y-3">
+                            <label class="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Constituent District</label>
+                            <div class="flex gap-2">
+                                <label class="flex-1">
+                                    <input type="radio" name="district" value="1" class="hidden peer" checked>
+                                    <div class="text-center py-2 bg-white border border-indigo-100 rounded-xl text-xs font-black text-indigo-400 peer-checked:bg-indigo-600 peer-checked:text-white peer-checked:border-indigo-600 transition-all cursor-pointer">DISTRICT I</div>
+                                </label>
+                                <label class="flex-1">
+                                    <input type="radio" name="district" value="2" class="hidden peer">
+                                    <div class="text-center py-2 bg-white border border-indigo-100 rounded-xl text-xs font-black text-indigo-400 peer-checked:bg-indigo-600 peer-checked:text-white peer-checked:border-indigo-600 transition-all cursor-pointer">DISTRICT II</div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
+                        <div>
+                            <p class="text-xs font-bold text-slate-700">Account Access</p>
+                            <p class="text-[9px] text-slate-400 uppercase font-bold tracking-tight">Immediate Login Permitted</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" name="is_active" class="sr-only peer" checked>
+                            <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── RIGHT COLUMN: IDENTITY DATA (8/12) ── -->
+        <div class="lg:col-span-8 space-y-6">
+            
+            <!-- Personal Data Card -->
+            <div class="bg-white rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50 p-10 space-y-8">
+                <div class="flex items-center gap-3 border-b border-slate-50 pb-6">
+                    <div class="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center text-sm shadow-lg">
+                        <i class="fas fa-id-card"></i>
+                    </div>
+                    <h3 class="text-xl font-black text-slate-800 tracking-tight">Personal Profile</h3>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Legal Given Name</label>
+                        <input type="text" name="first_name" required placeholder="e.g. Maria" 
+                            class="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl text-sm font-medium focus:ring-2 focus:ring-indigo-600 outline-none transition-all">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Legal Surname</label>
+                        <input type="text" name="last_name" required placeholder="e.g. Santos" 
+                            class="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl text-sm font-medium focus:ring-2 focus:ring-indigo-600 outline-none transition-all">
+                    </div>
+                    <div class="md:col-span-2 space-y-2">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Institutional Email Address</label>
+                        <div class="relative">
+                            <i class="fas fa-envelope absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 text-sm"></i>
+                            <input type="email" name="email" required placeholder="name@sanjuancity.gov.ph" 
+                                class="w-full pl-14 pr-6 py-4 bg-slate-50 border-none rounded-2xl text-sm font-medium focus:ring-2 focus:ring-indigo-600 outline-none transition-all">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Credentials Card -->
+            <div class="bg-white rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50 p-10 space-y-8">
+                <div class="flex items-center gap-3 border-b border-slate-50 pb-6">
+                    <div class="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center text-sm shadow-lg">
+                        <i class="fas fa-key"></i>
+                    </div>
+                    <h3 class="text-xl font-black text-slate-800 tracking-tight">Access Credentials</h3>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="md:col-span-2 space-y-2">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Username Identifier</label>
+                        <input type="text" name="username" required placeholder="sj_msantos" 
+                            class="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-600 outline-none transition-all font-mono">
+                    </div>
+                    
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Password</label>
+                        <input type="password" name="password" id="password" required 
+                            oninput="confirmPassword()"
+                            class="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-600 outline-none transition-all">
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Verify Password</label>
+                        <input type="password" name="confirm_password" id="verifyPassword" required 
+                            oninput="confirmPassword()"
+                            class="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-600 outline-none transition-all">
+
+                        <p id="passError" class="text-xs text-rose-500 hidden">
+                            Passwords do not match
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Info Alert -->
+                <div class="p-5 bg-indigo-900 rounded-3xl flex gap-5 items-center">
+                    <div class="w-10 h-10 rounded-xl bg-indigo-800 flex items-center justify-center text-indigo-400 shrink-0">
+                        <i class="fas fa-info text-xs"></i>
+                    </div>
+                    <p class="text-[11px] text-indigo-200 leading-relaxed font-medium">
+                        <span class="text-white font-bold uppercase tracking-widest">Security Policy:</span> 
+                        Account will be flagged for mandatory password update upon initial authentication. 
+                        Ensure the user receives their provisional credentials via secure communication.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center justify-end gap-6 pt-4">
+                <button type="reset" class="text-xs font-black text-slate-400 uppercase tracking-widest hover:text-rose-500 transition-colors">Clear Data</button>
+                <button type="submit" 
+                    class="group relative px-12 py-5 bg-indigo-600 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-indigo-200 hover:bg-indigo-700 hover:-translate-y-1 transition-all overflow-hidden">
+                    <span class="relative z-10"> Create</span>
+                    <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+function confirmPassword() {
+    const pass = document.getElementById('password').value;
+    const verpass = document.getElementById('verifyPassword').value;
+    const error = document.getElementById('passError');
+
+    if (verpass === "") {
+        error.classList.add('hidden');
+        return;
+    }
+
+    if (pass !== verpass) {
+        error.classList.remove('hidden');
+    } else {
+        error.classList.add('hidden');
+    }
+}
+
+function toggleCouncilFields() {
+    const role = document.getElementById('roleSelect').value;
+    const districtField = document.getElementById('districtField');
+
+    if (role === 'COUNCILOR') {
+        districtField.classList.remove('hidden');
+    } else {
+        districtField.classList.add('hidden');
+    }
+}
+</script>
+{% endblock %}

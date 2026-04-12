@@ -1,0 +1,125 @@
+<link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+
+<!-- TOOLBAR -->
+<div class="max-w-4xl mx-auto px-4 pt-6 pb-2 no-print">
+    <div class="flex justify-between items-center">
+
+        <div class="flex items-center gap-3">
+            <!-- Status badge -->
+            <span class="px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest
+                {% if doc.status == 'DRAFT' %}bg-slate-100 text-slate-500
+                {% elif doc.status == 'FILED' %}bg-blue-50 text-blue-600
+                {% elif doc.status == 'FIRST_READING' %}bg-amber-50 text-amber-600
+                {% elif doc.status == 'REFERRED' %}bg-orange-50 text-orange-500
+                {% elif doc.status == 'COMMITTEE' %}bg-yellow-50 text-yellow-600
+                {% elif doc.status == 'SECOND_READING' %}bg-violet-50 text-violet-600
+                {% elif doc.status == 'THIRD_READING' %}bg-purple-50 text-purple-600
+                {% elif doc.status == 'APPROVED' %}bg-emerald-50 text-emerald-600
+                {% else %}bg-slate-100 text-slate-500{% endif %}">
+                {{ doc.status }}
+            </span>
+
+            <!-- Print -->
+            <button onclick="window.print()"
+                class="px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2">
+                <i class="fas fa-print text-slate-400"></i> Print
+            </button>
+
+            <!-- Download PDF -->
+            <a href="" target="_blank"
+                class="px-4 py-2.5 bg-slate-900 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-700 transition-all shadow-sm flex items-center gap-2">
+                <i class="fas fa-file-pdf"></i> Download PDF
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- PAPER WRAPPER -->
+<div class="max-w-4xl mx-auto px-4 py-6" id="documentPaper">
+    <div class="paper bg-white shadow-xl border border-slate-200 mx-auto relative" style="max-width: 816px; padding: 72px 88px;">
+        <!-- LETTERHEAD + TITLE + BODY -->
+        <div class="text-center mb-6">
+            <p class="letterhead-line">Republic of the Philippines</p>
+            <p class="letterhead-line font-semibold">City of San Juan, Metro Manila</p>
+            <p class="letterhead-line">Office of the Sangguniang Panlungsod</p>
+        </div>
+
+        <div class="border-t border-slate-400 my-4"></div>
+
+        <div class="text-center mb-3">
+            <p class="text-[13px] font-black uppercase tracking-wide text-slate-900">
+                {% if doc.status != 'APPROVED' %}Draft {% endif %}
+                {% if doc.doc_type == 'ORDINANCE' %}Ordinance No. {% else %}Resolution No. {% endif %}{{ doc.ref_number }}
+            </p>
+            <p class="text-[11px] text-slate-500 mt-0.5">Series of {{ doc.created_at|date:"Y" }}</p>
+        </div>
+
+        <div class="text-center my-6 px-4">
+            <p class="doc-title">{{ doc.title }}</p>
+        </div>
+
+        <!-- Sponsored by -->
+        <div class="border border-slate-500 px-6 py-4 mb-7 text-center">
+            <p class="text-[11px] text-slate-500 mb-1.5">Sponsored by:</p>
+            <div class="text-[12px] font-semibold text-slate-800">
+                {% if doc.author.councilor_profile %}
+                    {{ doc.author.councilor_profile.name }}
+                {% else %}
+                    Hon. {{ doc.author.last_name }}, {{ doc.author.first_name }}
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Body -->
+        <div class="ql-editor doc-body" style="position:static; white-space:normal; padding:0;">
+            {{ doc.content|safe }}
+        </div>
+
+        <!-- Closing / signatures -->
+        <div class="mt-16 mb-14">
+            <p class="doc-closing-line">
+                {% if doc.doc_type == 'ORDINANCE' %}Approved: ___________________________
+                {% else %}Adopted: ___________________________{% endif %}
+            </p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-16">
+            <div class="text-center">
+                <div class="sig-line"></div>
+                <p class="sig-name">
+                    {% if doc.author.councilor_profile %}{{ doc.author.councilor_profile.name }}
+                    {% else %}Hon. {{ doc.author.last_name }}, {{ doc.author.first_name }}{% endif %}
+                </p>
+                <p class="sig-title">City Councilor</p>
+            </div>
+            <div class="text-center">
+                <div class="sig-line"></div>
+                <p class="sig-name sig-empty">— Co-signatory —</p>
+                <p class="sig-title">City Councilor</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Paper + Typography */
+.paper { font-family: 'EB Garamond', Georgia, serif; color: #111; line-height: 1.75; }
+.letterhead-line { font-size: 11px; color: #4b5563; line-height: 1.6; }
+.doc-title { font-size: 13px; font-weight: 700; text-transform: uppercase; color: #111; line-height: 1.7; letter-spacing: 0.02em; }
+.doc-closing-line { font-size: 12px; font-weight: 700; text-transform: uppercase; color: #1e293b; }
+.sig-line { border-bottom: 1px solid #1e293b; margin-bottom: 8px; margin-top: 56px; }
+.sig-name { font-size: 11px; font-weight: 800; text-transform: uppercase; color: #111; letter-spacing: 0.03em; }
+.sig-title { font-size: 10px; color: #6b7280; margin-top: 2px; }
+.sig-empty { color: #9ca3af; font-weight: 400; font-style: italic; text-transform: none; }
+.doc-body.ql-editor { font-family: 'EB Garamond', Georgia, serif !important; font-size: 12.5px !important; line-height: 1.8 !important; color: #111 !important; }
+.doc-body.ql-editor p, .doc-body.ql-editor li { font-size: 12.5px; margin-bottom: 4px; }
+.doc-body.ql-editor strong { font-weight: 700; }
+.doc-body.ql-editor ol, .doc-body.ql-editor ul { padding-left: 2em; }
+/* Print styles */
+@media print {
+    .no-print { display: none !important; }
+    body { background: white !important; }
+    .paper { box-shadow: none !important; border: none !important; margin: 0 !important; max-width: 100% !important; padding: 60px 80px !important; }
+}
+</style>

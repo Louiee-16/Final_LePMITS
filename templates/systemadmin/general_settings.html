@@ -1,0 +1,186 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-8">
+
+    <!-- ── FORM START ── -->
+    <form method="POST" enctype="multipart/form-data" id="settingsForm">
+        {% csrf_token %}
+
+        <!-- ── HEADER ── -->
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-6 mb-8">
+            <div>
+                <nav class="flex text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 gap-2 mb-2">
+                    <a href="{% url 'dashboard' %}" class="hover:text-indigo-600 transition-colors">Admin</a>
+                    <span>/</span>
+                    <span class="text-indigo-600">General Settings</span>
+                </nav>
+                <h1 class="text-3xl font-black text-slate-900 tracking-tight">System Configuration</h1>
+                <p class="text-slate-500 mt-1 font-medium">Global parameters and legislative branding.</p>
+            </div>
+            <div class="flex gap-3">
+                <button type="reset" class="px-6 py-2.5 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-all">
+                    Discard
+                </button>
+                <button type="submit" class="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all">
+                    Save Changes
+                </button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            
+            <!-- ── SIDE NAVIGATION (TABS) ── -->
+            <div class="lg:col-span-1 space-y-1">
+                <button type="button" onclick="switchTab('branding')" class="tab-btn w-full text-left px-4 py-3 rounded-xl text-sm font-bold flex items-center gap-3 transition-all bg-indigo-50 text-indigo-600 border border-indigo-100" id="tab-branding">
+                    <i class="fas fa-certificate w-5 text-center"></i> Official Branding
+                </button>
+                <button type="button" onclick="switchTab('legislative')" class="tab-btn w-full text-left px-4 py-3 rounded-xl text-sm font-bold flex items-center gap-3 transition-all text-slate-500 hover:bg-slate-50" id="tab-legislative">
+                    <i class="fas fa-gavel w-5 text-center"></i> Legislative Setup
+                </button>
+                <button type="button" onclick="switchTab('notifications')" class="tab-btn w-full text-left px-4 py-3 rounded-xl text-sm font-bold flex items-center gap-3 transition-all text-slate-500 hover:bg-slate-50" id="tab-notifications">
+                    <i class="fas fa-envelope-open-text w-5 text-center"></i> Notifications
+                </button>
+                <button type="button" onclick="switchTab('security')" class="tab-btn w-full text-left px-4 py-3 rounded-xl text-sm font-bold flex items-center gap-3 transition-all text-slate-500 hover:bg-slate-50" id="tab-security">
+                    <i class="fas fa-shield-alt w-5 text-center"></i> Maintenance
+                </button>
+            </div>
+
+            <!-- ── SETTINGS CONTENT ── -->
+            <div class="lg:col-span-3 space-y-6">
+
+                <!-- 1. BRANDING SECTION -->
+                <div id="section-branding" class="settings-section space-y-6">
+                    <div class="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+                        <h3 class="text-lg font-black text-slate-800 border-b border-slate-50 pb-4">Official Document Header</h3>
+                        
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Republic Line</label>
+                            <input type="text" name="republic_name" value="{{ settings.republic_name }}" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">City/Location Line</label>
+                            <input type="text" name="city_name" value="{{ settings.city_name }}" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Office Name</label>
+                            <input type="text" name="office_name" value="{{ settings.office_name }}" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
+                        </div>
+
+                        <!-- Logo Upload -->
+                        <div class="pt-4">
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">System Logo</label>
+                            <div class="mt-2 flex items-center gap-6 p-4 border-2 border-dashed border-slate-100 rounded-2xl">
+                                {% if settings.system_logo %}
+                                    <img src="{{ settings.system_logo.url }}" class="w-20 h-20 object-contain rounded-xl">
+                                {% else %}
+                                    <div class="w-20 h-20 bg-slate-50 rounded-xl flex items-center justify-center text-slate-300">
+                                        <i class="fas fa-image text-2xl"></i>
+                                    </div>
+                                {% endif %}
+                                <div class="flex flex-col gap-1">
+                                    <input type="file" name="system_logo" class="text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100">
+                                    <p class="text-[9px] text-slate-400 uppercase font-bold mt-1">PNG or JPG. Max 2MB.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. LEGISLATIVE SECTION -->
+                <div id="section-legislative" class="settings-section hidden space-y-6">
+                    <div class="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+                        <h3 class="text-lg font-black text-slate-800 border-b border-slate-50 pb-4">Legislative Setup</h3>
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Current Council Number</label>
+                            <input type="number" name="council_number" value="{{ settings.current_council_number }}" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Default Session Venue</label>
+                            <textarea name="default_venue" rows="3" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20">{{ settings.default_venue }}</textarea>
+                        </div>
+
+                        <div class="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
+                            <div>
+                                <p class="text-sm font-bold text-slate-700">Auto-increment Reference Numbers</p>
+                                <p class="text-[10px] text-slate-400 uppercase font-bold tracking-tight">Enable automatic ordinance numbering</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" name="auto_increment" class="sr-only peer" checked>
+                                <div class="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. NOTIFICATIONS SECTION (Placeholder) -->
+                <div id="section-notifications" class="settings-section hidden space-y-6">
+                    <div class="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
+                        <h3 class="text-lg font-black text-slate-800 border-b border-slate-50 pb-4">Notifications</h3>
+                        <p class="text-sm text-slate-500 py-4">Configure email alerts and system notifications for Councilors and staff.</p>
+                    </div>
+                </div>
+
+                <!-- 4. SECURITY & MAINTENANCE -->
+                <div id="section-security" class="settings-section hidden space-y-6">
+                    <div class="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+                        <h3 class="text-lg font-black text-slate-800 border-b border-slate-50 pb-4">System Maintenance</h3>
+                        
+                        <div class="p-6 bg-rose-50 border border-rose-100 rounded-2xl flex items-start gap-4">
+                            <i class="fas fa-exclamation-triangle text-rose-500 mt-1"></i>
+                            <div>
+                                <p class="text-sm font-bold text-rose-700">Maintenance Mode</p>
+                                <p class="text-xs text-rose-600 mb-4">Enabling this will prevent all non-admin users from accessing the system.</p>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" name="maintenance_mode" class="sr-only peer" {% if settings.maintenance_mode %}checked{% endif %}>
+                                    <div class="w-11 h-6 bg-slate-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-600"></div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="pt-4">
+                            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Database Tools</p>
+                            <a href="{% url 'trigger-backup' %}" class="w-full p-4 border border-slate-100 rounded-2xl flex items-center justify-between hover:bg-slate-50 transition-all group">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
+                                        <i class="fas fa-download"></i>
+                                    </div>
+                                    <div class="text-left">
+                                        <p class="text-sm font-bold text-slate-700">Database Backup</p>
+                                        <p class="text-[10px] text-slate-400 font-bold uppercase">Download current database snapshot (.json)</p>
+                                    </div>
+                                </div>
+                                <i class="fas fa-chevron-right text-slate-300 group-hover:text-indigo-600 transition-colors"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+    function switchTab(tabId) {
+        // Hide all sections
+        document.querySelectorAll('.settings-section').forEach(section => {
+            section.classList.add('hidden');
+        });
+        
+        // Remove active styles from all buttons
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.remove('bg-indigo-50', 'text-indigo-600', 'border', 'border-indigo-100');
+            btn.classList.add('text-slate-500');
+        });
+
+        // Show selected section
+        document.getElementById('section-' + tabId).classList.remove('hidden');
+        
+        // Add active styles to clicked button
+        const activeBtn = document.getElementById('tab-' + tabId);
+        activeBtn.classList.remove('text-slate-500');
+        activeBtn.classList.add('bg-indigo-50', 'text-indigo-600', 'border', 'border-indigo-100');
+    }
+</script>
+{% endblock %}

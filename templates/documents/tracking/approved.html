@@ -1,0 +1,171 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="w-full mx-auto space-y-10">
+
+    <!-- PAGE HEADER -->
+    <div class="flex justify-between items-end pb-4 border-b border-slate-100">
+        <div>
+            <nav class="flex text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 gap-2 mb-3">
+                <a href="{% url 'dashboard' %}" class="hover:text-indigo-600 transition-colors">Legislative</a>
+                <span>/</span>
+                <span class="text-emerald-600">Approved Registry</span>
+            </nav>
+            <h1 class="text-4xl font-[900] text-slate-900 tracking-tight">Legislative Archive</h1>
+            <p class="text-slate-500 mt-1 font-medium italic">Official Record of Enacted Ordinances and Approved Resolutions.</p>
+        </div>
+
+        <!-- Yearly Statistics -->
+        <div class="flex gap-4">
+            <div class="px-6 py-3 bg-white border border-slate-200 rounded-2xl shadow-sm">
+                <p class="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Enacted Ordinances</p>
+                <div class="flex items-center gap-3">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <p class="text-xl font-black text-slate-800">{{ ordinances_count }}</p>
+                </div>
+            </div>
+            <div class="px-6 py-3 bg-white border border-slate-200 rounded-2xl shadow-sm">
+                <p class="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Approved Resolutions</p>
+                <div class="flex items-center gap-3">
+                    <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                    <p class="text-xl font-black text-slate-800">{{ resolutions_count }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JS SEARCH BAR (REPLACED BACKEND FILTER) -->
+    <div class="flex justify-between items-center bg-slate-50 p-4 rounded-3xl border border-slate-100">
+        <div class="flex gap-4 w-full">
+
+            <!-- Search -->
+            <div class="relative flex-1">
+                <i class="fas fa-search absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 text-xs"></i>
+                <input 
+                    type="text" 
+                    id="searchInput"
+                    placeholder="Search by title or councilor..."
+                    class="w-full pl-12 pr-6 py-3 bg-white border-none rounded-2xl text-sm font-medium shadow-sm focus:ring-2 focus:ring-emerald-500 transition-all">
+            </div>
+            <select id="yearInput" class="px-5 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none text-sm">
+                <option value="">All Years</option>
+                {% for date in available_years %}
+                    <option value="{{ date.year }}">{{ date.year }}</option>
+                {% endfor %}
+            </select>
+
+
+            <!-- Clear -->
+            <button onclick="resetSearch()"
+                class="bg-slate-200 text-slate-600 px-6 py-3 rounded-2xl text-xs font-bold hover:bg-slate-300 transition-all">
+                Clear
+            </button>
+        </div>
+    </div>
+
+    <!-- DATA TABLE -->
+    <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+        <table class="w-full text-left">
+            <thead class="bg-slate-50 border-b border-slate-100">
+                <tr>
+                    <th class="px-10 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Date Enacted</th>
+                    <th class="px-10 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Official Number</th>
+                    <th class="px-10 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Title of Legislation</th>
+                    <th class="px-10 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Sponsor</th>
+                    <th class="px-10 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400 text-right">Actions</th>
+                </tr>
+            </thead>
+
+            <!-- IMPORTANT: added id -->
+            <tbody id="documentTable" class="divide-y divide-slate-50">
+                {% for doc in approved %}
+                <tr class="hover:bg-emerald-50/20 transition-colors group">
+
+                    <td class="px-10 py-6 text-sm text-slate-500 whitespace-nowrap">
+                        {{ doc.updated_at|date:"M d, Y" }}
+                    </td>
+
+                    <td class="px-10 py-6">
+                        <span class="text-xs font-black {% if doc.doc_type == 'ORDINANCE' %}text-emerald-700 bg-emerald-50 border-emerald-100{% else %}text-blue-700 bg-blue-50 border-blue-100{% endif %} px-4 py-1.5 rounded-xl border uppercase tracking-widest">
+                            {{ doc.reference_no }}
+                        </span>
+                    </td>
+
+                    <td class="px-10 py-6">
+                        <div class="max-w-md">
+                            <p class="text-sm font-extrabold text-slate-800 leading-snug group-hover:text-emerald-700 transition-colors line-clamp-3">
+                                {{ doc.title }}
+                            </p>
+                        </div>
+                    </td>
+
+                    <td class="px-10 py-6 text-sm font-medium text-slate-700 whitespace-nowrap"data-author="{{doc.author.get_councilor_name|lower}}">
+                        Hon. {{ doc.author.get_councilor_name }}
+                    </td>
+
+                    <td class="px-10 py-6 text-right">
+                        <div class="flex items-center justify-end gap-3">
+                            <a href="{%url 'document-history' doc.id%}" 
+                               class="w-10 h-10 flex items-center justify-center text-slate-300 hover:text-indigo-600 hover:bg-white hover:shadow-md border border-transparent hover:border-slate-100 rounded-xl transition-all">
+                                <i class="fas fa-history text-xs"></i>
+                            </a>
+
+                            <a href="{% url 'download_official_pdf' doc.id %}" 
+                                class="px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-700 hover:-translate-y-0.5 transition-all">
+                                <i class="fas fa-file-pdf mr-1.5"></i> Download Official
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="p-20 text-center">
+                        <div class="inline-flex items-center justify-center w-20 h-20 bg-slate-50 rounded-3xl mb-6 border border-slate-100">
+                            <i class="fas fa-folder-open text-3xl text-slate-200"></i>
+                        </div>
+                        <p class="text-slate-400 font-bold uppercase tracking-widest text-xs">No approved documents found</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+
+<script>
+function filterTable() {
+    const searchValue = document.getElementById("searchInput").value.toLowerCase();
+    const yearValue = document.getElementById("yearInput").value;
+
+    const rows = document.querySelectorAll("#documentTable tr");
+
+    rows.forEach(row => {
+        const date = row.children[0]?.innerText || "";
+        const title = row.children[2]?.innerText.toLowerCase() || "";
+        const author = row.children[3]?.dataset.author || "";
+
+        const year = date.slice(-4);
+
+        const matchText = title.includes(searchValue) || author.includes(searchValue);
+        const matchYear = yearValue === "" || year === yearValue;
+
+        row.style.display = (matchText && matchYear) ? "" : "none";
+    });
+}
+
+function resetSearch() {
+    document.getElementById("searchInput").value = "";
+    document.getElementById("yearInput").value = "";
+
+    const rows = document.querySelectorAll("#documentTable tr");
+    rows.forEach(row => row.style.display = "");
+}
+
+// Live search
+document.getElementById("searchInput").addEventListener("keyup", filterTable);
+document.getElementById("yearInput").addEventListener("keyup", filterTable);
+</script>
+
+{% endblock %}

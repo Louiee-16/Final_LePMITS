@@ -7,9 +7,15 @@ class User(AbstractUser):
         ('STAFF', 'Legislative Staff'),
         ('COUNCILOR', 'Councilor'),
         ('BRGY_SEC', 'Barangay Secretary'),
+        ('ADMIN', 'Admin')
     )
     role = models.CharField(max_length=20, choices=ROLES, default='STAFF')
     office_or_district = models.CharField(max_length=100, blank=True) # e.g. "District 1" or "Brgy. San Jose"
+    def get_councilor_name(self):
+        try:
+            return self.councilor_profile.name
+        except:
+            return self.username
 
     def __str__(self):
         return f"{self.username} ({self.get_role_display()})"

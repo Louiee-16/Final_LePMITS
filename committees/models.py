@@ -1,3 +1,4 @@
+#committees/models.py
 from django.db import models
 from councilors.models import Councilor
 

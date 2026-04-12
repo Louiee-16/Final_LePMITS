@@ -1,77 +1,349 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
-<div class="w-full mx-auto space-y-10">
-    <!-- HEADER -->
-    <div class="flex justify-between items-end">
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
+
+{%block toolbar%}
+<div class="no-print w-full mx-auto space-y-6 mb-8">
+
+    <!-- Page Header -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center pb-4 border-b border-slate-100 gap-4">
         <div>
-            <h1 class="text-4xl font-[900] text-slate-900 tracking-tight">Legislative Agenda</h1>
-            <p class="text-slate-500 mt-1 font-medium">Preparation of the Order of Business for the upcoming session.</p>
+            <nav class="flex text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 gap-2 mb-2">
+                <a href="{% url 'dashboard' %}" class="hover:text-indigo-600 transition-colors">Legislative</a>
+                <span>/</span>
+                <span class="text-indigo-600">Agenda</span>
+            </nav>
+            <h1 class="text-3xl font-[900] text-slate-900 tracking-tight">Order of Business</h1>
+            <p class="text-slate-500 mt-1 text-sm font-medium">
+                {% if session %}
+                    {{ session.session_number }}{% if session.session_number %}th{% endif %} Regular Session —
+                    {{ session.session_date|date:"F d, Y" }}
+                {% else %}
+                    No active session scheduled.
+                {% endif %}
+            </p>
         </div>
-        <div class="flex gap-4">
-            <button class="px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-all">
-                <i class="fas fa-print mr-2"></i> Print Agenda
-            </button>
-            <button class="px-6 py-3 bg-indigo-600 text-white rounded-2xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">
-                <i class="fas fa-calendar-plus mr-2"></i> Schedule Session
-            </button>
+
+        <div class="flex items-center gap-3">
+
+            <a href = "{%url 'finalize'%}"
+                class="px-5 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2">
+                <i class="fas fa-save text-slate-400"></i> Finalize
+            </a>
+    
+        {%if next_session_date != session.session_date %}
+            <a href="{%url 'send-agenda-email' session.id%}"
+                class="px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all flex items-center gap-2">
+                <i class="fas fa-envelope"></i> Send to Councilors
+            </a>
+            <a href="{%url 'download' session.id %}"
+                class="px-5 py-2.5 bg-slate-900 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-700 transition-all flex items-center gap-2">
+                <i class="fas fa-file-pdf"></i> Download PDF
+            </a>
+        {%endif%}
         </div>
     </div>
 
-    <!-- SESSION INFO CARD -->
-    <div class="bg-[#1e1b4b] rounded-[2.5rem] p-10 text-white shadow-2xl relative overflow-hidden">
-        <div class="absolute right-0 top-0 w-64 h-64 bg-indigo-500 opacity-10 rounded-full blur-3xl"></div>
-        <div class="relative z-10 flex flex-col md:flex-row justify-between items-center">
-            <div>
-                <p class="text-indigo-300 text-xs font-bold uppercase tracking-[0.3em] mb-2">Current Active Session</p>
-                <h2 class="text-5xl font-black tracking-tighter">{{ session.session_date|date:"F d, Y"|default:"No Active Session" }}</h2>
-                <p class="text-indigo-200 mt-2 font-medium"><i class="far fa-clock mr-2"></i> Scheduled for {{ session.session_time|default:"--:--" }}</p>
-            </div>
-            <div class="mt-8 md:mt-0 px-8 py-4 bg-white/5 rounded-3xl border border-white/10 backdrop-blur-md text-center">
-                <p class="text-[10px] font-bold uppercase tracking-widest text-indigo-300 mb-1">Items for Discussion</p>
-                <p class="text-4xl font-black">{{ agenda_items.count|default:"0" }}</p>
-            </div>
+    <!-- Session stats -->
+    {% if session %}
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 text-center">
+            <p class="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">First Reading</p>
+            <p class="text-2xl font-black text-blue-600">{{ first_reading|length }}</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 text-center">
+            <p class="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Committee Reports</p>
+            <p class="text-2xl font-black text-purple-600">{{ committee_reports|length }}</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 text-center">
+            <p class="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Second Reading</p>
+            <p class="text-2xl font-black text-orange-500">{{ second_reading|length }}</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 text-center">
+            <p class="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Third Reading</p>
+            <p class="text-2xl font-black text-emerald-600">{{ third_reading|length }}</p>
         </div>
     </div>
+    {% endif %}
+</div>
+{%endblock%}
+<!-- ═══════════════════════════════════════════════
+     THE OFFICIAL DOCUMENT (screen + print)
+════════════════════════════════════════════════ -->
+{% block official %}
+<div id="agendaDocument" class="agenda-paper bg-white border border-slate-200 shadow-xl mx-auto"
+     style="max-width: 816px; font-family: 'EB Garamond', 'Times New Roman', Georgia, serif;">
 
-    <!-- AGENDA ITEMS TABLE -->
-    <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
-        <div class="px-10 py-8 border-b border-slate-50 flex justify-between items-center">
-            <h3 class="font-extrabold text-slate-900 text-xl tracking-tight">Order of Business</h3>
-            <button class="text-xs font-bold text-indigo-600 uppercase tracking-widest hover:bg-indigo-50 px-4 py-2 rounded-xl transition-all">Add Item to Agenda</button>
+    <div class="px-16 py-14">
+
+        <!-- OFFICIAL HEADER -->
+        <div class="text-center mb-8">
+            <p class="text-[12px] font-bold uppercase tracking-widest">Republic of the Philippines</p>
+            <p class="text-[12px]">City of San Juan, Metro Manila</p>
+            <p class="text-[11px] text-slate-500">-o0o-</p>
+            <p class="text-[15px] font-black uppercase tracking-widest mt-1">Office of the Sangguniang Panlungsod</p>
         </div>
-        <table class="w-full text-left">
-            <thead class="bg-slate-50/50 text-[11px] uppercase tracking-widest text-slate-400">
-                <tr>
-                    <th class="px-10 py-5 font-extrabold">Seq.</th>
-                    <th class="px-10 py-5 font-extrabold">Reference</th>
-                    <th class="px-10 py-5 font-extrabold">Title / Measure</th>
-                    <th class="px-10 py-5 font-extrabold text-right">Action</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-50">
-                {% for item in agenda_items %}
-                <tr class="hover:bg-indigo-50/30 transition-colors">
-                    <td class="px-10 py-6 text-sm font-black text-slate-300">{{ forloop.counter }}</td>
-                    <td class="px-10 py-6 text-sm font-bold text-indigo-600">{{ item.reference_no }}</td>
-                    <td class="px-10 py-6">
-                        <p class="text-sm font-extrabold text-slate-800 leading-tight">{{ item.title }}</p>
-                        <p class="text-[10px] text-slate-400 mt-1 uppercase font-bold">{{ item.author.last_name }}</p>
-                    </td>
-                    <td class="px-10 py-6 text-right">
-                        <button class="text-slate-300 hover:text-rose-500 transition-colors"><i class="fas fa-times-circle"></i></button>
-                    </td>
-                </tr>
+
+        <!-- ORDER OF BUSINESS title -->
+        <div class="text-center mb-6">
+            <p class="text-[14px] font-black uppercase tracking-wider border-b-2 border-t-2 border-slate-800 py-2 inline-block px-8">
+                Order of Business
+            </p>
+        </div>
+
+        <!-- Session header paragraph -->
+        <div class="text-center mb-10">
+            <p class="text-[12px] leading-relaxed uppercase font-bold tracking-wide">
+                For the
+                {% if session.session_number %}{{ session.session_number }}{% if session.session_number == 1 %}st{% elif session.session_number == 2 %}nd{% elif session.session_number == 3 %}rd{% else %}th{% endif %}{% endif %}
+                Regular Session of the
+                {% if session.council_number %}{{ session.council_number }}{% if session.council_number == 1 %}st{% elif session.council_number == 2 %}nd{% elif session.council_number == 3 %}rd{% else %}th{% endif %}{% endif %}
+                City Council of the City Government of San Juan, Metro Manila
+                on {{ session.session_date|date:"F d, Y"|upper }},
+                {{ session.session_time|default:"10:00 A.M." }}
+                at the Session Hall, Room 214 of City of San Juan Government Center
+            </p>
+        </div>
+
+        <!-- ── CEREMONIAL ITEMS ───────────────────────── -->
+        <div class="space-y-3 mb-8">
+
+            <div class="agenda-item">
+                <span class="agenda-num">I.</span>
+                <span class="agenda-text"><strong>INVOCATION</strong>
+                    {% if session.invocation_by %}of {{ session.invocation_by }}{% endif %}
+                </span>
+            </div>
+
+            <div class="agenda-item">
+                <span class="agenda-num">II.</span>
+                <span class="agenda-text"><strong>NATIONAL ANTHEM AND SAN JUAN HYMN</strong></span>
+            </div>
+
+            <div class="agenda-item">
+                <span class="agenda-num">III.</span>
+                <span class="agenda-text"><strong>CALL TO ORDER</strong></span>
+            </div>
+
+            <div class="agenda-item">
+                <span class="agenda-num">IV.</span>
+                <span class="agenda-text"><strong>ROLL CALL</strong></span>
+            </div>
+
+            <div class="agenda-item">
+                <span class="agenda-num">V.</span>
+                <span class="agenda-text"><strong>PRIVILEGE SPEECH</strong></span>
+            </div>
+
+            <div class="agenda-item">
+                <span class="agenda-num">VI.</span>
+                <span class="agenda-text">
+                    <strong>READING AND APPROVAL OF THE MINUTES AND JOURNAL OF THE
+                    {% if session.previous_session_date %}
+                        REGULAR SESSION HELD ON {{ session.previous_session_date|date:"F d, Y"|upper }}.
+                    {% else %}
+                        PREVIOUS REGULAR SESSION.
+                    {% endif %}
+                    </strong>
+                </span>
+            </div>
+
+        </div>
+
+        <!-- ── BUSINESS OF THE DAY ────────────────────── -->
+        <div class="agenda-item mb-4">
+            <span class="agenda-num">VII.</span>
+            <span class="agenda-text"><strong>BUSINESS OF THE DAY</strong></span>
+        </div>
+
+        <!-- A. FIRST READING -->
+        <div class="ml-10 mb-6">
+            <p class="text-[12px] font-black uppercase underline mb-3">A. First Reading:</p>
+            {% for doc in first_reading %}
+            <div class="mb-4 ml-4">
+                <p class="text-[12px] font-bold">
+                    {{ forloop.counter }}.
+                    {% if doc.doc_type == 'ORDINANCE' %}DRAFT ORDINANCE{% else %}DRAFT RESOLUTION{% endif %}
+                    NO. {{ doc.reference_no|default:doc.id }}
+                    sponsored by
+                    {% if doc.author.councilor_profile %}{{ doc.author.councilor_profile.name }}{% else %}{{ doc.author.get_full_name }}{% endif %}
+                </p>
+                <p class="text-[12px] ml-4 mt-1 uppercase leading-snug">{{ doc.title }}</p>
+                {% if doc.referred_committee %}
+                <p class="text-[11px] ml-4 mt-1 italic">
+                    Committee{{ doc.referred_committee|pluralize }} on {{ doc.referred_committee.name }}
+                </p>
+                {% endif %}
+            </div>
+            {% empty %}
+            <p class="text-[11px] text-slate-400 italic ml-4">No items for First Reading.</p>
+            {% endfor %}
+        </div>
+
+        <!-- B. COMMITTEE REPORTS -->
+        <div class="ml-10 mb-6">
+            <p class="text-[12px] font-black uppercase underline mb-3">B. Committee Reports:</p>
+            {% for report in committee_reports %}
+            <div class="mb-4 ml-4">
+                <p class="text-[12px] font-bold">
+                    {{ forloop.counter }}.
+                    {% if report.original_doc.doc_type == 'ORDINANCE' %}DRAFT ORDINANCE{% else %}DRAFT RESOLUTION{% endif %}
+                    NO. {{ report.reference_no|default:report.original_doc.reference_no }}
+                    sponsored by the Committee on {{ report.original_doc.referred_committee.name }}
+                </p>
+                <p class="text-[12px] ml-4 mt-1 uppercase leading-snug">{{ report.title }}</p>
+            </div>
+            {% empty %}
+            <p class="text-[11px] text-slate-400 italic ml-4">No committee reports.</p>
+            {% endfor %}
+        </div>
+
+        <!-- C. SECOND READING -->
+        <div class="ml-10 mb-6">
+            <p class="text-[12px] font-black uppercase underline mb-3">C. Second Reading:</p>
+            {% for doc in second_reading %}
+            <div class="mb-4 ml-4">
+                <p class="text-[12px] font-bold">
+                    {{ forloop.counter }}.
+                    {% if doc.doc_type == 'ORDINANCE' %}DRAFT ORDINANCE{% else %}DRAFT RESOLUTION{% endif %}
+                    NO. {{ doc.reference_no|default:doc.id }}
+                    sponsored by
+                    {% if doc.referred_committee %}the Committee on {{ doc.referred_committee.name }}{% else %}{% if doc.author.councilor_profile %}{{ doc.author.councilor_profile.name }}{% else %}{{ doc.author.get_full_name }}{% endif %}{% endif %}
+                </p>
+                <p class="text-[12px] ml-4 mt-1 uppercase leading-snug">{{ doc.title }}</p>
+            </div>
+            {% empty %}
+            <p class="text-[11px] text-slate-400 italic ml-4">No items for Second Reading.</p>
+            {% endfor %}
+        </div>
+
+        <!-- D. THIRD READING -->
+        <div class="ml-10 mb-8">
+            <p class="text-[12px] font-black uppercase underline mb-3">D. Third Reading:</p>
+            {% for doc in third_reading %}
+            <div class="mb-4 ml-4">
+                <p class="text-[12px] font-bold">
+                    {{ forloop.counter }}.
+                    FINAL AMENDED
+                    {% if doc.doc_type == 'ORDINANCE' %}DRAFT ORDINANCE{% else %}DRAFT RESOLUTION{% endif %}
+                    NO. {{ doc.reference_no|default:doc.id }}
+                    sponsored by
+                    {% if doc.referred_committee %}the Committee on {{ doc.referred_committee.name }}{% else %}{% if doc.author.councilor_profile %}{{ doc.author.councilor_profile.name }}{% else %}{{ doc.author.get_full_name }}{% endif %}{% endif %}
+                </p>
+                <p class="text-[12px] ml-4 mt-1 uppercase leading-snug">{{ doc.title }}</p>
+            </div>
+            {% empty %}
+            <p class="text-[11px] text-slate-400 italic ml-4">No items for Third Reading.</p>
+            {% endfor %}
+        </div>
+
+        <!-- ── OTHER MATTERS ──────────────────────────── -->
+        <div class="mb-8">
+            <div class="agenda-item mb-4">
+                <span class="agenda-num">VIII.</span>
+                <span class="agenda-text"><strong>OTHER MATTERS</strong></span>
+            </div>
+            <div class="ml-10">
+                {% for item in other_matters %}
+                <div class="mb-4 ml-4">
+                    <p class="text-[12px]">
+                        {{ forloop.counter }}.
+                        {% if item.doc_type == 'ORDINANCE' %}
+                            {{ item.title }}
+                        {% else %}
+                            {{ item.title }}
+                        {% endif %}
+                    </p>
+                    <p class="text-[11px] ml-4 italic mt-0.5">For your information</p>
+                </div>
                 {% empty %}
-                <tr>
-                    <td colspan="4" class="p-20 text-center text-slate-400">
-                        <i class="fas fa-calendar-day text-4xl mb-4 block opacity-20"></i>
-                        No items have been added to this agenda yet.
-                    </td>
-                </tr>
+                <p class="text-[11px] text-slate-400 italic ml-4">No other matters.</p>
                 {% endfor %}
-            </tbody>
-        </table>
+            </div>
+        </div>
+
+        <!-- ── ADJOURNMENT ────────────────────────────── -->
+        <div class="agenda-item mb-16">
+            <span class="agenda-num">IX.</span>
+            <span class="agenda-text"><strong>ADJOURNMENT</strong></span>
+        </div>
+
+        <!-- Session adjourned line -->
+        <p class="text-[12px] ml-10">Session is adjourned at ________</p>
+
     </div>
 </div>
+
+{% endblock %}
+
+
+<style>
+    /* ── Agenda document ─────────────────────────── */
+    .agenda-paper {
+        line-height: 1.7;
+        color: #111;
+    }
+
+    .agenda-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+        font-size: 12px;
+    }
+
+    .agenda-num {
+        min-width: 32px;
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+
+    .agenda-text {
+        flex: 1;
+        line-height: 1.6;
+    }
+
+    /* ── Print styles ────────────────────────────── */
+    @media print {
+        .no-print { display: none !important; }
+
+        body {
+            background: white !important;
+            margin: 0;
+            padding: 0;
+        }
+
+        #agendaDocument {
+            box-shadow: none !important;
+            border: none !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+        }
+
+        #agendaDocument .px-16 {
+            padding-left: 72px !important;
+            padding-right: 72px !important;
+        }
+
+        @page {
+            size: letter;
+            margin: 0.8in 1in;
+        }
+    }
+
+    /* ── Responsive ──────────────────────────────── */
+    @media (max-width: 900px) {
+        #agendaDocument .px-16 {
+            padding-left: 24px !important;
+            padding-right: 24px !important;
+        }
+        #agendaDocument .py-14 {
+            padding-top: 32px !important;
+            padding-bottom: 32px !important;
+        }
+        #agendaDocument .ml-10 { margin-left: 16px !important; }
+        #agendaDocument .ml-4  { margin-left: 8px !important; }
+    }
+</style>
 {% endblock %}

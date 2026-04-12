@@ -42,8 +42,16 @@ INSTALLED_APPS = [
     'councilors',
     'committees',
     'archives',
+    'committee_level',
+    'barangay',
+    'OfficialGazette',
+    'secretariat',
+    'systemadmin',
+    'audit',
+    
 
 ]
+
 LOGIN_REDIRECT_URL = 'dashboard'
 LOGOUT_REDIRECT_URL = 'login'
 AUTH_USER_MODEL = 'accounts.User'
@@ -55,9 +63,9 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-
-
 ]
+
+
 #for security
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 SESSION_COOKIE_AGE = 1800
@@ -76,6 +84,8 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'committees.context_processors.committees_processor',
+                'systemadmin.context_processors.system_settings',
             ],
         },
     },
@@ -133,9 +143,11 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 
-
+STATICFILES_DIRS = [
+    BASE_DIR / "static",
+]
 #################### for email function ############################
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
@@ -144,3 +156,17 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'louielouiee16@gmail.com'
 EMAIL_HOST_PASSWORD = 'ytjo acqf mmay facv'
 DEFAULT_FROM_EMAIL = 'Secretariat System <louielouiee16@gmail.com>'
+
+CKEDITOR_CONFIGS = {
+    'default': {
+        'toolbar': 'Custom',
+        'toolbar_Custom': [
+            ['Bold', 'Italic', 'Underline'],
+            ['NumberedList', 'BulletedList', '-', 'Outdent', 'Indent', '-', 'JustifyLeft', 'JustifyCenter', 'JustifyRight', 'JustifyBlock'],
+            ['Link', 'Unlink'],
+            ['RemoveFormat', 'Source']
+        ],
+        'width': '100%',
+        'height': 400,
+    },
+}

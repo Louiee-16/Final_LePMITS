@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto py-12 px-6">
+    <div class="mb-10">
+        <h1 class="text-4xl font-[900] text-slate-900 tracking-tight">Register Barangay</h1>
+        <p class="text-slate-500 mt-2 font-medium">Enter the administrative details of the new Barangay unit.</p>
+    </div>
+
+    <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl p-12">
+        <form id="enrollmentModal" method="POST" action="{% url 'add-barangay' %}" class="space-y-8">
+            {% csrf_token %}
+
+            <!-- Barangay Name -->
+            <div class="space-y-2">
+                <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">
+                    Barangay Name
+                </label>
+                <input type="text" name="barangay_name" id="barangayName" oninput="checkBarangay()" required
+                       placeholder="e.g. San Jose" 
+                       class="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 shadow-inner">
+            </div>
+
+            <!-- Punong Barangay (Captain) -->
+            <div class="space-y-2">
+                <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">
+                    Punong Barangay (Captain)
+                </label>
+                <input type="text" name="captain" required placeholder="Enter full name" 
+                       class="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 shadow-inner">
+            </div>
+
+            <!-- Email -->
+            <div class="space-y-2">
+                <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">
+                    E-mail
+                </label>
+                <input type="email" name="email" id="email" oninput="checkBarangay()" placeholder="e.g. example@gmail.com" 
+                       class="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 shadow-inner">
+            </div>
+
+       
+            <div id="barangayError" class="hidden text-red-500 mt-2">
+                This barangay with this email already exists!
+            </div>
+
+ 
+            <div class="pt-6 flex gap-4">
+                <a href="{% url 'barangay-list' %}" class="flex-1 py-4 text-center text-slate-400 font-bold text-xs uppercase tracking-widest">
+                    Cancel
+                </a>
+                <button type="submit" class="flex-[2] bg-indigo-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 shadow-xl shadow-indigo-100">
+                    Register Unit
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+let barangayTimeout = null;
+
+function checkBarangay() {
+    clearTimeout(barangayTimeout);
+
+    const barangayNameInput = document.getElementById('barangayName');
+    const emailInput = document.getElementById('email');
+
+    const barangayName = barangayNameInput.value.trim();
+    const email = emailInput.value.trim();
+
+    const error = document.getElementById('barangayError');
+    const submitBtn = document.querySelector('#enrollmentModal button[type="submit"]');
+
+    const params = new URLSearchParams();
+    if (barangayName) params.append('barangay_name', barangayName);
+    if (email) params.append('email', email);
+
+
+    if (!barangayName && !email) {
+        error.classList.add('hidden');
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        return;
+    }
+
+    barangayTimeout = setTimeout(() => {
+        fetch(`/checker?${params.toString()}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.errors.length > 0) {
+                    let messages = [];
+                    if (data.errors.includes('barangay_name')) messages.push('Barangay name already exists');
+                    if (data.errors.includes('email')) messages.push('Email already exists');
+                    error.textContent = messages.join(' and ');
+                    error.classList.remove('hidden');
+                    submitBtn.disabled = true;
+                    submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                } else {
+                    error.classList.add('hidden');
+                    submitBtn.disabled = false;
+                    submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
+            })
+            .catch(() => {
+                error.classList.add('hidden');
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            });
+    }, 300);
+}
+</script>
+{% endblock %}

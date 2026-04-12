@@ -1,0 +1,435 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
+
+<div class="max-w-[1200px] mx-auto px-4 py-8">
+
+    <!-- HEADER -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 border-b border-slate-100 pb-6 gap-4">
+        <div class="flex items-center gap-4">
+            <a href="javascript:history.back()" class="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-all shadow-sm">
+                <i class="fas fa-arrow-left text-xs"></i>
+            </a>
+            <div>
+                <nav class="flex text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 gap-2 mb-1">
+                    <a href="{% url 'dashboard' %}" class="hover:text-indigo-600 transition-colors">Legislative</a>
+                    <span class="text-slate-200">/</span>
+                    <span class="text-indigo-600">
+                        {% if draft.status == 'DRAFT' %}Edit Draft{% else %}View Document{% endif %}
+                    </span>
+                </nav>
+                <div class="flex items-center gap-3">
+                    <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">
+                        {% if draft.status == 'DRAFT' %}Editing Draft{% else %}Record #{{ draft.id }}{% endif %}
+                    </h1>
+                    <!-- Status badge -->
+                    <span class="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest
+                        {% if draft.status == 'DRAFT' %}bg-slate-100 text-slate-500
+                        {% elif draft.status == 'FILED' %}bg-blue-50 text-blue-600
+                        {% elif draft.status == 'FIRST_READING' %}bg-amber-50 text-amber-600
+                        {% elif draft.status == 'SECOND_READING' %}bg-orange-50 text-orange-600
+                        {% elif draft.status == 'THIRD_READING' %}bg-violet-50 text-violet-600
+                        {% elif draft.status == 'APPROVED' %}bg-emerald-50 text-emerald-600
+                        {% else %}bg-slate-100 text-slate-500{% endif %}">
+                        {{ draft.get_status_display }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+            {% if draft.status == 'DRAFT' %}
+                <!-- DRAFT MODE — edit actions -->
+                <span id="autosaveStatus" class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest hidden">
+                    <i class="fas fa-check-circle mr-1"></i> Synced
+                </span>
+                <span id="autosaveSaving" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden">
+                    <i class="fas fa-circle-notch fa-spin mr-1"></i> Saving...
+                </span>
+                <button form="draftEditForm" type="submit" name="action" value="save"
+                    class="px-5 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm">
+                    <i class="fas fa-save mr-2"></i> Save Draft
+                </button>
+                <button form="draftEditForm" type="submit" name="action" value="submit"
+                    class="px-5 py-3 bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all">
+                    <i class="fas fa-paper-plane mr-2"></i> File Draft
+                </button>
+            {% else %}
+                <!-- FILED / VIEW MODE — read actions only -->
+                <button onclick="window.print()"
+                    class="px-5 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm">
+                    <i class="fas fa-print mr-2"></i> Print
+                </button>
+                <a href="{% url 'generate_pdf' draft.id %}"
+                    class="px-5 py-3 bg-slate-900 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-700 transition-all">
+                    <i class="fas fa-file-pdf mr-2"></i> Export PDF
+                </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- READ-ONLY NOTICE BANNER -->
+    {% if draft.status != 'DRAFT' %}
+    <div class="mb-6 flex items-center gap-3 px-5 py-4 bg-amber-50 border border-amber-100 rounded-2xl">
+        <i class="fas fa-lock text-amber-400 text-sm"></i>
+        <p class="text-xs font-bold text-amber-700">
+            This document has been officially filed and is now <span class="uppercase">read-only</span>. 
+            It can no longer be edited.
+        </p>
+    </div>
+    {% endif %}
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+        <!-- LEFT: MAIN CONTENT -->
+        <div class="lg:col-span-8 space-y-6">
+
+            {% if draft.status == 'DRAFT' %}
+            <!-- ══════════════════════════════
+                 EDIT MODE
+            ══════════════════════════════ -->
+            <form id="draftEditForm" method="POST" action="{%url 'create_draft'%}">
+                {% csrf_token %}
+                <input type="hidden" name="doc_id" value="{{ draft.id }}">
+
+                <!-- Title — big textarea -->
+                <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8 mb-6">
+                    <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">Legislative Title</label>
+                    <textarea name="title" id="titleInput" required rows="3"
+                        class="w-full px-4 py-4 border border-slate-200 rounded-xl text-lg font-extrabold text-slate-800 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 transition-all resize-none placeholder:font-normal placeholder:text-slate-300 leading-snug"
+                        placeholder="An Ordinance/Resolution providing for...">{{ draft.title }}</textarea>
+                </div>
+
+                <!-- Content editor -->
+                <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden mb-6">
+                    <div class="px-8 py-5 border-b border-slate-100 flex items-center gap-2.5 bg-slate-50/60">
+                        <div class="w-2 h-2 rounded-full bg-indigo-400"></div>
+                        <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">Draft Content</span>
+                    </div>
+                    <div id="quillEditor"></div>
+                    <textarea name="content" id="contentField" class="hidden">{{ draft.content }}</textarea>
+                </div>
+            </form>
+
+            {% else %}
+            <!-- ══════════════════════════════
+                 VIEW MODE — paper document
+            ══════════════════════════════ -->
+            <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
+
+                <!-- Paper header -->
+                <div class="px-16 pt-14 pb-8 text-center border-b border-slate-50">
+                    <p class="text-[10px] text-slate-400 uppercase tracking-[0.3em] font-bold">Republic of the Philippines</p>
+                    <p class="text-[11px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">City of San Juan, Metro Manila</p>
+                    <p class="text-[10px] text-slate-400 uppercase tracking-[0.2em] mt-0.5 italic font-bold">Office of the Sangguniang Panlungsod</p>
+
+                    <div class="mt-8 mb-2">
+                        <p class="text-xs font-black uppercase tracking-widest text-slate-700">
+                            Draft {{ draft.doc_type|title }} No. {{ draft.reference_no|default:draft.id }}
+                        </p>
+                        <p class="text-[10px] text-slate-400 mt-1">Series of {{ draft.created_at|date:"Y" }}</p>
+                    </div>
+                    <div class="w-16 h-px bg-slate-200 mx-auto mt-6"></div>
+                </div>
+
+                <!-- Title — large display -->
+                <div class="px-16 pt-10 pb-6 text-center border-b border-slate-50">
+                    <p class="text-base font-black uppercase text-slate-900 leading-relaxed max-w-2xl mx-auto tracking-wide">
+                        {{ draft.title }}
+                    </p>
+                </div>
+
+                <!-- Sponsored by -->
+                <div class="px-16 py-6 border-b border-slate-50">
+                    <div class="border border-slate-300 px-6 py-4 text-center max-w-xl mx-auto">
+                        <p class="text-[10px] text-slate-500 mb-2 font-bold">Sponsored by:</p>
+                        <p class="text-[11px] font-bold text-slate-800">
+                            {% if draft.author.councilor_profile %}
+                                {{ draft.author.councilor_profile.name }}
+                            {% else %}
+                                Hon. {{ draft.author.last_name }}, {{ draft.author.first_name }}
+                            {% endif %}
+                            {# Add co-sponsors here #}
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Document body -->
+                <div class="px-16 py-10">
+                    <div class="ql-editor doc-body" style="position: static; white-space: normal; padding: 0; font-family: Georgia, serif; font-size: 13px; line-height: 1.9; color: #1a1a1a;">
+                        {{ draft.content|safe }}
+                    </div>
+                </div>
+
+                <!-- Closing -->
+                <div class="px-16 pb-14 pt-6 border-t border-slate-50">
+                    <p class="text-[12px] font-bold text-slate-800 uppercase mb-16">
+                        {% if draft.doc_type == 'ORDINANCE' %}Approved:{% else %}Adopted:{% endif %}
+                        _______________
+                    </p>
+                    <div class="grid grid-cols-2 gap-16">
+                        <div class="text-center">
+                            <div class="border-b border-slate-700 mb-3 mt-12"></div>
+                            <p class="text-[11px] font-black uppercase text-slate-800">
+                                {% if draft.author.councilor_profile %}{{ draft.author.councilor_profile.name }}
+                                {% else %}Hon. {{ draft.author.last_name }}, {{ draft.author.first_name }}{% endif %}
+                            </p>
+                            <p class="text-[10px] text-slate-400">City Councilor</p>
+                        </div>
+                        <div class="text-center">
+                            <div class="border-b border-slate-700 mb-3 mt-12"></div>
+                            <p class="text-[11px] font-black uppercase text-slate-400 italic">— Co-signatory —</p>
+                            <p class="text-[10px] text-slate-400">City Councilor</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- RIGHT SIDEBAR -->
+        <aside class="lg:col-span-4 space-y-6">
+
+            <!-- Measure details -->
+            <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8">
+                <h3 class="text-sm font-black uppercase tracking-widest text-slate-800 mb-6 flex items-center gap-2">
+                    <i class="fas fa-file-lines text-indigo-600"></i> Measure Details
+                </h3>
+                <div class="space-y-4 text-[11px]">
+                    <div class="flex justify-between items-center pb-3 border-b border-slate-50">
+                        <span class="text-slate-400 font-bold uppercase tracking-widest">Type</span>
+                        {% if draft.status == 'DRAFT' %}
+                        <div class="flex gap-1.5" id="typeToggle">
+                            <label class="type-pill-label">
+                                <input type="radio" name="type" value="ORDINANCE" form="draftEditForm"
+                                    {% if draft.doc_type == 'ORDINANCE' %}checked{% endif %} class="hidden">
+                                <span class="type-pill {% if draft.doc_type == 'ORDINANCE' %}active{% endif %}">Ordinance</span>
+                            </label>
+                            <label class="type-pill-label">
+                                <input type="radio" name="type" value="RESOLUTION" form="draftEditForm"
+                                    {% if draft.doc_type == 'RESOLUTION' %}checked{% endif %} class="hidden">
+                                <span class="type-pill {% if draft.doc_type == 'RESOLUTION' %}active{% endif %}">Resolution</span>
+                            </label>
+                        </div>
+                        {% else %}
+                        <span class="font-black text-slate-700 uppercase">{{ draft.doc_type }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="flex justify-between items-center pb-3 border-b border-slate-50">
+                        <span class="text-slate-400 font-bold uppercase tracking-widest">Reference No.</span>
+                        <span class="font-black text-slate-700">{{ draft.reference_no|default:"—" }}</span>
+                    </div>
+                    <div class="flex justify-between items-center pb-3 border-b border-slate-50">
+                        <span class="text-slate-400 font-bold uppercase tracking-widest">Filed On</span>
+                        <span class="font-black text-slate-700">{{ draft.created_at|date:"M d, Y" }}</span>
+                    </div>
+                    <div class="flex justify-between items-center pb-3 border-b border-slate-50">
+                        <span class="text-slate-400 font-bold uppercase tracking-widest">Last Updated</span>
+                        <span class="font-black text-slate-700">{{ draft.updated_at|date:"M d, H:i" }}</span>
+                    </div>
+                    <div class="flex justify-between items-start">
+                        <span class="text-slate-400 font-bold uppercase tracking-widest shrink-0">Author</span>
+                        <span class="font-black text-slate-700 text-right">
+                            {% if draft.author.councilor_profile %}{{ draft.author.councilor_profile.name }}
+                            {% else %}Hon. {{ draft.author.last_name }}{% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Committee -->
+            <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8">
+                <h3 class="text-sm font-black uppercase tracking-widest text-slate-800 mb-5 flex items-center gap-2">
+                    <i class="fas fa-users-rectangle text-indigo-600"></i> Committee
+                </h3>
+                {% if draft.status == 'DRAFT' %}
+                <select name="referred_committee" form="draftEditForm"
+                    class="w-full px-4 py-3 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 transition-all">
+                    <option value="">— No Committee Yet —</option>
+                    {% for committee in committees %}
+                        <option value="{{ committee.id }}"
+                            {% if draft.referred_committee_id == committee.id %}selected{% endif %}>
+                            Committee on {{ committee.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+                {% else %}
+                <div class="px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-600">
+                    {% if draft.referred_committee %}
+                        <i class="fas fa-users-rectangle mr-2 text-slate-300"></i>
+                        Committee on {{ draft.referred_committee.name }}
+                    {% else %}
+                        <span class="text-slate-400 italic font-normal">Not yet referred</span>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Legislative path -->
+            <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8">
+                <h3 class="text-sm font-black uppercase tracking-widest text-slate-800 mb-6 flex items-center gap-2">
+                    <i class="fas fa-route text-indigo-600"></i> Legislative Path
+                </h3>
+                {% with statuses="DRAFT,FILED,FIRST_READING,REFERRED,COMMITTEE,SECOND_READING,THIRD_READING,APPROVED" %}
+                
+                <div class="space-y-4 relative before:absolute before:left-[10px] before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-100">
+                    {% for s in draft.STATUS_CHOICES %}
+                    {% if s.0 != 'GHOST' %}
+                    <div class="flex items-center gap-4 relative">
+                        <div class="w-5 h-5 rounded-full border-4 border-white shadow-sm shrink-0 z-10
+                            {% if draft.status == s.0 %}bg-indigo-500
+                            {% elif draft.status > s.0 %}bg-emerald-400
+                            {% else %}bg-slate-200{% endif %}">
+                        </div>
+                        <p class="text-[10px] font-black uppercase tracking-widest
+                            {% if draft.status == s.0 %}text-indigo-600
+                            {% elif draft.status > s.0 %}text-emerald-500
+                            {% else %}text-slate-300{% endif %}">
+                            {{ s.1 }}
+                        </p>
+                        {% if draft.status == s.0 %}
+                        <span class="ml-auto text-[8px] font-black uppercase tracking-widest text-indigo-400 bg-indigo-50 px-2 py-0.5 rounded-full">Now</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+                {% endwith %}
+                
+            </div>
+
+            <!-- Draft mode hint -->
+            {% if draft.status == 'DRAFT' %}
+            <div class="bg-slate-50 rounded-[2rem] border border-slate-100 p-6">
+                <p class="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-3">What happens next?</p>
+                <div class="space-y-3">
+                    <div class="flex items-start gap-3">
+                        <div class="w-5 h-5 rounded-full bg-white border border-slate-200 flex items-center justify-center shrink-0 mt-0.5">
+                            <i class="fas fa-save text-[8px] text-slate-400"></i>
+                        </div>
+                        <p class="text-[11px] text-slate-500 font-medium leading-snug"><span class="font-black text-slate-700">Save Draft</span> — stays private, editable anytime.</p>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <div class="w-5 h-5 rounded-full bg-indigo-100 border border-indigo-200 flex items-center justify-center shrink-0 mt-0.5">
+                            <i class="fas fa-paper-plane text-[8px] text-indigo-500"></i>
+                        </div>
+                        <p class="text-[11px] text-slate-500 font-medium leading-snug"><span class="font-black text-slate-700">File Draft</span> — officially submitted, gets a reference number, locked for editing.</p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+        </aside>
+    </div>
+</div>
+
+
+{% if draft.status == 'DRAFT' %}
+<script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
+<script>
+    // ── Quill ────────────────────────────────────────────────────
+    const quill = new Quill('#quillEditor', {
+        theme: 'snow',
+        placeholder: 'WHEREAS, ...',
+        modules: {
+            toolbar: [
+                [{ 'header': [1, 2, 3, false] }],
+                ['bold', 'italic', 'underline', 'strike'],
+                [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                [{ 'indent': '-1' }, { 'indent': '+1' }],
+                ['blockquote'], ['clean']
+            ]
+        }
+    });
+
+    const existing = document.getElementById('contentField').value;
+    if (existing) quill.root.innerHTML = existing;
+
+    document.getElementById('draftEditForm').addEventListener('submit', function () {
+        document.getElementById('contentField').value = quill.root.innerHTML;
+    });
+
+    // ── Autosave ─────────────────────────────────────────────────
+    const titleInput   = document.getElementById('titleInput');
+    const statusSaved  = document.getElementById('autosaveStatus');
+    const statusSaving = document.getElementById('autosaveSaving');
+    let autosaveTimer  = null;
+
+    function triggerAutosave() {
+        clearTimeout(autosaveTimer);
+        autosaveTimer = setTimeout(serverSync, 3000);
+    }
+
+    function serverSync() {
+        const title   = titleInput.value.trim();
+        const content = quill.root.innerHTML.trim();
+        if (!title && content === '<p><br></p>') return;
+
+        statusSaving.classList.remove('hidden');
+        statusSaved.classList.add('hidden');
+
+        fetch("{% url 'autosave_draft' %}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({
+                title: title || 'Untitled Draft',
+                content: content,
+                doc_id: '{{ draft.id }}'
+            })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'saved') {
+                statusSaving.classList.add('hidden');
+                statusSaved.classList.remove('hidden');
+                setTimeout(() => statusSaved.classList.add('hidden'), 3000);
+            }
+        })
+        .catch(() => statusSaving.classList.add('hidden'));
+    }
+
+    titleInput.addEventListener('input', triggerAutosave);
+    quill.on('text-change', triggerAutosave);
+
+    // ── Type pill toggle ─────────────────────────────────────────
+    document.querySelectorAll('#typeToggle input').forEach(radio => {
+        radio.addEventListener('change', () => {
+            document.querySelectorAll('.type-pill').forEach(p => p.classList.remove('active'));
+            radio.nextElementSibling.classList.add('active');
+        });
+    });
+</script>
+{% endif %}
+
+<style>
+    /* Quill editor */
+    .ql-toolbar.ql-snow { border: none !important; border-bottom: 1px solid #f1f5f9 !important; background: #f8fafc; padding: 10px 20px !important; }
+    .ql-container.ql-snow { border: none !important; font-size: 14px; font-family: Georgia, serif; }
+    #quillEditor .ql-editor { min-height: 480px; padding: 28px 36px !important; line-height: 1.9; color: #1e293b; }
+    .ql-editor.ql-blank::before { color: #94a3b8; font-style: italic; }
+
+    /* View mode Quill content */
+    .doc-body.ql-editor p, .doc-body.ql-editor li { font-size: 13px; margin-bottom: 5px; }
+    .doc-body.ql-editor strong { font-weight: 700; }
+
+    /* Type pills */
+    .type-pill {
+        display: block; padding: 5px 12px; border-radius: 10px;
+        font-size: 10px; font-weight: 900; text-transform: uppercase;
+        letter-spacing: 0.06em; cursor: pointer;
+        border: 1.5px solid #e2e8f0; color: #94a3b8;
+        transition: all 0.15s ease; background: white;
+    }
+    .type-pill:hover { border-color: #c7d2fe; color: #6366f1; }
+    .type-pill.active { background: #eef2ff; border-color: #6366f1; color: #4f46e5; }
+
+    /* Print */
+    @media print {
+        aside, nav, .top-action-bar { display: none !important; }
+        .lg\:col-span-8 { width: 100% !important; }
+        .bg-white { box-shadow: none !important; }
+    }
+</style>
+{% endblock %}

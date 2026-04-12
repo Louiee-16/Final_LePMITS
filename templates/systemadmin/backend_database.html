@@ -1,0 +1,161 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="space-y-8">
+
+    <!-- ── HEADER ── -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+            <nav class="flex text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 gap-2 mb-2">
+                <a href="{% url 'dashboard' %}" class="hover:text-indigo-600 transition-colors">Admin</a>
+                <span>/</span>
+                <span class="text-indigo-600">Database Engine</span>
+            </nav>
+            <h1 class="text-3xl font-black text-slate-900 tracking-tight">Database Management</h1>
+            <p class="text-slate-500 mt-1 font-medium">Monitor data integrity, table sizes, and storage health.</p>
+        </div>
+        
+        <div class="flex items-center gap-3">
+            <!-- CRITICAL: Link to the actual Django Admin -->
+            <a href="/admin/" target="_blank" class="px-5 py-2.5 bg-slate-900 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-700 transition-all shadow-lg flex items-center gap-2">
+                <i class="fas fa-external-link-alt text-indigo-400"></i> Open Django Admin
+            </a>
+        </div>
+    </div>
+
+    <!-- ── DB ENGINE STATS ── -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+            <div class="flex items-center gap-4 mb-4">
+                <div class="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 text-xl">
+                    <i class="fas fa-database"></i>
+                </div>
+                <div>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Engine</p>
+                    <p class="text-lg font-black text-slate-900">PostgreSQL 15.0</p>
+                </div>
+            </div>
+            <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                <div class="bg-indigo-500 h-full" style="width: 45%"></div>
+            </div>
+            <p class="text-[10px] text-slate-400 mt-2 font-bold uppercase">Connection Pool: 45% Active</p>
+        </div>
+
+        <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+            <div class="flex items-center gap-4 mb-4">
+                <div class="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 text-xl">
+                    <i class="fas fa-table"></i>
+                </div>
+                <div>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Tables</p>
+                    <p class="text-lg font-black text-slate-900">32 Registered Models</p>
+                </div>
+            </div>
+            <p class="text-[10px] text-slate-400 font-bold uppercase">Latest Migration: <span class="text-blue-600">0042_add_audit_logs</span></p>
+        </div>
+
+<div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+    <div class="flex items-center gap-4 mb-4">
+        <div class="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 text-xl">
+            <i class="fas fa-microchip"></i>
+        </div>
+        <div>
+            <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Query Speed</p>
+            <!-- DYNAMIC SPEED HERE -->
+            <p class="text-lg font-black text-slate-900">{{ query_speed }} ms</p>
+        </div>
+    </div>
+    
+    <!-- DYNAMIC STATUS LABEL -->
+    {% if query_speed < 50 %}
+        <p class="text-[10px] text-emerald-500 font-bold uppercase tracking-widest">● Optimization: High</p>
+    {% elif query_speed < 200 %}
+        <p class="text-[10px] text-amber-500 font-bold uppercase tracking-widest">● Optimization: Normal</p>
+    {% else %}
+        <p class="text-[10px] text-rose-500 font-bold uppercase tracking-widest">● Optimization: Lagging</p>
+    {% endif %}
+</div>
+    </div>
+
+    <!-- ── TABLE REGISTRY (THE BACKEND MODELS) ── -->
+    <div class="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+        <div class="p-6 border-b border-slate-50">
+            <h3 class="font-bold text-slate-800">Core Model Registry</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead class="bg-slate-50/50">
+                    <tr>
+                        <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Model Name</th>
+                        <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">App Label</th>
+                        <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Records</th>
+                        <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Raw Access</th>
+                    </tr>
+                </thead>
+                <!-- Replace your hardcoded <tbody> with this loop -->
+<tbody class="divide-y divide-slate-50">
+    {% for model in model_registry %}
+    <tr class="hover:bg-slate-50/50 transition-colors">
+        <td class="px-6 py-4">
+            <div class="flex items-center gap-3">
+                <i class="fas fa-table text-indigo-400"></i>
+                <span class="text-sm font-bold text-slate-700">{{ model.name }}</span>
+            </div>
+        </td>
+        <td class="px-6 py-4 text-xs font-medium text-slate-500">{{ model.app_label }}</td>
+        <td class="px-6 py-4">
+            <span class="text-xs font-black text-slate-900">{{ model.records }}</span>
+        </td>
+        <td class="px-6 py-4 text-right">
+            <a href="{{ model.admin_url }}" target="_blank" class="text-xs font-black text-indigo-600 uppercase tracking-widest hover:underline">View Raw</a>
+        </td>
+    </tr>
+    {% endfor %}
+</tbody>
+
+<!-- Update your Maintenance Buttons to point to the views -->
+<a href="{% url 'clear-system-cache' %}" class="w-full p-4 bg-slate-50 ...">
+    <span class="text-xs font-bold text-slate-600 uppercase tracking-widest">Clear Cache</span>
+</a>
+
+<a href="{% url 'trigger-backup' %}" class="w-full py-3 bg-white ...">
+    <i class="fas fa-file-export mr-2"></i> Trigger Manual Backup
+</a>
+            </table>
+        </div>
+    </div>
+
+    <!-- ── MAINTENANCE TOOLS ── -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+            <h3 class="font-bold text-slate-800">Data Lifecycle</h3>
+            <div class="space-y-3">
+                <button class="w-full p-4 bg-slate-50 rounded-2xl flex items-center justify-between group hover:bg-slate-100 transition-all">
+                    <div class="flex items-center gap-3">
+                        <i class="fas fa-broom text-amber-500"></i>
+                        <span class="text-xs font-bold text-slate-600 uppercase tracking-widest">Clear Cache</span>
+                    </div>
+                    <i class="fas fa-chevron-right text-slate-300 group-hover:translate-x-1 transition-all"></i>
+                </button>
+                <button class="w-full p-4 bg-slate-50 rounded-2xl flex items-center justify-between group hover:bg-slate-100 transition-all">
+                    <div class="flex items-center gap-3">
+                        <i class="fas fa-compress-arrows-alt text-blue-500"></i>
+                        <span class="text-xs font-bold text-slate-600 uppercase tracking-widest">Optimize Tables</span>
+                    </div>
+                    <i class="fas fa-chevron-right text-slate-300 group-hover:translate-x-1 transition-all"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-indigo-600 p-6 rounded-3xl shadow-xl shadow-indigo-100 space-y-4">
+            <h3 class="font-bold text-white">Critical Recovery</h3>
+            <p class="text-indigo-100 text-[10px] leading-relaxed uppercase font-bold tracking-wider">
+                This will trigger a full database dump. This process may slow down the system for a few seconds.
+            </p>
+            <button class="w-full py-3 bg-white text-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg">
+                <i class="fas fa-file-export mr-2"></i> Trigger Manual Backup
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -20,7 +20,9 @@ from django.urls import path, include
 from accounts.views import CustomLoginView, dashboard_redirect
 from django.contrib.auth import views as auth_views
 from django.conf.urls.static import static
+from accounts import views
 urlpatterns = [
+    path('', views.index, name='index'),
     path('admin/', admin.site.urls),
     path('login/', CustomLoginView.as_view(), name='login'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
@@ -28,6 +30,12 @@ urlpatterns = [
     path('',include('documents.urls')),
     path('',include('committees.urls')),
     path('',include('councilors.urls')),
+    path('',include('committee_level.urls')),
+    path('',include('barangay.urls')),
+    path('',include('OfficialGazette.urls')),
+    path('',include('secretariat.urls')),
+    path('',include('systemadmin.urls')),
+    path('',include('audit.urls')),
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -1,0 +1,324 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="space-y-8">
+
+    <!-- ── HEADER & ACTIONS ── -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+            <nav class="flex text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 gap-2 mb-2">
+                <a href="{% url 'dashboard' %}" class="hover:text-indigo-600 transition-colors">Admin</a>
+                <span>/</span>
+                <span class="text-indigo-600">User Registry</span>
+            </nav>
+            <h1 class="text-3xl font-black text-slate-900 tracking-tight">User Accounts</h1>
+            <p class="text-slate-500 mt-1 font-medium">Manage system access, roles, and account security.</p>
+        </div>
+        
+        <div class="flex items-center gap-3">
+            <button class="px-5 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2">
+                <i class="fas fa-file-export text-slate-400"></i> Export List
+            </button>
+            <a href="{% url 'create-user-page' %}"
+                class="px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all flex items-center gap-2">
+                <i class="fas fa-plus"></i> Create New User
+            </a>
+        </div>
+    </div>
+
+    <!-- ── STATS SUMMARY ── -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+            <p class="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Total Accounts</p>
+            <p class="text-2xl font-black text-slate-900">{{ users|length }}</p>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+            <p class="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Councilors</p>
+            <p class="text-2xl font-black text-blue-600">{{councilors|length}}</p>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+            <p class="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Barangay Admins</p>
+            <p class="text-2xl font-black text-emerald-600">{{barangay|length}}</p>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+            <p class="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Secretariat</p>
+            <p class="text-2xl font-black text-purple-600">{{secretariat|length}}</p>
+        </div>
+    </div>
+
+    <!-- ── SEARCH & FILTER BAR ── -->
+    <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row gap-4 items-center">
+        <div class="relative flex-1 w-full">
+            <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+            <input type="text" id="userSearch" onkeyup="filterUsers()" placeholder="Search by name, email, or username..." 
+                class="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all">
+        </div>
+        
+        <div class="flex items-center gap-2 w-full md:w-auto">
+            <select id="roleFilter" onchange="filterUsers()" class="bg-slate-50 border border-slate-100 text-slate-600 text-xs font-bold px-4 py-2.5 rounded-xl outline-none">
+                <option value="ALL">All Roles</option>
+                <option value="ADMIN">System Admin</option>
+                <option value="COUNCILOR">Councilor</option>
+                <option value="SECRETARIAT">Secretariat</option>
+                <option value="BARANGAY">Barangay</option>
+            </select>
+            
+            <select id="statusFilter" onchange="filterUsers()" class="bg-slate-50 border border-slate-100 text-slate-600 text-xs font-bold px-4 py-2.5 rounded-xl outline-none">
+                <option value="ALL">All Status</option>
+                <option value="ACTIVE">Active</option>
+                <option value="INACTIVE">Disabled</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- ── USERS TABLE ── -->
+    <div class="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-slate-50/50 border-b border-slate-100">
+                        <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">User Details</th>
+                        <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">System Role</th>
+                        <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Last Login</th>
+                        <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                        <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50">
+                    {% for u in users %}
+                    <tr class="user-row hover:bg-slate-50/50 transition-colors group"
+                        data-role="{{ u.role }}"
+                        data-status="{% if u.is_active %}ACTIVE{% else %}INACTIVE{% endif %}">
+                        
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold shadow-sm">
+                                    {{ u.username|slice:":1"|upper }}
+                                </div>
+                                <div class="flex flex-col search-target">
+                                    <span class="text-sm font-bold text-slate-800">{{ u.get_full_name|default:u.username }}</span>
+                                    <span class="text-xs text-slate-400">{{ u.email }}</span>
+                                </div>
+                            </div>
+                        </td>
+                        
+                        <td class="px-6 py-4">
+                            {% if u.role == 'ADMIN' %}
+                                <span class="px-3 py-1 rounded-lg bg-rose-50 text-rose-600 text-[10px] font-black uppercase tracking-wider">System Admin</span>
+                            {% elif u.role == 'COUNCILOR' %}
+                                <span class="px-3 py-1 rounded-lg bg-blue-50 text-blue-600 text-[10px] font-black uppercase tracking-wider">Councilor</span>
+                            {% elif u.role == 'SECRETARIAT' %}
+                                <span class="px-3 py-1 rounded-lg bg-purple-50 text-purple-600 text-[10px] font-black uppercase tracking-wider">Secretariat</span>
+                            {% else %}
+                                <span class="px-3 py-1 rounded-lg bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase tracking-wider">{{ u.role }}</span>
+                            {% endif %}
+                        </td>
+
+                        <td class="px-6 py-4 text-xs font-bold text-slate-600">
+                            {{ u.last_login|date:"M d, Y"|default:"Never" }}
+                        </td>
+
+                        <td class="px-6 py-4">
+                            {% if u.is_active %}
+                            <div class="flex items-center gap-1.5">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                <span class="text-[10px] font-black text-emerald-600 uppercase">Active</span>
+                            </div>
+                            {% else %}
+                            <div class="flex items-center gap-1.5">
+                                <span class="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+                                <span class="text-[10px] font-black text-slate-400 uppercase">Disabled</span>
+                            </div>
+                            {% endif %}
+                        </td>
+
+                        <!-- ACTIONS -->
+                        <td class="px-6 py-4 text-right">
+                            <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onclick="openResetModal('{{ u.id }}', '{{ u.username }}')" title="Reset Password" class="w-8 h-8 rounded-lg bg-slate-100 text-slate-500 hover:bg-amber-100 hover:text-amber-600 transition-all flex items-center justify-center">
+                                    <i class="fas fa-key text-xs"></i>
+                                </button>
+                                <button onclick="openEditModal('{{ u.id }}', '{{ u.first_name }}', '{{ u.last_name }}', '{{ u.email }}', '{{ u.role }}')" title="Edit User" class="w-8 h-8 rounded-lg bg-slate-100 text-slate-500 hover:bg-indigo-100 hover:text-indigo-600 transition-all flex items-center justify-center">
+                                    <i class="fas fa-pen text-xs"></i>
+                                </button>
+                                <button onclick="openStatusModal('{{ u.id }}', '{{ u.username }}', '{{ u.is_active }}')" title="Toggle Status" class="w-8 h-8 rounded-lg bg-slate-100 text-slate-500 hover:bg-rose-100 hover:text-rose-600 transition-all flex items-center justify-center">
+                                    <i class="fas fa-ban text-xs"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5" class="px-6 py-20 text-center text-slate-400 font-bold italic">No records found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="px-6 py-4 bg-slate-50/50 border-t border-slate-100">
+            <p id="rowCountLabel" class="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                Showing {{ users|length }} accounts
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- ── MODAL OVERLAY ── -->
+<div id="modalOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] hidden items-center justify-center p-4">
+    
+    <!-- EDIT MODAL -->
+    <div id="editModal" class="bg-white w-full max-w-lg rounded-[2rem] shadow-2xl hidden overflow-hidden animate-in zoom-in duration-200">
+        <form id="editForm" method="POST">
+            {% csrf_token %}
+            <div class="p-8 space-y-6">
+                <h3 class="text-xl font-black text-slate-900 tracking-tight">Update System Account</h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">First Name</label>
+                        <input type="text" name="first_name" id="edit_first_name" class="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Last Name</label>
+                        <input type="text" name="last_name" id="edit_last_name" class="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none">
+                    </div>
+                </div>
+                <div class="space-y-1">
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Email Address</label>
+                    <input type="email" name="email" id="edit_email" class="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none">
+                </div>
+                <div class="space-y-1">
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Assigned Role</label>
+                    <select name="role" id="edit_role" class="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold text-slate-700 outline-none">
+                        <option value="ADMIN">System Admin</option>
+                        <option value="COUNCILOR">Councilor</option>
+                        <option value="SECRETARIAT">Secretariat</option>
+                        <option value="BARANGAY">Barangay Admin</option>
+                    </select>
+                </div>
+            </div>
+            <div class="bg-slate-50 p-6 flex justify-end gap-3">
+                <button type="button" onclick="closeModals()" class="text-xs font-black text-slate-400 uppercase tracking-widest px-4">Cancel</button>
+                <button type="submit" class="px-6 py-3 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg hover:bg-indigo-700">Save Changes</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- RESET PASSWORD MODAL -->
+    <div id="resetModal" class="bg-white w-full max-w-md rounded-[2rem] shadow-2xl hidden overflow-hidden animate-in zoom-in duration-200">
+        <form id="resetForm" method="POST">
+            {% csrf_token %}
+            <div class="p-8 text-center space-y-4">
+                <div class="w-16 h-16 bg-amber-50 text-amber-500 rounded-2xl flex items-center justify-center mx-auto text-2xl mb-2"><i class="fas fa-key"></i></div>
+                <h3 class="text-xl font-black text-slate-900">Reset Security Credentials</h3>
+                <p class="text-sm text-slate-500">Are you sure you want to reset the password for <span id="reset_username_label" class="font-black text-slate-900"></span>?</p>
+            </div>
+            <div class="bg-slate-50 p-6 flex justify-center gap-3">
+                <button type="button" onclick="closeModals()" class="text-xs font-black text-slate-400 uppercase tracking-widest px-4">Cancel</button>
+                <button type="submit" class="px-6 py-3 bg-amber-500 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg hover:bg-amber-600">Reset Password</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- STATUS TOGGLE MODAL -->
+    <div id="statusModal" class="bg-white w-full max-w-md rounded-[2rem] shadow-2xl hidden overflow-hidden animate-in zoom-in duration-200">
+        <form id="statusForm" method="POST">
+            {% csrf_token %}
+            <div class="p-8 text-center space-y-4">
+                <div id="statusIcon" class="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto text-2xl mb-2"></div>
+                <h3 id="statusTitle" class="text-xl font-black text-slate-900">Update Account Status</h3>
+                <p id="statusText" class="text-sm text-slate-500"></p>
+            </div>
+            <div class="bg-slate-50 p-6 flex justify-center gap-3">
+                <button type="button" onclick="closeModals()" class="text-xs font-black text-slate-400 uppercase tracking-widest px-4">Cancel</button>
+                <button type="submit" id="statusBtn" class="px-6 py-3 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg"></button>
+            </div>
+        </form>
+    </div>
+
+</div>
+
+<script>
+// ── FILTER LOGIC ───────────────────────────────────────────
+function filterUsers() {
+    const searchQuery = document.getElementById('userSearch').value.toLowerCase();
+    const roleFilter = document.getElementById('roleFilter').value;
+    const statusFilter = document.getElementById('statusFilter').value;
+    const rows = document.querySelectorAll('.user-row');
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+        const text = row.querySelector('.search-target').innerText.toLowerCase();
+        const role = row.dataset.role;
+        const status = row.dataset.status;
+        const matchSearch = text.includes(searchQuery);
+        const matchRole = roleFilter === 'ALL' || role === roleFilter;
+        const matchStatus = statusFilter === 'ALL' || status === statusFilter;
+
+        if (matchSearch && matchRole && matchStatus) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+    document.getElementById('rowCountLabel').innerText = `Showing ${visibleCount} accounts`;
+}
+
+// ── MODAL LOGIC ────────────────────────────────────────────
+const overlay = document.getElementById('modalOverlay');
+
+function closeModals() {
+    overlay.classList.add('hidden');
+    overlay.classList.remove('flex');
+    document.getElementById('editModal').classList.add('hidden');
+    document.getElementById('resetModal').classList.add('hidden');
+    document.getElementById('statusModal').classList.add('hidden');
+}
+
+function openEditModal(id, fname, lname, email, role) {
+    overlay.classList.remove('hidden');
+    overlay.classList.add('flex');
+    document.getElementById('editModal').classList.remove('hidden');
+    document.getElementById('edit_first_name').value = fname;
+    document.getElementById('edit_last_name').value = lname;
+    document.getElementById('edit_email').value = email;
+    document.getElementById('edit_role').value = role;
+    document.getElementById('editForm').action = `/systemadmin/user/${id}/edit/`;
+}
+
+function openResetModal(id, username) {
+    overlay.classList.remove('hidden');
+    overlay.classList.add('flex');
+    document.getElementById('resetModal').classList.remove('hidden');
+    document.getElementById('reset_username_label').innerText = username;
+    document.getElementById('resetForm').action = `/systemadmin/user/${id}/reset-password/`;
+}
+
+function openStatusModal(id, username, isActive) {
+    overlay.classList.remove('hidden');
+    overlay.classList.add('flex');
+    const modal = document.getElementById('statusModal');
+    modal.classList.remove('hidden');
+    const btn = document.getElementById('statusBtn');
+    const icon = document.getElementById('statusIcon');
+    const text = document.getElementById('statusText');
+
+    if (isActive === 'True') {
+        text.innerText = `Are you sure you want to deactivate ${username}'s access?`;
+        btn.innerText = "Deactivate Account";
+        btn.className = "px-6 py-3 bg-rose-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg hover:bg-rose-700";
+        icon.className = "w-16 h-16 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center mx-auto text-2xl mb-2";
+        icon.innerHTML = '<i class="fas fa-ban"></i>';
+    } else {
+        text.innerText = `Restore system access for ${username}?`;
+        btn.innerText = "Enable Account";
+        btn.className = "px-6 py-3 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg hover:bg-emerald-700";
+        icon.className = "w-16 h-16 bg-emerald-50 text-emerald-500 rounded-2xl flex items-center justify-center mx-auto text-2xl mb-2";
+        icon.innerHTML = '<i class="fas fa-check"></i>';
+    }
+    document.getElementById('statusForm').action = `/systemadmin/user/${id}/toggle-status/`;
+}
+
+// Close on escape key
+document.addEventListener('keydown', (e) => { if (e.key === "Escape") closeModals(); });
+</script>
+{% endblock %}

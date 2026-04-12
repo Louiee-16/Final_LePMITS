@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        /* Simplified Page Setup */
+        @page {
+            size: letter;
+            margin: 2.5cm;
+        }
+        
+        body { 
+            font-family: Helvetica, Arial, sans-serif; 
+            color: #333; 
+            line-height: 1.5; 
+        }
+
+        .header { text-align: center; margin-bottom: 30px; }
+        .republic { text-transform: uppercase; font-size: 10px; }
+        .office { font-weight: bold; font-size: 14px; margin-top: 5px; }
+        
+        .ref-no { 
+            text-align: center; 
+            font-weight: bold; 
+            font-size: 16px; 
+            margin: 20px 0;
+            color: #1e40af; /* Indigo color */
+        }
+
+        .title { 
+            text-align: center; 
+            font-weight: bold; 
+            text-transform: uppercase; 
+            font-size: 14px;
+            margin-bottom: 40px; 
+        }
+
+        .meta { margin-bottom: 30px; font-size: 11px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        
+        .content { 
+            text-align: justify; 
+            font-size: 12px;
+        }
+
+        /* Signatories Area */
+        .signatories { margin-top: 50px; width: 100%; }
+        .sig-box { width: 250px; float: right; text-align: center; }
+        .line { border-bottom: 1px solid black; margin-bottom: 5px; margin-top: 40px;}
+        .name { font-weight: bold; text-transform: uppercase; font-size: 11px; }
+        .pos { font-size: 10px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="republic">Republic of the Philippines</div>
+        <div class="office">Office of the Sangguniang Panlungsod</div>
+    </div>
+
+    <div class="ref-no">{{ doc.reference_no }}</div>
+
+    <div class="title">{{ doc.title }}</div>
+
+    <div class="meta">
+        <p><strong>SPONSOR:</strong> Hon. {{ doc.author.last_name }}</p>
+        <p><strong>DATE ENACTED:</strong> {{ doc.updated_at|date:"F d, Y" }}</p>
+    </div>
+
+    <div class="content">
+        {{ doc.content|linebreaks }}
+    </div>
+
+    <div class="signatories">
+        <div class="sig-box">
+            <div class="line"></div>
+            <div class="name">Secretary Name</div>
+            <div class="pos">Secretary to the Sanggunian</div>
+        </div>
+    </div>
+</body>
+</html>

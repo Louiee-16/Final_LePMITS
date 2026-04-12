@@ -1,0 +1,340 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+
+<!-- TOOLBAR -->
+<div class="max-w-4xl mx-auto px-4 pt-6 pb-2 no-print">
+    <div class="flex justify-between items-center">
+        <a href="javascript:history.back()"
+            class="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-600 transition-colors">
+            <i class="fas fa-chevron-left text-[8px]"></i> Back
+        </a>
+        <div class="flex items-center gap-3">
+            <!-- Status badge -->
+            <span class="px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest
+                {% if doc.status == 'DRAFT' %}bg-slate-100 text-slate-500
+                {% elif doc.status == 'FILED' %}bg-blue-50 text-blue-600
+                {% elif doc.status == 'FIRST_READING' %}bg-amber-50 text-amber-600
+                {% elif doc.status == 'REFERRED' %}bg-orange-50 text-orange-500
+                {% elif doc.status == 'COMMITTEE' %}bg-yellow-50 text-yellow-600
+                {% elif doc.status == 'SECOND_READING' %}bg-violet-50 text-violet-600
+                {% elif doc.status == 'THIRD_READING' %}bg-purple-50 text-purple-600
+                {% elif doc.status == 'APPROVED' %}bg-emerald-50 text-emerald-600
+                {% else %}bg-slate-100 text-slate-500{% endif %}">
+                {{ doc.status }}
+            </span>
+
+            <!-- Print -->
+            <button onclick="window.print()"
+                class="px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2">
+                <i class="fas fa-print text-slate-400"></i> Print
+            </button>
+
+            <!-- Download PDF -->
+            <a href=""
+                class="px-4 py-2.5 bg-slate-900 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-700 transition-all shadow-sm flex items-center gap-2">
+                <i class="fas fa-file-pdf"></i> Download PDF
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- PAPER WRAPPER -->
+<div class="max-w-4xl mx-auto px-4 py-6" id="documentPaper">
+    <div class="paper bg-white shadow-xl border border-slate-200 mx-auto relative" style="max-width: 816px; padding: 72px 88px;">
+
+        {% if doc.doc_type == 'ORDINANCE' %}
+        <!-- ══════════════════════════════════════
+             ORDINANCE LAYOUT
+        ══════════════════════════════════════ -->
+
+        <!-- Letterhead -->
+        <div class="text-center mb-6">
+            <p class="letterhead-line">Republic of the Philippines</p>
+            <p class="letterhead-line font-semibold">City of San Juan, Metro Manila</p>
+            <p class="letterhead-line">Office of the Sangguniang Panlungsod</p>
+        </div>
+
+        <div class="border-t border-slate-400 my-4"></div>
+
+        <!-- Doc number -->
+        <div class="text-center mb-3">
+            <p class="text-[13px] font-black uppercase tracking-wide text-slate-900">
+                {% if doc.status != 'APPROVED'  %}Draft {% endif %}Ordinance No. {{ doc.ref_number}}
+            </p>
+            <p class="text-[11px] text-slate-500 mt-0.5">Series of {{ doc.created_at|date:"Y" }}</p>
+        </div>
+
+        <!-- Title -->
+        <div class="text-center my-6 px-4">
+            <p class="doc-title">{{ doc.title }}</p>
+        </div>
+
+        <!-- Sponsored by -->
+        <div class="border border-slate-500 px-6 py-4 mb-7 text-center">
+            <p class="text-[11px] text-slate-500 mb-1.5">Sponsored by:</p>
+            <div class="text-[12px] font-semibold text-slate-800">
+                {% if doc.author.councilor_profile %}
+                    {{ doc.author.councilor_profile.name }}
+                {% else %}
+                    Hon. {{ doc.author.last_name }}, {{ doc.author.first_name }}
+                {% endif %}
+                {# co-sponsors here #}
+            </div>
+        </div>
+
+        <!-- Body -->
+        <div class="ql-editor doc-body" style="position:static; white-space:normal; padding:0;">
+            {{ doc.content|safe }}
+        </div>
+
+        <!-- APPROVED -->
+        <div class="mt-16 mb-14">
+            <p class="doc-closing-line">Approved: ___________________________</p>
+        </div>
+
+        <!-- Signatures -->
+        <div class="grid grid-cols-2 gap-16">
+            <div class="text-center">
+                <div class="sig-line"></div>
+                <p class="sig-name">
+                    {% if doc.author.councilor_profile %}{{ doc.author.councilor_profile.name }}
+                    {% else %}Hon. {{ doc.author.last_name }}, {{ doc.author.first_name }}{% endif %}
+                </p>
+                <p class="sig-title">City Councilor</p>
+            </div>
+            <div class="text-center">
+                <div class="sig-line"></div>
+                <p class="sig-name sig-empty">— Co-signatory —</p>
+                <p class="sig-title">City Councilor</p>
+            </div>
+        </div>
+
+        {% else %}
+        <!-- ══════════════════════════════════════
+             RESOLUTION LAYOUT
+        ══════════════════════════════════════ -->
+
+        <!-- Letterhead -->
+        <div class="text-center mb-4">
+            <p class="letterhead-line">Republic of the Philippines</p>
+            <p class="letterhead-line">City of San Juan</p>
+            <p class="letterhead-line">Metro Manila</p>
+        </div>
+
+        <!-- Office name — larger for resolution -->
+        <div class="text-center mb-4">
+            <p class="text-[14px] font-black uppercase tracking-widest text-slate-900">Office of the Sangguniang Panlungsod</p>
+        </div>
+
+        <div class="border-t border-slate-400 my-4"></div>
+
+        <!-- Doc number -->
+        <div class="text-center mb-3">
+            <p class="text-[13px] font-black uppercase tracking-wide text-slate-900">
+
+                {% if doc.status != 'APPROVED'  %}Draft {% endif %}Resolution No.{{doc.ref_number}}
+            </p>
+            <p class="text-[11px] text-slate-500 mt-0.5">Series of {{ doc.created_at|date:"Y" }}</p>
+        </div>
+
+        <!-- Title -->
+        <div class="my-6">
+            <p class="doc-title text-justify">{{ doc.title }}</p>
+        </div>
+
+        <!-- Sponsored by -->
+        <div class="border border-slate-500 px-6 py-4 mb-7 text-center">
+            <p class="text-[11px] text-slate-500 mb-1.5">Sponsored by:</p>
+            <div class="text-[12px] font-semibold text-slate-800">
+                {% if doc.author.councilor_profile %}
+                    Hon. {{ doc.author.get_councilor_name }}
+                {% elif doc.original_doc.author.get_councilor_name%}
+                    Hon. {{doc.original_doc.author.get_councilor_name}}
+                   
+                {% endif %}
+                {# co-sponsors here #}
+            </div>
+        </div>
+
+        <!-- Body -->
+        <div class="ql-editor doc-body" style="position:static; white-space:normal; padding:0;">
+            {{ doc.content|safe }}
+        </div>
+
+        <!-- ADOPTED -->
+        <div class="mt-16 mb-10">
+            <p class="doc-closing-line">Adopted: ___________________________</p>
+        </div>
+
+        <!-- Page 2 — Signatures -->
+        <div class="page-break"></div>
+
+        <div class="pt-10">
+            <!-- Page 2 header -->
+            <div class="text-right mb-10">
+                <p class="text-[10px] text-slate-400 font-bold tracking-widest uppercase">
+                    Page 2 of D.R. No. -{{ doc.created_at|date:"Y" }}
+                </p>
+            </div>
+
+            <p class="text-[12px] text-slate-700 text-center mb-12 font-medium">Respectfully Submitted by:</p>
+
+            {% if doc.referred_committee %}
+            <div class="mb-8">
+                <p class="text-[11px] font-bold text-slate-700 text-center mb-8 uppercase tracking-wide">
+                    The Committee on {{ doc.referred_committee.name }}
+                </p>
+                <div class="grid grid-cols-2 gap-x-20 gap-y-12">
+                    {% if doc.referred_committee.chairman %}
+                    <div class="text-center">
+                        <div class="sig-line"></div>
+                        <p class="sig-name">{{ doc.referred_committee.chairman.name }}</p>
+                        <p class="sig-title">Chairperson</p>
+                    </div>
+                    {% endif %}
+                    {% if doc.referred_committee.vice_chairman %}
+                    <div class="text-center">
+                        <div class="sig-line"></div>
+                        <p class="sig-name">{{ doc.referred_committee.vice_chairman.name }}</p>
+                        <p class="sig-title">Vice-Chairperson</p>
+                    </div>
+                    {% endif %}
+                    {% if doc.referred_committee.member %}
+                    <div class="text-center">
+                        <div class="sig-line"></div>
+                        <p class="sig-name">{{ doc.referred_committee.member.name }}</p>
+                        <p class="sig-title">Member</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% else %}
+            <!-- Fallback: just the author -->
+            <div class="grid grid-cols-2 gap-16">
+                <div class="text-center">
+                    <div class="sig-line"></div>
+                    <p class="sig-name">
+                        {% if doc.author.councilor_profile %}{{ doc.author.councilor_profile.name }}
+                        {% else %}Hon. {{ doc.author.last_name }}, {{ doc.author.first_name }}{% endif %}
+                    </p>
+                    <p class="sig-title">City Councilor</p>
+                </div>
+                <div class="text-center">
+                    <div class="sig-line"></div>
+                    <p class="sig-name sig-empty">— Co-signatory —</p>
+                    <p class="sig-title">City Councilor</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+    </div>
+    <!-- end .paper -->
+</div>
+
+<style>
+    /* Paper */
+    .paper {
+        font-family: 'EB Garamond', 'Times New Roman', Georgia, serif;
+        color: #111;
+        line-height: 1.75;
+    }
+
+    /* Letterhead */
+    .letterhead-line {
+        font-size: 11px;
+        color: #4b5563;
+        line-height: 1.6;
+    }
+
+    /* Document title */
+    .doc-title {
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #111;
+        line-height: 1.7;
+        letter-spacing: 0.02em;
+    }
+
+    /* Closing line */
+    .doc-closing-line {
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #1e293b;
+    }
+
+    /* Signatures */
+    .sig-line {
+        border-bottom: 1px solid #1e293b;
+        margin-bottom: 8px;
+        margin-top: 56px;
+    }
+    .sig-name {
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        color: #111;
+        letter-spacing: 0.03em;
+    }
+    .sig-title {
+        font-size: 10px;
+        color: #6b7280;
+        margin-top: 2px;
+    }
+    .sig-empty {
+        color: #9ca3af;
+        font-weight: 400;
+        font-style: italic;
+        text-transform: none;
+    }
+
+    /* Quill content inside paper */
+    .doc-body.ql-editor {
+        font-family: 'EB Garamond', 'Times New Roman', Georgia, serif !important;
+        font-size: 12.5px !important;
+        line-height: 1.8 !important;
+        color: #111 !important;
+    }
+    .doc-body.ql-editor p,
+    .doc-body.ql-editor li {
+        font-size: 12.5px;
+        margin-bottom: 4px;
+    }
+    .doc-body.ql-editor strong { font-weight: 700; }
+    .doc-body.ql-editor ol,
+    .doc-body.ql-editor ul { padding-left: 2em; }
+
+    /* Page break for resolution page 2 */
+    .page-break {
+        border-top: 2px dashed #e2e8f0;
+        margin: 48px 0 0;
+    }
+
+    /* Print */
+    @media print {
+        .no-print { display: none !important; }
+        body { background: white !important; }
+        .paper {
+            box-shadow: none !important;
+            border: none !important;
+            margin: 0 !important;
+            max-width: 100% !important;
+            padding: 60px 80px !important;
+        }
+        .page-break {
+            border: none;
+            page-break-before: always;
+        }
+        #documentPaper {
+            padding: 0 !important;
+        }
+    }
+</style>
+{% endblock %}

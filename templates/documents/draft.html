@@ -1,191 +1,422 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto py-8 px-4">
-    <!-- Header Section -->
-    <div class="mb-8">
-        <h1 class="text-3xl font-bold text-slate-800">Create New Draft</h1>
-        <p class="text-slate-500 mt-1">Prepare your legislative measure. Use the AI assistant for legal basis research.</p>
-    </div>
+<link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
 
-    <!-- Main Form Card -->
-    <div class="bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden">
-        <form action="{% url 'create_draft' %}" method="POST" id="draftForm" class="p-8">
-            {% csrf_token %}
+<div class="max-w-[1200px] mx-auto px-4 py-8">
+
+    <!-- HEADER -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 border-b border-slate-100 pb-6 gap-4">
+        <div class="flex items-center gap-4">
+            <a href="{% url 'dashboard' %}" class="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-all shadow-sm">
+                <i class="fas fa-arrow-left text-xs"></i>
+            </a>
+            <div>
+                <nav class="flex text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 gap-2 mb-1">
+                    <a href="{% url 'dashboard' %}" class="hover:text-indigo-600 transition-colors">Legislative</a>
+                    <span class="text-slate-200">/</span>
+                    <span class="text-indigo-600">New Draft</span>
+                </nav>
+                <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Create New Draft</h1>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <span id="autosaveStatus" class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest hidden">
+                <i class="fas fa-check-circle mr-1"></i> Synced
+            </span>
+            <span id="autosaveSaving" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden">
+                <i class="fas fa-circle-notch fa-spin mr-1"></i> Saving...
+            </span>
             
-            <!-- CRITICAL: Hidden field to link Autosave to this Form -->
-            <input type="hidden" name="doc_id" id="doc_id_field">
-
-            <!-- 1. Legislative Title -->
-            <div class="mb-8">
-                <label class="block text-slate-700 text-sm font-semibold mb-2">Legislative Title</label>
-                <input type="text" name="title" required 
-                       class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" 
-                       placeholder="Ex: An Ordinance Regulating...">
-            </div>
-
-            <!-- 2. Type and Author -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <div>
-                    <label class="block text-slate-700 text-sm font-semibold mb-2">Measure Type</label>
-                    <select name="type" class="w-full px-4 py-3 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 outline-none">
-                        <option value="ORDINANCE">Ordinance</option>
-                        <option value="RESOLUTION">Resolution</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-slate-700 text-sm font-semibold mb-2">Primary Author</label>
-                    <input type="text" class="w-full px-4 py-3 border border-slate-300 rounded-lg bg-slate-50 text-slate-500 cursor-not-allowed" 
-                           value="Hon. {{ user.username }} (You)" readonly>
-                </div>
-            </div>
-
-            <!-- 3. Target Committee -->
-            <div class="mb-8 bg-slate-50 p-6 rounded-xl border border-slate-200">
-                <label class="block text-slate-700 text-sm font-bold mb-2">Sponsor Committee</label>
-                <select name="target_committee" class="w-full px-4 py-3 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 outline-none">
-                    <option value="" disabled selected>-- Select a Committee --</option>
-                    {% for committee in committees %}
-                        <option value="{{ committee.id }}">Committee on {{ committee.committee_name }}</option>                    
-                    {% endfor %}
-                </select>
-            </div>
-
-            <!-- 4. Content Area -->
-            <div class="mb-8">
-                <label class="block text-slate-700 text-sm font-semibold mb-2">Draft Content</label>
-                <textarea name="content" required 
-                          class="w-full h-80 px-4 py-4 border border-slate-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-blue-500 outline-none leading-relaxed" 
-                          placeholder="WHEREAS..."></textarea>
-            </div>
-
-            <!-- AI Section -->
-            <div class="mt-4 mb-8 pt-8 border-t border-slate-100">
-                <div class="flex items-center justify-between mb-4">
-                    <label class="text-purple-900 text-sm font-bold flex items-center">
-                        <i class="fas fa-robot mr-2"></i> AI Legal Basis Assistant
-                    </label>
-                    <button type="button" id="aiCheckBtn" class="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-4 py-2 rounded-lg shadow transition">
-                        Find Legal Basis
-                    </button>
-                </div>
-                <div id="aiResults" class="hidden bg-amber-50 border border-amber-200 rounded-xl p-6 text-sm text-slate-800 shadow-inner">
-                    <div id="aiContent" class="prose prose-sm max-w-none"></div>
-                </div>
-            </div>
-
-            <!-- Action Buttons (Only 2 as requested) -->
-            <div class="flex flex-col sm:flex-row justify-end gap-4 mt-8 pt-6 border-t border-slate-100">
-                <button type="submit" name="action" value="save" class="px-8 py-3 rounded-lg border border-slate-300 text-slate-600 font-bold hover:bg-slate-50 transition">
-                    <i class="fas fa-save mr-2"></i> Save Draft
-                </button>
-                <button type="submit" name="action" value="submit" class="bg-blue-900 text-white px-10 py-3 rounded-lg font-bold hover:bg-blue-800 shadow-lg transition transform active:scale-95">
-                    <i class="fas fa-paper-plane mr-2"></i> File Draft
-                </button>
-            </div>
-        </form>
+            <button form="draftForm" type="submit" name="action" value="save"
+                class="px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-50 hover:text-indigo-600 transition-all shadow-sm">
+                <i class="fas fa-save mr-2"></i> Save Draft
+            </button>
+            <button form="draftForm" type="submit" name="action" value="submit"
+                class="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all">
+                <i class="fas fa-paper-plane mr-2"></i> File Draft
+            </button>
+        </div>
     </div>
+
+    <!-- GHOST RECOVERY BANNER -->
+    {% if ghost %}
+    <div id="recoveryBanner" class="mb-6 flex items-center justify-between gap-4 px-6 py-4 bg-amber-50 border border-amber-200 rounded-2xl">
+        <div class="flex items-center gap-3">
+            <i class="fas fa-clock-rotate-left text-amber-400"></i>
+            <div>
+                <p class="text-xs font-black text-amber-800 uppercase tracking-widest">Unsaved work recovered</p>
+                <p class="text-[11px] text-amber-600 font-medium mt-0.5">"{{ ghost.title }}" — last saved {{ ghost.updated_at|timesince }} ago</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-3 shrink-0">
+            <button type="button" onclick="discardGhost()"
+                class="text-[10px] font-black uppercase tracking-widest text-amber-500 hover:text-amber-700 transition-colors">
+                Discard
+            </button>
+            <span class="text-[10px] font-black uppercase tracking-widest text-emerald-600">
+                <i class="fas fa-check-circle mr-1"></i> Restored
+            </span>
+        </div>
+    </div>
+    {% endif %}
+
+    <form id="draftForm" action="{% url 'create_draft' %}" method="POST">
+        {% csrf_token %}
+        <input type="hidden" name="doc_id" id="doc_id_field" value="{{ ghost.id|default:'' }}">
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+            <!-- LEFT: MAIN EDITOR -->
+            <div class="lg:col-span-8 space-y-6">
+
+                <!-- Title — auto-growing textarea -->
+                <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8">
+                    <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">
+                        Legislative Title
+                    </label>
+                    <textarea
+                        name="title"
+                        id="titleInput"
+                        required
+                        rows="2"
+                        class="title-textarea w-full px-4 py-3 border border-slate-200 rounded-xl font-extrabold text-slate-800 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 transition-all placeholder:font-normal placeholder:text-slate-300 resize-none overflow-hidden leading-snug"
+                        placeholder="An Ordinance/Resolution providing for...">{{ ghost.title|default:'' }}</textarea>
+                    <p class="text-[10px] text-slate-300 font-medium mt-2 text-right">
+                        <span id="charCount">0</span> characters
+                    </p>
+                </div>
+
+                <!-- Content Editor -->
+                <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="px-8 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-2 h-2 rounded-full bg-indigo-400"></div>
+                            <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">Draft Content</span>
+                        </div>
+                        <span class="text-[9px] font-bold text-slate-300 uppercase tracking-widest" id="wordCount">0 words</span>
+                    </div>
+                    <!-- Fixed: explicit height wrapper so Quill has space to render -->
+                    <div id="quillEditor" style="min-height: 480px;"></div>
+                    <textarea name="content" id="contentField" class="hidden">{{ ghost.content|default:'' }}</textarea>
+                </div>
+
+                <!-- AI Legal Basis Assistant -->
+                <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8">
+                    <div class="flex items-center justify-between mb-5">
+                        <div class="flex items-center gap-3">
+                            <div class="w-9 h-9 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-center">
+                                <i class="fas fa-robot text-violet-500 text-sm"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs font-black uppercase tracking-widest text-slate-700">AI Legal Basis Assistant</p>
+                                <p class="text-[10px] text-slate-400 font-medium">Finds relevant laws and ordinances for your draft</p>
+                            </div>
+                        </div>
+                        <button type="button" id="aiCheckBtn"
+                            class="px-4 py-2.5 bg-violet-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-violet-700 hover:-translate-y-0.5 transition-all shadow-lg shadow-violet-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0">
+                            <i class="fas fa-search mr-2"></i> Find Legal Basis
+                        </button>
+                    </div>
+
+                    <div id="aiLoading" class="hidden">
+                        <div class="bg-slate-50 border border-slate-100 rounded-2xl p-5 flex items-center gap-4">
+                            <i class="fas fa-circle-notch fa-spin text-violet-400"></i>
+                            <p class="text-xs text-slate-400 font-medium italic">Searching legal database...</p>
+                        </div>
+                    </div>
+
+                    <div id="aiResults" class="hidden">
+                        <div class="bg-violet-50 border border-violet-100 rounded-2xl p-6">
+                            <p class="text-[9px] font-black uppercase tracking-widest text-violet-400 mb-3">AI Suggestion</p>
+                            <div id="aiContent" class="text-sm text-slate-700 leading-relaxed font-medium prose prose-sm max-w-none"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT SIDEBAR -->
+            <aside class="lg:col-span-4 space-y-6 sticky top-6">
+
+                <!-- Measure Details -->
+                <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8">
+                    <h3 class="text-sm font-black uppercase tracking-widest text-slate-800 mb-6 flex items-center gap-2">
+                        <i class="fas fa-file-lines text-indigo-600"></i> Measure Details
+                    </h3>
+                    <div class="space-y-5">
+                        <div>
+                            <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Type</label>
+                            <div class="grid grid-cols-2 gap-2">
+                                <label class="doc-type-label">
+                                    <input type="radio" name="type" value="ORDINANCE" checked class="hidden">
+                                    <span class="type-pill">
+                                        <i class="fas fa-scroll mr-1.5 text-[9px]"></i>Ordinance
+                                    </span>
+                                </label>
+                                <label class="doc-type-label">
+                                    <input type="radio" name="type" value="RESOLUTION" class="hidden">
+                                    <span class="type-pill">
+                                        <i class="fas fa-file-circle-check mr-1.5 text-[9px]"></i>Resolution
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="border-t border-slate-50 pt-5">
+                            <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Primary Author</label>
+                            <div class="flex items-center gap-3 px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl">
+                                <div class="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center text-white text-[10px] font-black shrink-0">
+                                    {{ user.last_name|first }}
+                                </div>
+                                <span class="text-xs font-bold text-slate-600">
+                                    {% if user.councilor_profile %}
+                                        {{ user.councilor_profile.name }}
+                                    {% else %}
+                                        Hon. {{ user.last_name }}, {{ user.first_name }}
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Committee -->
+                <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8">
+                    <h3 class="text-sm font-black uppercase tracking-widest text-slate-800 mb-5 flex items-center gap-2">
+                        <i class="fas fa-users-rectangle text-indigo-600"></i> Referred Committee
+                    </h3>
+                    <select name="referred_committee"
+                        class="w-full px-4 py-3 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 transition-all">
+                        <option value="">— No Committee Yet —</option>
+                        {% for committee in committees %}
+                            <option value="{{ committee.id }}">Committee on {{ committee.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <p class="text-[10px] text-slate-300 font-medium mt-3 italic">Can be assigned later during referral.</p>
+                </div>
+
+                <!-- Info box -->
+                <div class="bg-slate-50 rounded-[2rem] border border-slate-100 p-6 space-y-4">
+                    <p class="text-[9px] font-black uppercase tracking-widest text-slate-400">What happens next?</p>
+                    <div class="flex items-start gap-3">
+                        <div class="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                            <i class="fas fa-save text-[8px] text-slate-400"></i>
+                        </div>
+                        <p class="text-[11px] text-slate-500 font-medium leading-snug">
+                            <span class="font-black text-slate-700">Save Draft</span> — stays private, editable anytime. Autosaved every few seconds.
+                        </p>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <div class="w-6 h-6 rounded-lg bg-indigo-100 border border-indigo-200 flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                            <i class="fas fa-paper-plane text-[8px] text-indigo-500"></i>
+                        </div>
+                        <p class="text-[11px] text-slate-500 font-medium leading-snug">
+                            <span class="font-black text-slate-700">File Draft</span> — officially submitted, gets a reference number, enters First Reading. <span class="text-rose-400 font-black">Cannot be undone.</span>
+                        </p>
+                    </div>
+                </div>
+
+            </aside>
+        </div>
+    </form>
 </div>
 
-<!-- Autosave Status Indicator -->
-<div id="autosave-status" class="fixed bottom-6 right-6 text-[10px] font-bold uppercase tracking-widest text-slate-400 bg-white px-4 py-2 rounded-full shadow-lg border border-slate-100 hidden">
-    <i class="fas fa-check-circle mr-2 text-emerald-500"></i> Synced to Cloud
-</div>
-
+<script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
 <script>
-    const titleInput = document.querySelector('input[name="title"]');
-    const contentInput = document.querySelector('textarea[name="content"]');
-    const docIdInput = document.getElementById('doc_id_field');
-    const statusIndicator = document.getElementById('autosave-status');
-
-    // 1. RECOVERY LOGIC
-    window.onload = function() {
-        const savedTitle = localStorage.getItem('draft_title');
-        const savedContent = localStorage.getItem('draft_content');
-        const savedId = localStorage.getItem('current_doc_id');
-
-        if (savedTitle || savedContent) {
-            if (confirm("Restore unsaved work from your last session?")) {
-                titleInput.value = savedTitle;
-                contentInput.value = savedContent;
-                if(savedId) docIdInput.value = savedId;
-            } else {
-                localStorage.clear();
-            }
+    // ── Quill ────────────────────────────────────────────────────
+    const quill = new Quill('#quillEditor', {
+        theme: 'snow',
+        placeholder: 'WHEREAS, ...',
+        modules: {
+            toolbar: [
+                [{ 'header': [1, 2, 3, false] }],
+                ['bold', 'italic', 'underline', 'strike'],
+                [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                [{ 'indent': '-1' }, { 'indent': '+1' }],
+                ['blockquote'], ['clean']
+            ]
         }
-    };
+    });
 
-    // 2. LOCAL CACHE
-    function localSave() {
-        localStorage.setItem('draft_title', titleInput.value);
-        localStorage.setItem('draft_content', contentInput.value);
+    const existingContent = document.getElementById('contentField').value;
+    if (existingContent) quill.root.innerHTML = existingContent;
+
+    document.getElementById('draftForm').addEventListener('submit', function () {
+        document.getElementById('contentField').value = quill.root.innerHTML;
+    });
+
+    // ── Word count ───────────────────────────────────────────────
+    function updateWordCount() {
+        const text = quill.getText().trim();
+        const words = text ? text.split(/\s+/).filter(w => w).length : 0;
+        document.getElementById('wordCount').textContent = `${words} word${words !== 1 ? 's' : ''}`;
+    }
+    quill.on('text-change', updateWordCount);
+
+    // ── Auto-grow title textarea ─────────────────────────────────
+    const titleInput = document.getElementById('titleInput');
+
+    function autoGrow(el) {
+        el.style.height = 'auto';
+        el.style.height = el.scrollHeight + 'px';
     }
 
-    // 3. SERVER SYNC (Every 30s)
+    titleInput.addEventListener('input', function () {
+        autoGrow(this);
+        document.getElementById('charCount').textContent = this.value.length;
+        triggerAutosave();
+    });
+
+    autoGrow(titleInput);
+    document.getElementById('charCount').textContent = titleInput.value.length;
+
+    // ── Autosave ─────────────────────────────────────────────────
+    const docIdField   = document.getElementById('doc_id_field');
+    const statusSaved  = document.getElementById('autosaveStatus');
+    const statusSaving = document.getElementById('autosaveSaving');
+    let autosaveTimer  = null;
+
+    function triggerAutosave() {
+        clearTimeout(autosaveTimer);
+        autosaveTimer = setTimeout(serverSync, 3000);
+    }
+
     function serverSync() {
-        if (!titleInput.value && !contentInput.value) return;
+        const title   = titleInput.value.trim();
+        const content = quill.root.innerHTML.trim();
+        if (!title && content === '<p><br></p>') return;
+
+        statusSaving.classList.remove('hidden');
+        statusSaved.classList.add('hidden');
 
         fetch("{% url 'autosave_draft' %}", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "X-CSRFToken": "{{ csrf_token }}"
-            },
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
             body: JSON.stringify({
-                title: titleInput.value,
-                content: contentInput.value,
-                doc_id: localStorage.getItem('current_doc_id')
+                title: title || 'Untitled Draft',
+                content: content,
+                doc_id: docIdField.value || null
             })
         })
-        .then(response => response.json())
+        .then(r => r.json())
         .then(data => {
             if (data.status === 'saved') {
-                localStorage.setItem('current_doc_id', data.doc_id);
-                docIdInput.value = data.doc_id; // Update hidden field
-                showStatus();
+                docIdField.value = data.doc_id;
+                statusSaving.classList.add('hidden');
+                statusSaved.classList.remove('hidden');
+                setTimeout(() => statusSaved.classList.add('hidden'), 3000);
             }
         })
-        .catch(err => console.log("Offline mode: saving locally only."));
+        .catch(() => statusSaving.classList.add('hidden'));
     }
 
-    function showStatus() {
-        statusIndicator.classList.remove('hidden');
-        setTimeout(() => statusIndicator.classList.add('hidden'), 3000);
+    quill.on('text-change', triggerAutosave);
+
+    // ── Doc type pill toggle ─────────────────────────────────────
+    document.querySelectorAll('.doc-type-label input').forEach(radio => {
+        radio.addEventListener('change', () => {
+            document.querySelectorAll('.type-pill').forEach(p => p.classList.remove('active'));
+            radio.nextElementSibling.classList.add('active');
+        });
+    });
+    document.querySelector('.doc-type-label input:checked')
+        ?.nextElementSibling.classList.add('active');
+
+    // ── Ghost discard ────────────────────────────────────────────
+    function discardGhost() {
+        if (!confirm('Discard your recovered draft? This cannot be undone.')) return;
+        fetch("{% url 'discard_ghost' %}", {
+            method: 'POST',
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+        }).then(() => {
+            document.getElementById('recoveryBanner')?.remove();
+            titleInput.value = '';
+            autoGrow(titleInput);
+            document.getElementById('charCount').textContent = '0';
+            docIdField.value = '';
+            quill.setContents([]);
+        });
     }
 
-    titleInput.addEventListener('input', localSave);
-    contentInput.addEventListener('input', localSave);
-    setInterval(localSave, 2000); 
-    setInterval(serverSync, 30000); 
+    // ── AI Legal Basis ───────────────────────────────────────────
+    document.getElementById('aiCheckBtn').addEventListener('click', function () {
+        const title   = titleInput.value.trim();
+        const content = quill.getText().trim();
 
-    // CLEAR CACHE ON FORM SUBMIT
-    document.getElementById('draftForm').onsubmit = function() {
-        localStorage.clear();
-    };
+        if (!title || !content) {
+            alert("Please fill in the Title and Content first.");
+            return;
+        }
 
-    // AI Logic
-    document.getElementById('aiCheckBtn').addEventListener('click', function() {
-        const title = titleInput.value;
-        const content = contentInput.value;
-        if(!title || !content) { alert("Please fill Title and Content."); return; }
-        
+        document.getElementById('aiResults').classList.add('hidden');
+        document.getElementById('aiLoading').classList.remove('hidden');
         this.disabled = true;
-        this.innerText = "Searching...";
 
         fetch("", {
             method: 'POST',
-            headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
-            body: JSON.stringify({ title: title, content: content })
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({ title, content })
         })
         .then(res => res.json())
         .then(data => {
+            document.getElementById('aiLoading').classList.add('hidden');
             document.getElementById('aiResults').classList.remove('hidden');
-            document.getElementById('aiContent').innerHTML = data.basis;
+            document.getElementById('aiContent').innerHTML = data.basis || 'No results found.';
         })
-        .finally(() => {
-            this.disabled = false;
-            this.innerText = "Find Legal Basis";
-        });
+        .catch(() => {
+            document.getElementById('aiLoading').classList.add('hidden');
+            document.getElementById('aiContent').innerHTML = 'Could not reach AI assistant. Try again.';
+            document.getElementById('aiResults').classList.remove('hidden');
+        })
+        .finally(() => { this.disabled = false; });
     });
 </script>
+
+<style>
+    .ql-toolbar.ql-snow {
+        border: none !important;
+        border-bottom: 1px solid #f1f5f9 !important;
+        background: #f8fafc;
+        padding: 10px 20px !important;
+    }
+    .ql-container.ql-snow {
+        border: none !important;
+        font-size: 14px;
+        font-family: Georgia, serif;
+    }
+    #quillEditor .ql-editor {
+        min-height: 480px;
+        padding: 28px 36px !important;
+        line-height: 1.9;
+        color: #1e293b;
+    }
+    .ql-editor.ql-blank::before {
+        color: #94a3b8;
+        font-style: italic;
+    }
+    .title-textarea {
+        font-size: 1.1rem;
+        min-height: 60px;
+        transition: border-color 0.15s, box-shadow 0.15s, height 0s;
+    }
+    .type-pill {
+        display: block;
+        text-align: center;
+        padding: 10px 12px;
+        border-radius: 12px;
+        font-size: 10px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        cursor: pointer;
+        border: 2px solid #e2e8f0;
+        color: #94a3b8;
+        transition: all 0.15s ease;
+        background: white;
+    }
+    .type-pill:hover { border-color: #c7d2fe; color: #6366f1; }
+    .type-pill.active { background: #eef2ff; border-color: #6366f1; color: #4f46e5; }
+</style>
 {% endblock %}

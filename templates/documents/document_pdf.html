@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: "EB Garamond", "Times New Roman", Georgia, serif;
+            font-size: 12.5px;
+            color: #111;
+            line-height: 1.8;
+        }
+
+        .letterhead-line {
+            font-size: 11px;
+            color: #4b5563;
+            line-height: 1.6;
+            text-align: center;
+            display: block;
+        }
+
+        .text-center { text-align: center; }
+        .text-justify { text-align: justify; }
+
+        .doc-number {
+            font-size: 13px;
+            font-weight: 800;  /* ← was 700 */
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            text-align: center;
+            margin: 12px 0 4px;
+        }
+
+        .doc-series {
+            font-size: 11px;
+            color: #6b7280;
+            text-align: center;
+            margin-bottom: 16px;
+        }
+
+        .divider {
+            border: none;
+            border-top: 1px solid #9ca3af;
+            margin: 12px 0;
+        }
+
+        .doc-title {
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: #111;
+            line-height: 1.7;
+            letter-spacing: 0.02em;
+            margin: 16px 0;
+        }
+
+        .sponsor-box {
+            border: 1px solid #6b7280;
+            padding: 12px 24px;
+            margin-bottom: 20px;
+            text-align: center;
+            display: block;  /* ← add this */
+        }
+
+        .sponsor-label {
+            font-size: 11px;
+            color: #6b7280;
+            margin-bottom: 4px;
+        }
+
+        .sponsor-name {
+            font-size: 12px;
+            font-weight: 600;
+            color: #111;
+        }
+
+        /* Quill content */
+        p {
+            margin-bottom: 2px;
+            margin-top: 0;
+            text-align: justify;  /* ← match the scanned copy */
+        }
+        strong { font-weight: 700; }
+        em { font-style: italic; }
+        ol, ul { padding-left: 2em; margin-bottom: 8px; }
+        li { margin-bottom: 3px; }
+        h1, h2, h3 { font-weight: 700; margin: 12px 0 6px; }
+        blockquote { border-left: 3px solid #ccc; padding-left: 12px; color: #555; }
+        .ql-align-justify { text-align: justify; }
+        .ql-align-center { text-align: center; }
+        .ql-align-right { text-align: right; }
+        .ql-indent-1 { padding-left: 3em; }
+        .ql-indent-2 { padding-left: 6em; }
+        .ql-indent-3 { padding-left: 9em; }
+
+        .closing-line {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-top: 48px;
+            margin-bottom: 40px;
+        }
+
+        .signatures {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 64px;
+            margin-top: 8px;
+        }
+
+        .sig-block { text-align: center; }
+
+        .sig-line {
+            border-bottom: 1px solid #111;
+            margin-top: 48px;
+            margin-bottom: 8px;
+        }
+
+        .sig-name {
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .sig-role {
+            font-size: 10px;
+            color: #6b7280;
+            margin-top: 2px;
+        }
+
+        .page-break { page-break-before: always; padding-top: 32px; }
+
+        .page-2-header {
+            text-align: right;
+            font-size: 10px;
+            color: #9ca3af;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            font-weight: 700;
+            margin-bottom: 32px;
+        }
+
+        .submitted-by {
+            text-align: center;
+            font-size: 12px;
+            color: #374151;
+            margin-bottom: 32px;
+        }
+
+        .committee-label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            text-align: center;
+            letter-spacing: 0.04em;
+            margin-bottom: 24px;
+        }
+
+        .committee-sigs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 48px 80px;
+        }
+    </style>
+</head>
+<body>
+
+{% if doc.doc_type == 'ORDINANCE' %}
+
+    <span class="letterhead-line">Republic of the Philippines</span>
+    <span class="letterhead-line" style="font-weight:600;">City of San Juan, Metro Manila</span>
+    <span class="letterhead-line">Office of the Sangguniang Panlungsod</span>
+
+    <hr class="divider">
+
+    <p class="doc-number">
+        {% if doc.status != 'APPROVED'  %}Draft {% endif %}Ordinance No. {{ doc.ref_number}}
+    </p>
+    <p class="doc-series">Series of {{ doc.created_at|date:"Y" }}</p>
+
+    <p class="doc-title text-center">{{ doc.title }}</p>
+
+    <div class="sponsor-box">
+        <div class="sponsor-label">Sponsored by:</div>
+        <div class="sponsor-name">
+            {% if doc.author.councilor_profile %}{{ doc.author.councilor_profile.name }}
+            {% else %}Hon. {{ doc.author.last_name }}, {{ doc.author.first_name }}{% endif %}
+        </div>
+    </div>
+    {{ doc.content|safe }}
+
+    <p class="closing-line">Approved: ___________________________</p>
+
+    <div class="signatures">
+        <div class="sig-block">
+            <div class="sig-line"></div>
+            <p class="sig-name">
+                {% if doc.author.councilor_profile %}{{ doc.author.councilor_profile.name }}
+                {% else %}Hon. {{ doc.author.last_name }}, {{ doc.author.first_name }}{% endif %}
+            </p>
+            <p class="sig-role">City Councilor</p>
+        </div>
+        <div class="sig-block">
+            <div class="sig-line"></div>
+            <p class="sig-name" style="color:#9ca3af; font-style:italic; text-transform:none; font-weight:400;">— Co-signatory —</p>
+            <p class="sig-role">City Councilor</p>
+        </div>
+    </div>
+
+{% else %}
+
+    <span class="letterhead-line">Republic of the Philippines</span>
+    <span class="letterhead-line">City of San Juan</span>
+    <span class="letterhead-line">Metro Manila</span>
+
+    <p class="doc-number" style="font-size:14px; margin-top:8px;">Office of the Sangguniang Panlungsod</p>
+
+    <hr class="divider">
+
+    <p class="doc-number">
+        {% if doc.status == 'DRAFT' or doc.status == 'GHOST' %}Draft {% endif %}Resolution No. {{ doc.reference_no|default:doc.id }}
+    </p>
+    <p class="doc-series">Series of {{ doc.created_at|date:"Y" }}</p>
+
+    <p class="doc-title text-justify">{{ doc.title }}</p>
+
+    <div class="sponsor-box" style="text-align:left;">
+        <p class="sponsor-label">Sponsored by:</p>
+        <p class="sponsor-name">
+            {% if doc.author.councilor_profile %}{{ doc.author.councilor_profile.name }}
+            {% else %}Hon. {{ doc.author.last_name }}, {{ doc.author.first_name }}{% endif %}
+        </p>
+    </div>
+
+    {{ doc.content|safe }}
+
+    <p class="closing-line">Adopted: ___________________________</p>
+
+    <!-- Page 2 -->
+    <div class="page-break">
+        <p class="page-2-header">
+            Page 2 of D.R. No. {{ doc.reference_no|default:doc.id }}-{{ doc.created_at|date:"Y" }}
+        </p>
+
+        <p class="submitted-by">Respectfully Submitted by:</p>
+
+        {% if doc.referred_committee %}
+        <p class="committee-label">The Committee on {{ doc.referred_committee.name }}</p>
+        <div class="committee-sigs">
+            {% if doc.referred_committee.chairman %}
+            <div class="sig-block">
+                <div class="sig-line"></div>
+                <p class="sig-name">{{ doc.referred_committee.chairman.name }}</p>
+                <p class="sig-role">Chairperson</p>
+            </div>
+            {% endif %}
+            {% if doc.referred_committee.vice_chairman %}
+            <div class="sig-block">
+                <div class="sig-line"></div>
+                <p class="sig-name">{{ doc.referred_committee.vice_chairman.name }}</p>
+                <p class="sig-role">Vice-Chairperson</p>
+            </div>
+            {% endif %}
+            {% if doc.referred_committee.member %}
+            <div class="sig-block">
+                <div class="sig-line"></div>
+                <p class="sig-name">{{ doc.referred_committee.member.name }}</p>
+                <p class="sig-role">Member</p>
+            </div>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="signatures">
+            <div class="sig-block">
+                <div class="sig-line"></div>
+                <p class="sig-name">
+                    {% if doc.author.councilor_profile %}{{ doc.author.councilor_profile.name }}
+                    {% else %}Hon. {{ doc.author.last_name }}, {{ doc.author.first_name }}{% endif %}
+                </p>
+                <p class="sig-role">City Councilor</p>
+            </div>
+            <div class="sig-block">
+                <div class="sig-line"></div>
+                <p class="sig-name" style="color:#9ca3af; font-style:italic; text-transform:none; font-weight:400;">— Co-signatory —</p>
+                <p class="sig-role">City Councilor</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+{% endif %}
+
+</body>
+</html>

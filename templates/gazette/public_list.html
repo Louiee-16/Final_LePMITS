@@ -1,0 +1,89 @@
+{% extends 'base.html' %} <!-- You can create a separate 'public_base.html' without the sidebar later -->
+
+{% block content %}
+<div class="max-w-6xl mx-auto py-16 px-6">
+    
+    <!-- 1. PUBLIC HEADER -->
+    <div class="text-center mb-16">
+        <div class="inline-flex items-center gap-3 px-4 py-2 bg-emerald-50 rounded-full border border-emerald-100 mb-6">
+            <span class="relative flex h-2 w-2">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span class="text-[10px] font-black uppercase tracking-widest text-emerald-700">Official Public Registry</span>
+        </div>
+        <h1 class="text-5xl font-[900] text-slate-900 tracking-tight mb-4">The Official Gazette</h1>
+        <p class="text-slate-500 text-lg max-w-2xl mx-auto font-medium leading-relaxed">
+            Access and download all enacted ordinances and approved resolutions passed by the Sangguniang Panlungsod.
+        </p>
+    </div>
+
+    <!-- 2. SEARCH & FILTER BAR -->
+    <div class="bg-white rounded-[2.5rem] shadow-2xl shadow-slate-200/60 p-4 mb-12 border border-slate-100">
+        <form method="GET" action="" class="flex flex-col md:flex-row gap-4">
+            <div class="relative flex-1">
+                <i class="fas fa-search absolute left-6 top-1/2 -translate-y-1/2 text-slate-300"></i>
+                <input type="text" name="q" placeholder="Search by topic, number, or keyword (e.g. 'Curfew', 'Health')..." 
+                       class="w-full pl-14 pr-6 py-5 bg-slate-50 border-none rounded-[1.5rem] text-sm font-bold focus:ring-2 focus:ring-emerald-500 transition-all">
+            </div>
+            <select name="year" class="bg-slate-50 border-none rounded-[1.5rem] px-8 py-5 text-xs font-black text-slate-600 focus:ring-2 focus:ring-emerald-500 uppercase tracking-widest">
+                <option value="">All Years</option>
+                <option value="2026">2026</option>
+                <option value="2025">2025</option>
+            </select>
+            <button type="submit" class="bg-emerald-600 text-white px-10 py-5 rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100">
+                Find Legislation
+            </button>
+        </form>
+    </div>
+
+    <!-- 3. RESULTS GRID -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {% for doc in approved_docs %}
+        <div class="group bg-white rounded-[2.5rem] border border-slate-100 p-10 hover:shadow-2xl hover:-translate-y-1 transition-all duration-500 relative overflow-hidden">
+            <!-- Background Decoration -->
+            <div class="absolute -top-10 -right-10 opacity-[0.03] group-hover:opacity-[0.07] transition-opacity">
+                <i class="fas fa-scroll text-[12rem] text-slate-900 rotate-12"></i>
+            </div>
+
+            <div class="relative z-10">
+                <div class="flex justify-between items-start mb-6">
+                    <span class="text-[10px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 px-4 py-1.5 rounded-xl border border-emerald-100">
+                        {{ doc.reference_no }}
+                    </span>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        {{ doc.updated_at|date:"M d, Y" }}
+                    </span>
+                </div>
+
+                <h2 class="text-xl font-black text-slate-900 leading-tight mb-4 group-hover:text-emerald-700 transition-colors">
+                    {{ doc.title }}
+                </h2>
+                
+                <p class="text-slate-500 text-sm line-clamp-3 mb-8 leading-relaxed font-medium">
+                    {{ doc.content|truncatewords:40 }}
+                </p>
+
+                <div class="flex items-center justify-between pt-6 border-t border-slate-50">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500">
+                            {{ doc.author.last_name|slice:":1" }}
+                        </div>
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sponsor: <span class="text-slate-700">Hon. {{ doc.author.last_name }}</span></p>
+                    </div>
+                    
+                    <a href="{% url 'gazette_detail' doc.id %}" class="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center hover:bg-emerald-600 transition-colors shadow-xl">
+                        <i class="fas fa-chevron-right text-xs"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-span-full py-20 text-center">
+            <i class="fas fa-search text-4xl text-slate-100 mb-4 block"></i>
+            <p class="text-slate-400 font-bold uppercase tracking-widest text-xs">No records found matching your search</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

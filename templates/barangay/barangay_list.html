@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+
+    <!-- HEADER SECTION -->
+    <div class="md:flex md:items-center md:justify-between mb-10 border-b border-slate-200 pb-6">
+        <div class="flex-1 min-w-0">
+            <h2 class="text-3xl font-[900] text-slate-900 tracking-tight">Barangay Registry</h2>
+            <p class="text-slate-500 mt-1 font-medium italic">Official list of registered barangay units in the city.</p>
+        </div>
+        <div class="mt-5 lg:mt-0 lg:ml-4">
+            <a href="{% url 'add-barangay' %}" 
+               class="inline-flex items-center px-6 py-3 border border-transparent rounded-xl shadow-lg shadow-indigo-100 text-xs font-black text-white bg-indigo-600 hover:bg-indigo-700 uppercase tracking-widest transition-all">
+                <i class="fas fa-plus-circle mr-2"></i> Register New Barangay
+            </a>
+        </div>
+    </div>
+
+    <!-- GRID SECTION -->
+    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {% if barangays %}
+            {% for brgy in barangays %}
+            <div class="bg-white border border-slate-200 rounded-[2rem] shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden group">
+                <div class="p-8">
+                    <div class="flex items-start justify-between mb-6">
+                        <!-- Icon -->
+                        <div class="h-16 w-16 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                            <i class="fas fa-landmark text-2xl"></i>
+                        </div>
+                        <!-- Barangay Code -->
+
+                    </div>
+
+                    <h3 class="text-xl font-black text-slate-900 tracking-tight mb-1 uppercase">Brgy. {{ brgy.barangay_name }}</h3>
+                    <div class="flex items-center text-sm text-slate-500 font-medium">
+                        <i class="fas fa-user-tie mr-2 text-slate-300"></i>
+                        <span class="text-xs text-slate-400 uppercase tracking-tighter mr-2">Captain:</span>
+                        <span class="text-slate-800 font-bold">{{ brgy.captain }}</span>
+                    </div>
+                </div>
+
+                <!-- ACTION BUTTONS -->
+                <div class="bg-slate-50 px-8 py-4 flex items-center justify-between border-t border-slate-100">
+                    <a href="" class="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-600 transition-colors">
+                        <i class="fas fa-eye mr-1"></i> View
+                    </a>
+                    <a href="" class="text-[10px] font-black uppercase tracking-widest text-rose-300 hover:text-rose-500 transition-colors">
+                        <i class="fas fa-trash-alt mr-1"></i> Delete
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-span-full py-24 bg-white border-2 border-dashed border-slate-200 rounded-[3rem] text-center">
+                <i class="fas fa-folder-open text-4xl text-slate-200 mb-4 block"></i>
+                <p class="text-slate-400 font-bold uppercase tracking-widest text-xs">No Barangays found</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

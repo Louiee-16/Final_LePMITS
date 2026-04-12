@@ -1,0 +1,182 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="w-full mx-auto space-y-10">
+    
+    <!-- HEADER & PRIMARY ACTION -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-4xl font-[1000] text-slate-900 tracking-tight">Barangay Dashboard</h1>
+            <p class="text-slate-500 mt-1 font-medium text-lg">
+                Welcome, Brgy. {{ user.barangay_profile.barangay_name}}
+            </p>
+        </div>
+        <a href="javascript:void(0)" id="openModal"
+           class="px-8 py-4 bg-indigo-600 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-indigo-100 hover:bg-indigo-700 hover:-translate-y-1 transition-all flex items-center gap-3">
+            <i class="fas fa-plus-circle text-lg"></i> Upload Barangay Measure
+        </a>
+    </div>
+
+    <!-- STATS GRID -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div class="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
+            <p class="text-[11px] font-black text-slate-400 uppercase">Filed Draft</p>
+            <h3 class="text-5xl font-black text-slate-900 mt-2">{{ filed_drafts_count }}</h3>
+        </div>
+
+        <div class="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
+            <p class="text-[11px] font-black text-slate-400 uppercase">Registered Residents</p>
+            <h3 class="text-5xl font-black text-slate-900 mt-2">{{ residents_count }}</h3>
+        </div>
+    </div>
+
+    <!-- TABLE -->
+    <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+        <div class="px-10 py-8 border-b border-slate-50">
+            <h3 class="font-extrabold text-slate-900 text-xl">Filed Drafts</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead class="bg-slate-50 text-[11px] font-black uppercase text-slate-400">
+                    <tr>
+                        <th class="px-10 py-5">Date Filed</th>
+                        <th class="px-10 py-5">Draft Title</th>
+                        <th class="px-10 py-5">Status</th>
+                        <th class="px-10 py-5 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for brgy in barangays %}
+                    <tr>
+                        <td class="px-10 py-6">{{ brgy.code|default:"N/A" }}</td>
+                        <td class="px-10 py-6">{{ brgy.barangay_name }}</td>
+                        <td class="px-10 py-6">{{ brgy.captain }}</td>
+                        <td class="px-10 py-6 text-right">...</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="p-10 text-center text-slate-400">No data</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL -->
+<div id="draftModal" class="fixed inset-0 bg-black/40 hidden flex items-center justify-center z-50">
+    <div class="bg-white w-full max-w-lg rounded-3xl p-8 relative">
+
+        <button id="closeModal" class="absolute top-4 right-4">✕</button>
+
+        <h2 class="text-xl font-extrabold mb-6">Upload Barangay Measure</h2>
+
+        <form method="POST" enctype="multipart/form-data" action="{%url 'upload-measure'%}">
+            {% csrf_token %}
+
+            <!-- TITLE -->
+            <div class="mb-6">
+                <label class="block text-sm font-bold mb-2">Document Title</label>
+                {{ form.title }}
+                <p id="titleError" class="text-red-600 text-sm mt-1 hidden"></p>
+            </div>
+
+            <!-- SUBJECT -->
+            <div class="mb-6">
+                <label class="block text-sm font-bold mb-2">Subject</label>
+                {{ form.subject }}
+            </div>
+
+            <!-- REMARKS -->
+            <div class="mb-6">
+                <label class="block text-sm font-bold mb-2">Remarks</label>
+                {{ form.remarks }}
+            </div>
+
+            <!-- FILE -->
+            <div class="mb-6">
+                <label class="block text-sm font-bold mb-2">File</label>
+                {{ form.scanned_pdf }}
+            </div>
+
+            <div class="flex justify-end gap-3">
+                <button type="button" id="cancelModal">Cancel</button>
+                <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-xl">
+                    Upload
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const modal = document.getElementById('draftModal');
+    const openBtn = document.getElementById('openModal');
+    const closeBtn = document.getElementById('closeModal');
+    const cancelBtn = document.getElementById('cancelModal');
+    const form = modal.querySelector('form');
+
+    const titleInput = form.querySelector('input[name="title"]');
+    const errorText = document.getElementById('titleError');
+    const submitBtn = form.querySelector('button[type="submit"]');
+
+    // Strict format
+    const pattern = /^Barangay Ordinance No\. \d+, Series of \d{4}$/;
+
+    function closeModal() {
+        modal.classList.add('hidden');
+        form.reset();
+        errorText.classList.add('hidden');
+        submitBtn.disabled = true;
+    }
+
+    openBtn.onclick = () => modal.classList.remove('hidden');
+    closeBtn.onclick = closeModal;
+    cancelBtn.onclick = closeModal;
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+    });
+
+    // 🔹 Live validation
+    function validateTitle() {
+        const value = titleInput.value.trim();
+
+        if (pattern.test(value)) {
+            errorText.classList.add('hidden');
+            titleInput.classList.remove('border-red-500');
+            titleInput.classList.add('border-green-500');
+            submitBtn.disabled = false;
+        } else {
+            errorText.innerText = "Use format: Barangay Ordinance No. 123, Series of 2024";
+            errorText.classList.remove('hidden');
+            titleInput.classList.add('border-red-500');
+            titleInput.classList.remove('border-green-500');
+            submitBtn.disabled = true;
+        }
+    }
+
+    // Force prefix (optional but helpful)
+    titleInput.addEventListener('input', () => {
+        if (!titleInput.value.startsWith("Barangay Ordinance No.")) {
+            titleInput.value = "Barangay Ordinance No. ";
+        }
+        validateTitle();
+    });
+
+    // 🔹 Final safety check on submit
+    form.addEventListener('submit', (e) => {
+        if (!pattern.test(titleInput.value.trim())) {
+            e.preventDefault();
+            validateTitle();
+        }
+    });
+
+    // Disable submit initially
+    submitBtn.disabled = true;
+});
+</script>
+
+{% endblock %}

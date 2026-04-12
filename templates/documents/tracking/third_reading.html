@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="w-full mx-auto space-y-10">
+
+    <!-- PAGE HEADER -->
+    <div class="flex justify-between items-end pb-4 border-b border-slate-100">
+        <div>
+            <nav class="flex text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 gap-2 mb-3">
+                <a href="{% url 'dashboard' %}" class="hover:text-indigo-600 transition-colors">Legislative</a>
+                <span>/</span>
+                <span class="text-indigo-600">Third Reading</span>
+            </nav>
+            <h1 class="text-4xl font-[900] text-slate-900 tracking-tight">Third & Final Reading</h1>
+            <p class="text-slate-500 mt-1 font-medium italic">Final voting stage. Documents here are in their "Clean Print" form. No further amendments allowed.</p>
+        </div>
+
+        <div class="flex gap-3">
+            <div class="px-5 py-3 bg-white border border-slate-200 rounded-xl shadow-sm text-center">
+                <p class="text-[9px] font-black uppercase tracking-widest text-slate-400">Final Vote Pending</p>
+                <p class="text-2xl font-black text-emerald-600">{{ third_reading|length }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- DATA TABLE -->
+    <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+        <table class="w-full text-left">
+            <thead class="bg-slate-50 border-b border-slate-100">
+                <tr>
+                    <th class="px-10 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Finalized On</th>
+                    <th class="px-10 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Reference No.</th>
+                    <th class="px-10 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Title</th>
+                    <th class="px-10 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Principal Author</th>
+                    <th class="px-10 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400 text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-50">
+                {% for doc in third_reading %}
+                <tr class="hover:bg-slate-50/50 transition-colors group">
+
+                    <td class="px-10 py-6 text-sm text-slate-600 whitespace-nowrap">
+                        {{ doc.updated_at|date:"M d, Y" }}
+                    </td>
+
+                    <td class="px-10 py-6">
+                        <span class="text-xs font-black text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg border border-indigo-100 uppercase tracking-widest">
+                            {{ doc.reference_no }}
+                        </span>
+                    </td>
+
+                    <td class="px-10 py-6">
+                        <div class="max-w-md">
+                            <p class="text-sm font-extrabold text-slate-800 leading-snug line-clamp-3 "title="{{doc.title}}">
+                                {{ doc.title }}
+                            </p>
+                            <span class="text-[9px] font-bold text-slate-400 uppercase tracking-[0.15em] mt-1 inline-block">{{ doc.doc_type }}</span>
+                        </div>
+                    </td>
+
+                    <td class="px-10 py-6 text-sm font-medium text-slate-700 whitespace-nowrap">
+                        Hon. {{ doc.surname }}
+                    </td>
+
+                    <!-- Actions -->
+                    <td class="px-10 py-6 text-right">
+                        <div class="flex items-center justify-end gap-3">
+                            
+                            {% if user.role == 'SECRETARIAT' or user.role == 'STAFF' %}
+                                <!-- Action: Final Approval (Green) -->
+                                <button type="button" 
+                                    onclick="openApprovalModal('{{ doc.id }}', '{{ doc.title|escapejs }}')"
+                                    class="px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-700 hover:-translate-y-0.5 transition-all">
+                                    <i class="fas fa-check-double mr-1.5"></i> Final Approval
+                                </button>
+
+                                <!-- Action: Failure (Red) -->
+                                <form action="{%url 'move-to-disapproved' doc.id%}" method="POST" class="inline" onsubmit="return confirm('Are you sure you want to mark this measure as FAILED? This cannot be undone.')">
+                                    {% csrf_token %}
+                                    <button type="submit" 
+                                        class="p-2.5 bg-white border border-rose-200 text-rose-500 rounded-xl hover:bg-rose-50 transition-all" title="Mark as Failed">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </form>
+                            {% endif %}
+
+                            <a href="{%url 'view-document' doc.id%}" class="w-9 h-9 flex items-center justify-center text-slate-300 hover:text-indigo-600 hover:bg-white hover:shadow-md border border-transparent hover:border-slate-100 rounded-xl transition-all" title="Review Final Text">
+                                <i class="fas fa-eye text-xs"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="p-20 text-center">
+                        <div class="inline-flex items-center justify-center w-20 h-20 bg-white rounded-3xl shadow-sm mb-6 border border-slate-100">
+                            <i class="fas fa-check-circle text-3xl text-slate-200"></i>
+                        </div>
+                        <p class="text-slate-400 font-bold uppercase tracking-widest text-xs">No documents for Final Reading</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- FINAL APPROVAL MODAL -->
+<div id="approvalModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-[2rem] shadow-2xl max-w-lg w-full p-10 transform transition-all">
+        <h2 class="text-2xl font-[900] text-slate-800 mb-2">Confirm Enactment</h2>
+        <p class="text-slate-500 text-sm mb-8">
+            You are about to officially approve this measure. This will move the document to the **Approved** state and create the final paper trail archive.
+        </p>
+        
+        <p id="modalDocTitle" class="bg-slate-50 p-4 rounded-xl text-xs font-bold text-slate-700 border border-slate-100 mb-8 italic"></p>
+
+        <form id="approvalForm" method="POST" action="">
+            {% csrf_token %}
+            
+            <div class="flex gap-3">
+                <button type="button" onclick="closeApprovalModal()" class="flex-1 py-4 text-slate-400 font-bold hover:text-slate-600">Wait, Go Back</button>
+                <button type="submit" class="flex-[2] bg-emerald-600 text-white py-4 rounded-2xl font-black hover:bg-emerald-700 shadow-lg shadow-emerald-100">
+                    <i class="fas fa-stamp mr-2"></i> Approve & Sign
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openApprovalModal(docId, title) {
+        document.getElementById('approvalForm').action = `/approve/${docId}/`;
+        document.getElementById('modalDocTitle').innerText = title;
+        document.getElementById('approvalModal').classList.remove('hidden');
+    }
+    function closeApprovalModal() {
+        document.getElementById('approvalModal').classList.add('hidden');
+    }
+</script>
+{% endblock %}

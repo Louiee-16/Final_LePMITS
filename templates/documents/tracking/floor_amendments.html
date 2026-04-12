@@ -1,0 +1,461 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="max-w-[1800px] mx-auto px-4 py-6">
+
+    <!-- TOP HEADER BAR -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-slate-100 pb-5 gap-4">
+        <div class="flex items-center gap-4">
+            <a href="{%url 'second-reading'%}" class="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-all shadow-sm">
+                <i class="fas fa-arrow-left text-xs"></i>
+            </a>
+            <div>
+                <nav class="flex text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 gap-2 mb-1">
+                    <a href="{% url 'dashboard' %}" class="hover:text-indigo-600 transition-colors">Legislative</a>
+                    <span class="text-slate-200">/</span>
+                    <a href="{%url 'second-reading'%}" class="hover:text-indigo-600 transition-colors">Second Reading</a>
+                    <span class="text-slate-200">/</span>
+                    <span class="text-indigo-600">Floor Amendments</span>
+                </nav>
+                <h1 class="text-xl font-extrabold text-slate-900 tracking-tight leading-tight max-w-2xl">{{ doc.title }}</h1>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3 shrink-0">
+            <p class="text-[10px] font-bold text-slate-400 uppercase mr-1">
+                Last Saved: <span class="text-slate-600">{{ doc.updated_at|date:"M d, H:i" }}</span>
+            </p>
+
+            <!-- Current status badge (read-only, shows saved state) -->
+            {% if doc.amendment_status %}
+            <span class="px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest
+                {% if doc.amendment_status == 'IN_PROGRESS' %}bg-amber-50 text-amber-600 border border-amber-200
+                {% elif doc.amendment_status == 'FINALIZED' %}bg-emerald-50 text-emerald-600 border border-emerald-200
+                {% elif doc.amendment_status == 'NO_AMENDMENTS' %}bg-slate-100 text-slate-500 border border-slate-200
+                {% endif %}">
+                {% if doc.amendment_status == 'IN_PROGRESS' %}<i class="fas fa-circle-half-stroke mr-1"></i> In Progress
+                {% elif doc.amendment_status == 'FINALIZED' %}<i class="fas fa-check-circle mr-1"></i> Finalized
+                {% elif doc.amendment_status == 'NO_AMENDMENTS' %}<i class="fas fa-minus-circle mr-1"></i> No Amendments
+                {% endif %}
+            </span>
+            {% endif %}
+
+            <!-- Save triggers the status modal -->
+            <button type="button" onclick="openSaveModal()"
+                class="px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all">
+                <i class="fas fa-save mr-2"></i> Save
+            </button>
+
+            <div class="flex flex-col gap-2">
+                <button type="button" onclick="openThirdReadingModal()"
+                    class="px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-700 hover:-translate-y-0.5 transition-all">
+                    <i class="fas fa-paper-plane mr-2"></i> Move to Third Reading
+                </button>
+                <button type="button" onclick="openCommitteeModal()"
+                    class="px-5 py-2.5 bg-rose-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-rose-100 hover:bg-rose-700 hover:-translate-y-0.5 transition-all">
+                    <i class="fas fa-rotate-left mr-2"></i> Return to Committee
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DIFF LEGEND -->
+    <div class="flex items-center gap-6 mb-4 px-1">
+        <div class="flex items-center gap-2">
+            <div class="w-3 h-3 rounded-full bg-slate-300"></div>
+            <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">Original — Read Only</span>
+        </div>
+        <div class="w-px h-4 bg-slate-200"></div>
+        <div class="flex items-center gap-2">
+            <div class="w-3 h-3 rounded-full bg-indigo-400"></div>
+            <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">Amended Version — Editable</span>
+        </div>
+        <div class="w-px h-4 bg-slate-200"></div>
+        <div class="flex items-center gap-2">
+            <div class="w-3 h-3 rounded bg-amber-100 border border-amber-300"></div>
+            <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">Active Section Highlight</span>
+        </div>
+    </div>
+
+    <!-- SIDE BY SIDE PANELS -->
+    <form id="amendmentsForm" method="POST" action="{% url 'save_amendments' doc.id %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="save">
+        <input type="hidden" name="amendment_status" id="amendmentStatusField" value="{{ doc.amendment_status|default:'IN_PROGRESS' }}">
+
+        <div class="grid grid-cols-2 gap-0 rounded-[2rem] overflow-hidden border border-slate-200 shadow-sm" style="height: calc(100vh - 230px); min-height: 600px;">
+
+            <!-- LEFT: ORIGINAL (Read-only) -->
+            <div class="flex flex-col border-r border-slate-200 bg-white overflow-hidden">
+                <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between shrink-0">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-2 h-2 rounded-full bg-slate-300"></div>
+                        <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">Committee-Approved Original</span>
+                    </div>
+                    <span class="text-[9px] font-black uppercase tracking-widest text-slate-300 bg-slate-100 px-2.5 py-1 rounded-full">Read Only</span>
+                </div>
+                <div id="originalPanel" class="flex-1 overflow-y-auto px-10 py-8 text-[13px] leading-[1.9] text-slate-600 font-serif original-content ql-editor" style="position:static; white-space:normal;">
+                    {{ doc.content|safe }}
+                </div>
+            </div>
+
+            <!-- RIGHT: EDITABLE -->
+            <div class="flex flex-col bg-white overflow-hidden">
+                <div class="px-6 py-4 border-b border-slate-100 bg-white flex items-center justify-between shrink-0">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-2 h-2 rounded-full bg-indigo-400"></div>
+                        <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">Amended Version</span>
+                    </div>
+                    <span class="text-[9px] font-black uppercase tracking-widest text-indigo-400 bg-indigo-50 px-2.5 py-1 rounded-full">
+                        <i class="fas fa-pen-nib mr-1"></i> Editable
+                    </span>
+                </div>
+                <div class="flex-1 overflow-hidden flex flex-col">
+                    <div id="amendmentEditor" class="flex-1"></div>
+                    <textarea name="amended_content" id="amendedContent" class="hidden">{{ doc.amended_content|default:doc.content }}</textarea>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     SAVE + STATUS MODAL
+══════════════════════════════════════════════ -->
+<div id="saveModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+    <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="closeSaveModal()"></div>
+    <div class="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-sm p-8 modal-card">
+
+        <div class="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mb-5">
+            <i class="fas fa-tag text-indigo-500"></i>
+        </div>
+
+        <h2 class="text-base font-black text-slate-900 tracking-tight mb-1">Mark Amendment Status</h2>
+        <p class="text-xs text-slate-400 font-medium mb-6 leading-relaxed">
+            Before saving, mark where this amendment session currently stands.
+        </p>
+
+        <!-- Status options -->
+        <div class="space-y-3 mb-6">
+
+            <label class="save-status-label flex items-start gap-4 p-4 border-2 border-slate-100 rounded-2xl cursor-pointer hover:bg-slate-50 transition-all">
+                <input type="radio" name="saveStatus" value="IN_PROGRESS" class="hidden" checked>
+                <div class="w-9 h-9 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0 mt-0.5">
+                    <i class="fas fa-circle-half-stroke text-amber-500 text-sm"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-black uppercase tracking-widest text-slate-700">In Progress</p>
+                    <p class="text-[11px] text-slate-400 font-medium mt-0.5">Amendments are still being worked on.</p>
+                </div>
+            </label>
+
+            <label class="save-status-label flex items-start gap-4 p-4 border-2 border-slate-100 rounded-2xl cursor-pointer hover:bg-slate-50 transition-all">
+                <input type="radio" name="saveStatus" value="FINALIZED" class="hidden">
+                <div class="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0 mt-0.5">
+                    <i class="fas fa-check-circle text-emerald-500 text-sm"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-black uppercase tracking-widest text-slate-700">Finalized</p>
+                    <p class="text-[11px] text-slate-400 font-medium mt-0.5">All amendments are done and reviewed.</p>
+                </div>
+            </label>
+
+            <label class="save-status-label flex items-start gap-4 p-4 border-2 border-slate-100 rounded-2xl cursor-pointer hover:bg-slate-50 transition-all">
+                <input type="radio" name="saveStatus" value="NO_AMENDMENTS" class="hidden">
+                <div class="w-9 h-9 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0 mt-0.5">
+                    <i class="fas fa-minus-circle text-slate-400 text-sm"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-black uppercase tracking-widest text-slate-700">No Amendments</p>
+                    <p class="text-[11px] text-slate-400 font-medium mt-0.5">No changes were made to this draft.</p>
+                </div>
+            </label>
+
+        </div>
+
+        <div class="flex gap-3">
+            <button type="button" onclick="closeSaveModal()"
+                class="flex-1 px-4 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-all">
+                Cancel
+            </button>
+            <button type="button" onclick="confirmSave()"
+                class="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">
+                <i class="fas fa-save mr-2"></i> Save
+            </button>
+        </div>
+    </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     MOVE TO THIRD READING MODAL
+══════════════════════════════════════════════ -->
+<div id="thirdReadingModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+    <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="closeThirdReadingModal()"></div>
+    <div class="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-md p-8 modal-card">
+
+        <div class="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center mb-6">
+            <i class="fas fa-paper-plane text-emerald-500 text-xl"></i>
+        </div>
+
+        <h2 class="text-lg font-black text-slate-900 tracking-tight mb-2">Move to Third Reading</h2>
+        <p class="text-sm text-slate-500 font-medium leading-relaxed mb-6">
+            This will finalize all floor amendments and elevate the document to Third Reading.
+            <span class="text-slate-700 font-bold">This action cannot be undone.</span>
+        </p>
+
+        <div class="bg-slate-50 rounded-2xl border border-slate-100 p-5 mb-6 space-y-3">
+            <p class="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-3">Before proceeding, confirm:</p>
+            <label class="flex items-start gap-3 cursor-pointer group">
+                <input type="checkbox" id="check1" class="mt-0.5 w-4 h-4 accent-emerald-500 shrink-0" onchange="checkAllConfirmed()">
+                <span class="text-xs text-slate-600 font-medium group-hover:text-slate-800 transition-colors">All floor amendments have been applied and saved.</span>
+            </label>
+            <label class="flex items-start gap-3 cursor-pointer group">
+                <input type="checkbox" id="check2" class="mt-0.5 w-4 h-4 accent-emerald-500 shrink-0" onchange="checkAllConfirmed()">
+                <span class="text-xs text-slate-600 font-medium group-hover:text-slate-800 transition-colors">The amended version has been reviewed by the committee chair.</span>
+            </label>
+            <label class="flex items-start gap-3 cursor-pointer group">
+                <input type="checkbox" id="check3" class="mt-0.5 w-4 h-4 accent-emerald-500 shrink-0" onchange="checkAllConfirmed()">
+                <span class="text-xs text-slate-600 font-medium group-hover:text-slate-800 transition-colors">The document is ready for final deliberation.</span>
+            </label>
+        </div>
+
+        <div class="flex gap-3">
+            <button type="button" onclick="closeThirdReadingModal()"
+                class="flex-1 px-5 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-all">
+                Cancel
+            </button>
+            <form action="{% url 'move_to_third_reading' doc.id %}" method="POST" class="flex-1">
+                {% csrf_token %}
+                <button type="submit" id="confirmBtn" disabled
+                    class="w-full px-5 py-3 bg-emerald-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:bg-emerald-600">
+                    <i class="fas fa-paper-plane mr-2"></i> Confirm & Move
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     RETURN TO COMMITTEE MODAL
+══════════════════════════════════════════════ -->
+<div id="committeeModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+    <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="closeCommitteeModal()"></div>
+    <div class="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-md p-8 modal-card">
+
+        <div class="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center mb-6">
+            <i class="fas fa-rotate-left text-rose-500 text-xl"></i>
+        </div>
+
+        <h2 class="text-lg font-black text-slate-900 tracking-tight mb-2">Return to Committee</h2>
+        <p class="text-sm text-slate-500 font-medium leading-relaxed mb-6">
+            This will send the document back to committee for further deliberation.
+            <span class="text-slate-700 font-bold">This action cannot be undone.</span>
+        </p>
+
+        <div class="flex gap-3">
+            <button type="button" onclick="closeCommitteeModal()"
+                class="flex-1 px-5 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-all">
+                Cancel
+            </button>
+            <form action="" method="POST" class="flex-1">
+                {% csrf_token %}
+                <button type="submit"
+                    class="w-full px-5 py-3 bg-rose-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-rose-100 hover:bg-rose-700 transition-all">
+                    <i class="fas fa-rotate-left mr-2"></i> Confirm & Return
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+<link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
+<script>
+    // ── Quill ────────────────────────────────────────────────────────
+    const quill = new Quill('#amendmentEditor', {
+        theme: 'snow',
+        placeholder: 'Apply floor amendments here...',
+        modules: {
+            toolbar: [
+                [{ 'header': [1, 2, 3, false] }],
+                ['bold', 'italic', 'underline', 'strike'],
+                [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                [{ 'indent': '-1' }, { 'indent': '+1' }],
+                ['blockquote'], ['clean']
+            ]
+        }
+    });
+
+    const existing = document.getElementById('amendedContent').value;
+    if (existing) quill.root.innerHTML = existing;
+
+    document.getElementById('amendmentsForm').addEventListener('submit', function () {
+        document.getElementById('amendedContent').value = quill.root.innerHTML;
+    });
+
+    // ── Cursor tracking ──────────────────────────────────────────────
+    const originalPanel = document.getElementById('originalPanel');
+
+    function getActiveParagraphIndex() {
+        const selection = quill.getSelection();
+        if (!selection) return -1;
+        const [leaf] = quill.getLeaf(selection.index);
+        if (!leaf) return -1;
+        let node = leaf.domNode;
+        while (node && node.parentNode !== quill.root) node = node.parentNode;
+        if (!node) return -1;
+        return Array.from(quill.root.children).indexOf(node);
+    }
+
+    function highlightOriginalParagraph(index) {
+        Array.from(originalPanel.children).forEach((el, i) => {
+            el.classList.remove('active-highlight');
+            if (i === index && index !== -1) {
+                el.classList.add('active-highlight');
+                el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            }
+        });
+    }
+
+    quill.on('selection-change', range => { if (range) highlightOriginalParagraph(getActiveParagraphIndex()); });
+    quill.on('text-change', () => highlightOriginalParagraph(getActiveParagraphIndex()));
+
+    // ── Save modal ───────────────────────────────────────────────────
+    function openSaveModal() {
+        // Pre-select whatever is currently saved
+        const current = document.getElementById('amendmentStatusField').value;
+        const radios = document.querySelectorAll('input[name="saveStatus"]');
+        radios.forEach(r => {
+            r.checked = r.value === current;
+            updateSaveStatusCard(r);
+        });
+        openModalById('saveModal');
+    }
+
+    function closeSaveModal() { closeModalById('saveModal'); }
+
+    function confirmSave() {
+        // Read selected status, push to hidden field, submit form
+        const selected = document.querySelector('input[name="saveStatus"]:checked');
+        if (selected) document.getElementById('amendmentStatusField').value = selected.value;
+        document.getElementById('amendedContent').value = quill.root.innerHTML;
+        document.getElementById('amendmentsForm').submit();
+    }
+
+    // Save status card highlight
+    function updateSaveStatusCard(radio) {
+        const label = radio.closest('label');
+        if (radio.checked) {
+            label.classList.add('border-indigo-300', 'bg-indigo-50/50');
+            label.classList.remove('border-slate-100');
+        } else {
+            label.classList.remove('border-indigo-300', 'bg-indigo-50/50');
+            label.classList.add('border-slate-100');
+        }
+    }
+
+    document.querySelectorAll('input[name="saveStatus"]').forEach(radio => {
+        radio.addEventListener('change', () => {
+            document.querySelectorAll('input[name="saveStatus"]').forEach(updateSaveStatusCard);
+        });
+    });
+
+    // ── Third reading modal ──────────────────────────────────────────
+    function openThirdReadingModal() {
+        ['check1','check2','check3'].forEach(id => document.getElementById(id).checked = false);
+        document.getElementById('confirmBtn').disabled = true;
+        openModalById('thirdReadingModal');
+    }
+    function closeThirdReadingModal() { closeModalById('thirdReadingModal'); }
+
+    function checkAllConfirmed() {
+        const allChecked = ['check1','check2','check3'].every(id => document.getElementById(id).checked);
+        document.getElementById('confirmBtn').disabled = !allChecked;
+    }
+
+    // ── Committee modal ──────────────────────────────────────────────
+    function openCommitteeModal() { openModalById('committeeModal'); }
+    function closeCommitteeModal() { closeModalById('committeeModal'); }
+
+    // ── Generic modal helpers ────────────────────────────────────────
+    function openModalById(id) {
+        const modal = document.getElementById(id);
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeModalById(id) {
+        const modal = document.getElementById(id);
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        document.body.style.overflow = '';
+    }
+
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') {
+            ['saveModal','thirdReadingModal','committeeModal'].forEach(closeModalById);
+        }
+    });
+</script>
+
+<style>
+    .ql-toolbar.ql-snow {
+        border: none !important;
+        border-bottom: 1px solid #f1f5f9 !important;
+        background: #f8fafc;
+        padding: 8px 16px !important;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    .ql-container.ql-snow {
+        border: none !important;
+        font-size: 13px;
+        font-family: Georgia, serif;
+        flex: 1;
+        overflow-y: auto;
+    }
+    #amendmentEditor .ql-editor {
+        padding: 32px 40px !important;
+        line-height: 1.9;
+        color: #1e293b;
+        min-height: 100%;
+    }
+    .ql-editor.ql-blank::before { color: #94a3b8; font-style: italic; }
+    #amendmentEditor { display: flex; flex-direction: column; height: 100%; }
+    #amendmentEditor > .ql-container { flex: 1; overflow-y: auto; }
+
+    /* Original panel highlight */
+    .original-content p,
+    .original-content li,
+    .original-content h1,
+    .original-content h2,
+    .original-content h3,
+    .original-content blockquote {
+        padding: 4px 8px;
+        border-radius: 6px;
+        margin-bottom: 4px;
+        transition: background 0.25s ease, border-left 0.2s ease;
+        border-left: 3px solid transparent;
+    }
+    .original-content .active-highlight {
+        background-color: #fef9c3;
+        border-left: 3px solid #f59e0b;
+    }
+
+    /* Modal animation */
+    .modal-card { animation: modalIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
+    @keyframes modalIn {
+        from { opacity: 0; transform: scale(0.92) translateY(12px); }
+        to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    /* Save status labels */
+    .save-status-label { user-select: none; }
+</style>
+{% endblock %}

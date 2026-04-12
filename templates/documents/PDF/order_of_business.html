@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: "Times New Roman", Georgia, serif;
+            font-size: 12px;
+            color: #111;
+            line-height: 1.7;
+        }
+
+        @page {
+            size: letter;
+            margin: 0.8in 1in;
+        }
+
+        .text-center { text-align: center; }
+        .uppercase { text-transform: uppercase; }
+        .font-bold { font-weight: 700; }
+        .underline { text-decoration: underline; }
+
+        /* Header */
+        .doc-header { text-align: center; margin-bottom: 20px; }
+        .doc-header p { margin-bottom: 2px; }
+        .ob-title {
+            font-size: 14px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            border-top: 2px solid #111;
+            border-bottom: 2px solid #111;
+            padding: 6px 32px;
+            display: inline-block;
+            margin: 8px 0;
+        }
+
+        /* Session heading */
+        .session-heading {
+            text-align: center;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 12px;
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+
+        /* Agenda items */
+        .agenda-section {
+            display: flex;
+            margin-bottom: 10px;
+        }
+        .agenda-num {
+            min-width: 36px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .agenda-body { flex: 1; }
+
+        /* Business of day sub-items */
+        .sub-section { margin-left: 40px; margin-bottom: 16px; }
+        .sub-heading {
+            font-weight: 800;
+            text-transform: uppercase;
+            text-decoration: underline;
+            margin-bottom: 8px;
+        }
+        .doc-item { margin-left: 16px; margin-bottom: 10px; }
+        .doc-item p { margin-bottom: 2px; }
+        .doc-title { text-transform: uppercase; margin-left: 16px; }
+
+        .empty-note { color: #666; font-style: italic; margin-left: 16px; }
+        .adjournment-line { margin-left: 40px; margin-top: 32px; }
+    </style>
+</head>
+<body>
+
+    <!-- OFFICIAL HEADER -->
+    <div class="doc-header">
+        <p style="font-weight:700; text-transform:uppercase; letter-spacing:0.05em;">Republic of the Philippines</p>
+        <p>City of San Juan, Metro Manila</p>
+        <p style="color:#555;">-o0o-</p>
+        <p style="font-weight:800; text-transform:uppercase; letter-spacing:0.08em; font-size:13px;">Office of the Sangguniang Panlungsod</p>
+        <div class="ob-title">Order of Business</div>
+    </div>
+
+    <!-- SESSION HEADING -->
+    <p class="session-heading">
+        For the
+        {{ session.session_number }}{% if session.session_number == 1 %}st{% elif session.session_number == 2 %}nd{% elif session.session_number == 3 %}rd{% else %}th{% endif %}
+        Regular Session of the
+        {{ session.council_number }}{% if session.council_number == 1 %}st{% elif session.council_number == 2 %}nd{% elif session.council_number == 3 %}rd{% else %}th{% endif %}
+        City Council of the City Government of San Juan, Metro Manila
+        on {{ session.session_date|date:"F d, Y"|upper }},
+        {{ session.session_time|default:"10:00 A.M." }}
+        at the Session Hall, Room 214 of City of San Juan Government Center
+    </p>
+
+    <!-- CEREMONIAL ITEMS -->
+    <div class="agenda-section">
+        <div class="agenda-num">I.</div>
+        <div class="agenda-body"><strong>INVOCATIONnnnn</strong>{% if session.invocation_by %} of {{ session.invocation_by }}{% endif %}</div>
+    </div>
+
+    <div class="agenda-section flex gap-2">
+        <div class="agenda-num">II.</div>
+        <div class="agenda-body"><strong>NATIONAL ANTHEM AND SAN JUAN HYMN</strong></div>
+    </div>
+
+    <div class="agenda-section">
+        <div class="agenda-num">III.</div>
+        <div class="agenda-body"><strong>CALL TO ORDER</strong></div>
+    </div>
+
+    <div class="agenda-section">
+        <div class="agenda-num">IV.</div>
+        <div class="agenda-body"><strong>ROLL CALL</strong></div>
+    </div>
+
+    <div class="agenda-section">
+        <div class="agenda-num">V.</div>
+        <div class="agenda-body"><strong>PRIVILEGE SPEECH</strong></div>
+    </div>
+
+    <div class="agenda-section">
+        <div class="agenda-num">VI.</div>
+        <div class="agenda-body">
+            <strong>READING AND APPROVAL OF THE MINUTES AND JOURNAL OF THE
+            {% if session.previous_session_date %}
+                REGULAR SESSION HELD ON {{ session.previous_session_date|date:"F d, Y"|upper }}.
+            {% else %}
+                PREVIOUS REGULAR SESSION.
+            {% endif %}
+            </strong>
+        </div>
+    </div>
+
+    <!-- BUSINESS OF THE DAY -->
+    <div class="agenda-section" style="margin-top:8px;">
+        <div class="agenda-num">VII.</div>
+        <div class="agenda-body"><strong>BUSINESS OF THE DAY</strong></div>
+    </div>
+
+    <!-- A. FIRST READING -->
+    <div class="sub-section">
+        <p class="sub-heading">A. First Reading:</p>
+        {% for doc in first_reading %}
+        <div class="doc-item">
+            <p class="font-bold">
+                {{ forloop.counter }}.
+                {% if doc.doc_type == 'ORDINANCE' %}DRAFT ORDINANCE{% else %}DRAFT RESOLUTION{% endif %}
+                NO. {{ doc.reference_no|default:doc.id }}
+                sponsored by
+                {% if doc.author.councilor_profile %}{{ doc.author.councilor_profile.name }}{% else %}{{ doc.author.get_full_name }}{% endif %}
+            </p>
+            <p class="doc-title">{{ doc.title }}</p>
+            {% if doc.referred_committee %}
+            <p style="margin-left:16px; font-style:italic; font-size:11px;">
+                Committee on {{ doc.referred_committee.name }}
+            </p>
+            {% endif %}
+        </div>
+        {% empty %}
+        <p class="empty-note">No items for First Reading.</p>
+        {% endfor %}
+    </div>
+
+    <!-- B. COMMITTEE REPORTS -->
+    <div class="sub-section">
+        <p class="sub-heading">B. Committee Reports:</p>
+        {% for report in committee_reports %}
+        <div class="doc-item">
+            <p class="font-bold">
+                {{ forloop.counter }}.
+                {% if report.original_doc.doc_type == 'ORDINANCE' %}DRAFT ORDINANCE{% else %}DRAFT RESOLUTION{% endif %}
+                NO. {{ report.reference_no|default:report.original_doc.reference_no }}
+                sponsored by the Committee on {{ report.original_doc.referred_committee.name }}
+            </p>
+            <p class="doc-title">{{ report.title }}</p>
+        </div>
+        {% empty %}
+        <p class="empty-note">No committee reports.</p>
+        {% endfor %}
+    </div>
+
+    <!-- C. SECOND READING -->
+    <div class="sub-section">
+        <p class="sub-heading">C. Second Reading:</p>
+        {% for doc in second_reading %}
+        <div class="doc-item">
+            <p class="font-bold">
+                {{ forloop.counter }}.
+                {% if doc.doc_type == 'ORDINANCE' %}DRAFT ORDINANCE{% else %}DRAFT RESOLUTION{% endif %}
+                NO. {{ doc.reference_no|default:doc.id }}
+                sponsored by
+                {% if doc.referred_committee %}the Committee on {{ doc.referred_committee.name }}
+                {% else %}{% if doc.author.councilor_profile %}{{ doc.author.councilor_profile.name }}{% else %}{{ doc.author.get_full_name }}{% endif %}{% endif %}
+            </p>
+            <p class="doc-title">{{ doc.title }}</p>
+        </div>
+        {% empty %}
+        <p class="empty-note">No items for Second Reading.</p>
+        {% endfor %}
+    </div>
+
+    <!-- D. THIRD READING -->
+    <div class="sub-section">
+        <p class="sub-heading">D. Third Reading:</p>
+        {% for doc in third_reading %}
+        <div class="doc-item">
+            <p class="font-bold">
+                {{ forloop.counter }}.
+                FINAL AMENDED
+                {% if doc.doc_type == 'ORDINANCE' %}DRAFT ORDINANCE{% else %}DRAFT RESOLUTION{% endif %}
+                NO. {{ doc.reference_no|default:doc.id }}
+                sponsored by
+                {% if doc.referred_committee %}the Committee on {{ doc.referred_committee.name }}
+                {% else %}{% if doc.author.councilor_profile %}{{ doc.author.councilor_profile.name }}{% else %}{{ doc.author.get_full_name }}{% endif %}{% endif %}
+            </p>
+            <p class="doc-title">{{ doc.title }}</p>
+        </div>
+        {% empty %}
+        <p class="empty-note">No items for Third Reading.</p>
+        {% endfor %}
+    </div>
+
+    <!-- OTHER MATTERS -->
+    <div class="agenda-section" style="margin-top: 8px;">
+        <div class="agenda-num">VIII.</div>
+        <div class="agenda-body"><strong>OTHER MATTERS</strong></div>
+    </div>
+
+    <div class="sub-section">
+        {% for item in other_matters %}
+        <div class="doc-item">
+            <p>{{ forloop.counter }}. {{ item.title }}</p>
+            <p style="margin-left:16px; font-style:italic; font-size:11px;">For your information</p>
+        </div>
+        {% empty %}
+        <p class="empty-note">No other matters.</p>
+        {% endfor %}
+    </div>
+
+    <!-- ADJOURNMENT -->
+    <div class="agenda-section" style="margin-top: 8px;">
+        <div class="agenda-num">IX.</div>
+        <div class="agenda-body"><strong>ADJOURNMENT</strong></div>
+    </div>
+
+    <p class="adjournment-line">Session is adjourned at ________</p>
+
+</body>
+</html>

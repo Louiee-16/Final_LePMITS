@@ -1,0 +1,15 @@
+<div class="h-full flex flex-col">
+    <div class="mb-4 px-4">
+        <h2 class="text-lg font-bold text-slate-800">{{ doc.title }}</h2>
+        <p class="text-sm text-slate-500">{{ doc.doc_type }} | Ref: {{ doc.reference_no }}</p>
+    </div>
+    
+    <!-- PDF Viewer -->
+<div class="w-full h-[600px] bg-slate-100 rounded-xl overflow-hidden">
+    {% if doc.scanned_pdf %}
+<iframe src="/serve_pdf/{{ doc.id }}/" width="100%" height="600px"></iframe>
+    {% else %}
+        <p class="p-10 text-center">No PDF file found.</p>
+    {% endif %}
+</div>
+</div>
