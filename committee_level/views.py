@@ -41,7 +41,8 @@ def _sync_report_status_from_hearing(report, outcome):
 # ---------------------------------------------------------------------------
 def move_to_second_reading(request, doc_id):
     referred_doc = get_object_or_404(Document, id=doc_id)
-    referred_doc.content = referred_doc.amended_content
+    if referred_doc.amended_content:
+        referred_doc.content = referred_doc.amended_content
     referred_doc.status = 'SECOND_READING'
     referred_doc.save()
     return redirect('view-committee')
@@ -308,7 +309,8 @@ def move_to_unfinished(request, doc_id):
     doc = get_object_or_404(Document,id=doc_id, status__icontains='COMMITTEE' )
     if request.method != 'POST':
         return redirect('report_workbench',draft_id = doc_id)
-    doc.content = doc.amended_content
+    if doc.amended_content:
+        doc.content = doc.amended_content
     doc.status = 'UNFINISHED_BUSINESS'
     doc.amended_content = None
     doc.amendment_status = None

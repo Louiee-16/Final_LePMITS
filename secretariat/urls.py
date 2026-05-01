@@ -11,5 +11,8 @@ urlpatterns = [
     path('finalize/order_of_business/',views.finalize_agenda, name = 'finalize'),
     path('agenda/<int:session_id>/email/', views.send_agenda_email, name='send_agenda_email'),
     path('agenda/<int:session_id>/pdf/', views.generate_agenda_pdf, name='generate_agenda_pdf'),
-    path('send/<int:session_id>/order_of_business/', views.send_agenda_email, name = 'send-agenda-email')
+    path('send/<int:session_id>/order_of_business/', views.send_agenda_email, name = 'send-agenda-email'),
+
+    path('public_participation/<int:doc_id>/',views.public_participation,name= 'public-participation'),
 ]
+

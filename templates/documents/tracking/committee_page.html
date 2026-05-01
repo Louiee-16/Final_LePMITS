@@ -43,17 +43,17 @@
                     <!-- Column 1: People's Participation -->
                     <td class="px-8 py-7">
                         {% if user.role == 'SECRETARIAT' or user.role == 'STAFF' %}
-                        <form action="" method="POST">
+                        <form action="{%url 'public-participation' doc.id %}" method="POST">
                             {% csrf_token %}
-                            <input type="hidden" name="doc_id" value="{{ doc.id }}">
-                            <button type="submit" name="action" value="toggle_pp"
+                            <button type="submit" 
                                 class="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all
-                                {% if doc.people_participation_open %}
+                                {% if doc.public_participation %}
                                     bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100
                                 {% else %}
                                     bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-100
                                 {% endif %}">
-                                {% if doc.people_participation_open %}
+                                
+                                {% if doc.public_participation %}
                                     <i class="fas fa-lock mr-1.5"></i> Close PP
                                 {% else %}
                                     <i class="fas fa-lock-open mr-1.5"></i> Open PP

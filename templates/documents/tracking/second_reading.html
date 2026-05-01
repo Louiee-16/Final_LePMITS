@@ -38,7 +38,7 @@
             </thead>
             <tbody class="divide-y divide-slate-50">
                 {% for doc in second_reading %}
-                <tr class="hover:bg-indigo-50/30 transition-colors group">
+                <tr class="hover:bg-indigo-50/30 transition-colors group" data-doc-id = "{{doc.id}}">
 
                     <td class="px-10 py-6 text-sm text-slate-600 whitespace-nowrap">
                         {{ doc.updated_at|date:"M d, Y" }}
@@ -119,5 +119,37 @@
         </table>
     </div>
 </div>
+
+
+<div id="docModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden z-50 flex items-start justify-center overflow-auto p-4">
+    <div class="bg-white rounded-[2rem] shadow-2xl max-w-5xl w-full p-6 relative">
+        <button id="closeDocModal" class="absolute top-4 right-4 text-slate-500 hover:text-slate-900 text-2xl font-bold">&times;</button>
+        <div id="docContent" class="w-full"></div>
+    </div>
+</div>
+
+<script>
+document.querySelectorAll('tr[data-doc-id]').forEach(row =>{
+    row.addEventListener('click', ()=>{
+        const docId = row.getAttribute('data-doc-id');
+        const modal = document.getElementById('docModal');
+        const contentDiv =document.getElementById('docContent');
+        modal.classList.remove('hidden');
+        fetch(`/modal/document/${docId}`)
+            .then(response =>response.text())
+            .then(html => contentDiv.innerHTML = html)
+            .catch(err=> contentDiv.innerHTML = "<p class='text-red-500 text-center mt-10'>Failed to load document.</p>");
+        
+    });
+});
+document.getElementById('closeDocModal').addEventListener('click', ()=>{
+    const modal = document.getElementById('docModal');
+    const contentDiv = document.getElementById('docContent');
+    contentDiv.innerHTML = "";
+    modal.classList.add('hidden');
+})
+</script>
+
+
 
 {% endblock %}

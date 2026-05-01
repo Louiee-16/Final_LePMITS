@@ -80,7 +80,6 @@
         <table class="w-full text-left">
             <thead class="bg-slate-50 border-b border-slate-100">
                 <tr>
-                    <th class="px-10 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Ref No.</th>
                     <th class="px-10 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Title</th>
                     <th class="px-10 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Author</th>
                     <th class="px-10 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400 text-right">Actions</th>
@@ -89,17 +88,13 @@
             <tbody class="divide-y divide-slate-50">
                 {% for doc in barangay_docs %}
                 <tr class="hover:bg-indigo-50/30 transition-colors cursor-pointer" data-doc-id="{{ doc.id }}">
-                    <td class="px-10 py-6 text-sm font-bold text-indigo-600">{{ doc.reference_no }}</td>
                     <td class="px-10 py-6">
                         <p class="text-sm font-extrabold text-slate-800 line-clamp-1" title="{{ doc.title }}">
-                            {{ doc.title|truncatechars:30 }}
+                            {{ doc.title}}
                         </p>
-                        <span class="text-[10px] bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded font-bold">
-                            {{ doc.doc_type }}
-                        </span>
                     </td>
                     <td class="px-10 py-6 text-sm font-medium text-slate-700">{{ doc.origin_barangay.barangay_name}}</td>
-                    <td class="px-10 py-6 text-right flex flex-col gap-1">
+                    <td class="px-10 py-6 text-right flex flex-row gap-1 justify-end">
                         {% if user.role == 'SECRETARIAT' %}
                         <form method="POST" action="{% url 'move-to-other-matters' doc.id %}">
                             {% csrf_token %}

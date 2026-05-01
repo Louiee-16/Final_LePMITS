@@ -5,11 +5,32 @@ from committee_level.models import CommitteeReport
 from barangay.models import BarangayFiles
 from django.contrib.auth.decorators import login_required
 from .models import Session
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseForbidden
 from django.template.loader import render_to_string
 from django.core.mail import EmailMessage
 from django.contrib import messages
 from django.conf import settings
+
+
+@login_required
+def public_participation(request, doc_id):
+    if not request.user.is_authenticated:
+        return redirect('login')
+
+    if request.user.role != 'SECRETARIAT':
+        return HttpResponseForbidden()
+
+    if request.method == 'POST':
+        doc = get_object_or_404(Document, id=doc_id)
+
+        doc.public_participation = not doc.public_participation
+        doc.save()
+    return redirect(request.META.get('HTTP_REFERER') or reverse('view-committee'))      
+        
+
+
+
+
 
 @login_required
 def Secretariat_dashboard(request):

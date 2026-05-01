@@ -18,7 +18,7 @@ class Document(models.Model):
     ]
 
     DOC_CHOICES = [('ORDINANCE', 'Ordinance'), ('RESOLUTION', 'Resolution')]
-
+    public_participation = models.BooleanField(default=False)
     title = models.TextField()
     reference_no = models.CharField(max_length=100, blank=True, null=True)
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='my_docs')
