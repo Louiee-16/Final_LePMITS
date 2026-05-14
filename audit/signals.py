@@ -10,11 +10,9 @@ def on_login(sender, request, user, **kwargs):
 
 @receiver(user_logged_out)
 def on_logout(sender, request, user, **kwargs):
-    # This is where your crash happened. 
-    # We check if user is not None before using user.username
+
     if user:
         log_action(request, action='LOGOUT', target=f'{user.username} logged out')
     else:
-        # Optional: if user is None, you can try getting it from request.user 
-        # or just skip logging it to prevent the crash.
+
         pass

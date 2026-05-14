@@ -341,37 +341,102 @@
     }
 
     // ── AI Legal Basis ───────────────────────────────────────────
-    document.getElementById('aiCheckBtn').addEventListener('click', function () {
-        const title   = titleInput.value.trim();
-        const content = quill.getText().trim();
+// ── AI Legal Basis ───────────────────────────────────────────
+document.getElementById('aiCheckBtn').addEventListener('click', async function () {
+    const title   = titleInput.value.trim();
+    const content = quill.getText().trim();
 
-        if (!title || !content) {
-            alert("Please fill in the Title and Content first.");
+    if (!title || !content) {
+        alert("Please fill in the Title and Content first.");
+        return;
+    }
+
+    const btn = this;
+    btn.disabled = true;
+    document.getElementById('aiResults').classList.add('hidden');
+    document.getElementById('aiLoading').classList.remove('hidden');
+
+    try {
+        // ── Step 1: ensure the ghost is saved so we have a pk ──────────
+        // If autosave hasn't fired yet (docIdField is empty), force a sync
+        // now and wait for it to complete before calling the AI endpoint.
+        if (!docIdField.value) {
+            clearTimeout(autosaveTimer);
+            await new Promise((resolve, reject) => {
+                const title   = titleInput.value.trim();
+                const content = quill.root.innerHTML.trim();
+
+                fetch("{% url 'autosave_draft' %}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({
+                        title: title || 'Untitled Draft',
+                        content: content,
+                        doc_id: null
+                    })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'saved') {
+                        docIdField.value = data.doc_id;
+                        statusSaving.classList.add('hidden');
+                        statusSaved.classList.remove('hidden');
+                        setTimeout(() => statusSaved.classList.add('hidden'), 3000);
+                        resolve();
+                    } else {
+                        reject(new Error("Autosave did not return a doc_id."));
+                    }
+                })
+                .catch(reject);
+            });
+        }
+
+        // ── Step 2: call the AI endpoint with the now-guaranteed pk ────
+        const pk = docIdField.value;
+        if (!pk) throw new Error("Could not save draft before AI lookup.");
+
+        const res  = await fetch("{% url 'ai_legal_basis' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({ pk: pk })
+        });
+
+        const data = await res.json();
+
+        document.getElementById('aiLoading').classList.add('hidden');
+        document.getElementById('aiResults').classList.remove('hidden');
+
+        if (!res.ok || data.error) {
+            document.getElementById('aiContent').innerHTML =
+                `<span class="text-rose-500 font-bold">${data.error || 'Unknown error.'}</span>`;
             return;
         }
 
-        document.getElementById('aiResults').classList.add('hidden');
-        document.getElementById('aiLoading').classList.remove('hidden');
-        this.disabled = true;
+        // ── Step 3: render result — newlines → <br>, preserve numbering ─
+        const formatted = data.result
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/\n/g, '<br>');
 
-        fetch("", {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-            body: JSON.stringify({ title, content })
-        })
-        .then(res => res.json())
-        .then(data => {
-            document.getElementById('aiLoading').classList.add('hidden');
-            document.getElementById('aiResults').classList.remove('hidden');
-            document.getElementById('aiContent').innerHTML = data.basis || 'No results found.';
-        })
-        .catch(() => {
-            document.getElementById('aiLoading').classList.add('hidden');
-            document.getElementById('aiContent').innerHTML = 'Could not reach AI assistant. Try again.';
-            document.getElementById('aiResults').classList.remove('hidden');
-        })
-        .finally(() => { this.disabled = false; });
-    });
+        document.getElementById('aiContent').innerHTML = formatted;
+
+    } catch (err) {
+        document.getElementById('aiLoading').classList.add('hidden');
+        document.getElementById('aiResults').classList.remove('hidden');
+        document.getElementById('aiContent').innerHTML =
+            `<span class="text-rose-500 font-bold">Could not reach AI assistant. Try again.</span>`;
+        console.error("ai_legal_basis error:", err);
+    } finally {
+        btn.disabled = false;
+    }
+});
 </script>
 
 <style>

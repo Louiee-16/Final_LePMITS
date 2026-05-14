@@ -571,6 +571,7 @@ def approved_registry(request):
 @login_required
 def modal_document_viewer(request, doc_id):
     doc = get_object_or_404(Document, id=doc_id)
+
     try:
         parts = doc.reference_no.split("-")
         doc.ref_number = int(parts[1])
@@ -674,3 +675,72 @@ def download_document_pdf(request, doc_id):
         return HttpResponse('PDF generation failed', status=500)
 
     return response
+
+
+
+import json
+import logging
+
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404
+from django.views.decorators.http import require_POST
+
+from documents.models import Document
+from documents.rag.generator import generate_legal_basis
+
+logger = logging.getLogger(__name__)
+
+
+@login_required
+@require_POST
+def ai_legal_basis(request):
+    """
+    POST /documents/ai-legal-basis/
+    Body (JSON): { "pk": <int> }
+
+    Reads title + doc_type from the DB record (never trusts user-supplied strings),
+    calls generate_legal_basis(), returns { "result": <str> } or { "error": <str> }.
+
+    On the create-draft page the ghost pk comes from the autosave response
+    (docIdField.value). The JS layer ensures autosave has completed before
+    this endpoint is called.
+    """
+    try:
+        body = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({"error": "Invalid request body."}, status=400)
+
+    pk = body.get("pk")
+    if not pk:
+        return JsonResponse(
+            {"error": "Draft not saved yet — please wait a moment and try again."},
+            status=400,
+        )
+
+    document = get_object_or_404(Document, pk=pk)
+
+    # Only the author or staff may request AI suggestions for a document
+    if document.author != request.user and not request.user.is_staff:
+        return JsonResponse({"error": "Permission denied."}, status=403)
+
+    try:
+        result = generate_legal_basis(
+            title=document.title,
+            doc_type=document.doc_type,
+        )
+    except ValueError as exc:
+        logger.warning("ai_legal_basis: ValueError pk=%s: %s", pk, exc)
+        return JsonResponse({"error": str(exc)}, status=400)
+    except RuntimeError as exc:
+        logger.error("ai_legal_basis: RuntimeError pk=%s: %s", pk, exc)
+        return JsonResponse(
+            {"error": "The AI backend is unavailable. Try again in a moment."},
+            status=500,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("ai_legal_basis: unexpected error pk=%s: %s", pk, exc)
+        return JsonResponse({"error": "Unexpected server error."}, status=500)
+
+    return JsonResponse({"result": result})
+

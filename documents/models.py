@@ -4,6 +4,10 @@ from django.conf import settings
 from committees.models import Committee
 from archives.models import Archives
 from barangay.models import BarangayFiles
+from pgvector.django import VectorField
+
+
+
 class Document(models.Model):
     STATUS_CHOICES = [
         ('GHOST','Ghost Draft'),
@@ -32,6 +36,7 @@ class Document(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     amended_content = models.TextField(blank=True, null=True)
+    embedding = VectorField(dimensions=384,null=True,blank=True)
     amendment_status = models.CharField(
         max_length=20,
         choices=[
@@ -98,3 +103,26 @@ class AmendmentNote(models.Model):
 
     def __str__(self):
         return f"Amendment note on {self.doc} by {self.author}"
+
+
+class LegacyDocument(models.Model):
+    DOC_TYPE_CHOICES = [
+        ('ORDINANCE','Ordinance'),
+        ('RESOLUTION','Resolution'),
+    ]
+
+    title = models.CharField(max_length=500)
+    reference_no = models.CharField(max_length=100, blank=True)
+    doc_type = models.CharField(max_length=20, choices=DOC_TYPE_CHOICES)
+    year = models.IntegerField(null=True, blank=True)
+    pdf_file = models.FileField(upload_to='legacy_documents/%Y/')
+    extracted_text = models.TextField(blank=True)  # OCR result stored here
+    embedding = VectorField(dimensions=384, null=True, blank=True)
+    ocr_processed = models.BooleanField(default=False)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-year', 'reference_no']
+
+    def __str__(self):
+        return f"{self.doc_type} {self.reference_no} ({self.year})"

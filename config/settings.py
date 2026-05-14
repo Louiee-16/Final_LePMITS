@@ -170,3 +170,10 @@ CKEDITOR_CONFIGS = {
         'height': 400,
     },
 }
+
+
+LLM_BACKEND = "ollama"          # or "claude"
+ANTHROPIC_API_KEY = "sk-ant-…"  # only needed for "claude"
+CLAUDE_MODEL = "claude-opus-4-5"        # optional override
+OLLAMA_MODEL = "llama3.2:1b"    # optional override
+OLLAMA_ENDPOINT = "http://localhost:11434/api/generate"  # optional override

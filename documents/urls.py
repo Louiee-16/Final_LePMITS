@@ -37,11 +37,12 @@ urlpatterns = [
     ############################ PAPER TRAIL #########################
     path('history/<int:pk>/',views.document_history, name = 'document-history'),
     path('view_archive/<int:doc_id>/', views.view_document, name='view-document'), #url for viewing while on progress
-    path('modal/document/<int:doc_id>/',views.modal_document_viewer, name='modal-document_view'), #url for viewing document modal version
+    path('modal/document/<int:doc_id>/',views.modal_document_viewer, name='modal-document-view'), #url for viewing document modal version
     path('drafts/discard-ghost/', views.discard_ghost, name='discard_ghost'),
     path('history/<str:doc_id>/trail_version',views.view_trail_version, name="trail-version"), #viewing kapag sa audit trail na
     ########################## for downloading###########################
     path('download-official/<int:pk>/', views.download_official_pdf, name='download_official_pdf'), #download button for approved files
     path('documents/<int:doc_id>/', views.download_document_pdf, name='download_document_pdf'), # download for any document version
     ##################################################################################
+    path("ai-legal-basis/", views.ai_legal_basis, name="ai_legal_basis"),
 ]
