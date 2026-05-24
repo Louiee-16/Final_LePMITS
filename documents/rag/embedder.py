@@ -98,6 +98,7 @@ def extract_pdf_text(pdf_path: str) -> str:
                         # Render page to PIL image at 200 dpi (good balance of
                         # speed vs. accuracy for A4 legislative documents).
                         pil_image: Image.Image = page.to_image(resolution=200).original
+                        pil_image = pil_image.convert("RGB")
                         ocr_text: str = pytesseract.image_to_string(
                             pil_image, lang="eng"
                         )

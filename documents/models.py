@@ -111,11 +111,11 @@ class LegacyDocument(models.Model):
         ('RESOLUTION','Resolution'),
     ]
 
-    title = models.CharField(max_length=500)
+    title = models.CharField(max_length=1000)
     reference_no = models.CharField(max_length=100, blank=True)
     doc_type = models.CharField(max_length=20, choices=DOC_TYPE_CHOICES)
     year = models.IntegerField(null=True, blank=True)
-    pdf_file = models.FileField(upload_to='legacy_documents/%Y/')
+    pdf_file = models.FileField(upload_to='legacy_documents/%Y/', max_length = 500)
     extracted_text = models.TextField(blank=True)  # OCR result stored here
     embedding = VectorField(dimensions=384, null=True, blank=True)
     ocr_processed = models.BooleanField(default=False)
@@ -126,3 +126,27 @@ class LegacyDocument(models.Model):
 
     def __str__(self):
         return f"{self.doc_type} {self.reference_no} ({self.year})"
+    
+class PublicComment(models.Model):
+    """
+    Read-only mirror of gazette_publiccomment.
+    Unmanaged — Django will never create or migrate this table.
+    LePMITS reads directly from the Gazette's existing table.
+    """
+    document    = models.ForeignKey(Document, on_delete=models.DO_NOTHING)
+    name        = models.CharField(max_length=200)
+    barangay    = models.CharField(max_length=100, blank=True)
+    comment     = models.TextField()
+    is_approved = models.BooleanField(default=False)
+    created_at  = models.DateTimeField(auto_now_add=True)
+    ip_address  = models.GenericIPAddressField(null=True, blank=True)
+    tag         = models.CharField(max_length=10, default='comment')
+    replyTo     = models.ForeignKey(
+        'self', null=True, blank=True,
+        on_delete=models.DO_NOTHING,
+        related_name='replies'
+    )
+
+    class Meta:
+        managed = False                      # ← never touch the real table
+        db_table = 'gazette_publiccomment'   # ← must match exactly

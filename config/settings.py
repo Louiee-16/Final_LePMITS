@@ -52,6 +52,21 @@ INSTALLED_APPS = [
 
 ]
 
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers':{
+        'console':{
+            'class':'logging.StreamHandler',
+        },
+    },
+    'root':{
+        'handlers': ['console'],
+        'level': 'INFO'
+    },
+}
+
+
 LOGIN_REDIRECT_URL = 'dashboard'
 LOGOUT_REDIRECT_URL = 'login'
 AUTH_USER_MODEL = 'accounts.User'
@@ -63,12 +78,16 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'systemadmin.middleware.SessionIdleTimeoutMiddleware'
 ]
 
 
 #for security
+
+CSRF_COOKIE_NAME = "csrftoken_mgmt"
+SESSION_COOKIE_NAME = "sessionid_mgmt"
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
-SESSION_COOKIE_AGE = 1800
+#SESSION_COOKIE_AGE = 3600
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = False
 ROOT_URLCONF = 'config.urls'
@@ -172,8 +191,12 @@ CKEDITOR_CONFIGS = {
 }
 
 
-LLM_BACKEND = "ollama"          # or "claude"
+LLM_BACKEND = "gemini"          # or "claude"
 ANTHROPIC_API_KEY = "sk-ant-…"  # only needed for "claude"
 CLAUDE_MODEL = "claude-opus-4-5"        # optional override
 OLLAMA_MODEL = "llama3.2:1b"    # optional override
+OPENAI_API_KEY = "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"
+GPT_MODEL = "gpt-4.1-mini"
 OLLAMA_ENDPOINT = "http://localhost:11434/api/generate"  # optional override
+GEMINI_API_KEY = "AIzaSyAglFkfjSZ1XF-KS27p_T_4wYuwbLNHcoE"
+GEMINI_MODEL = "gemini-2.5-flash"

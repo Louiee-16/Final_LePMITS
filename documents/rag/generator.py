@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Defaults (can be overridden in settings.py)
 # ---------------------------------------------------------------------------
-_DEFAULT_BACKEND = "ollama"
+_DEFAULT_BACKEND = "gemini"
 _DEFAULT_CLAUDE_MODEL = "claude-opus-4-5"
 _OLLAMA_ENDPOINT = "http://localhost:11434/api/generate"
 _OLLAMA_MODEL = "llama3.2:3b"
@@ -115,6 +115,12 @@ INSTRUCTIONS:
 5. DO NOT invent, hallucinate, or paraphrase laws that are not present in the context or not part of your verified knowledge. If uncertain, say so.
 6. Keep your response concise and professional — this will be reviewed by legislative staff.
 
+
+STRICT RULES:
+- Only cite specific laws or ordinances you can see in the retrieved documents above
+- Never invent section numbers — if you don't know the exact section, omit it
+- If retrieved documents are not relevant enough, say so honestly
+- Prioritize San Juan City ordinances over generic national law references
 Respond with a numbered list of suggested legal bases followed by a brief rationale for each."""
 
     return prompt
@@ -123,6 +129,84 @@ Respond with a numbered list of suggested legal bases followed by a brief ration
 # ---------------------------------------------------------------------------
 # LLM backends
 # ---------------------------------------------------------------------------
+
+def _call_gemini(prompt: str) -> str:
+    """Call the Google Gemini API and return the response text."""
+    try:
+        import google.generativeai as genai  # pip install google-generativeai
+    except ImportError as exc:
+        raise RuntimeError(
+            "The 'google-generativeai' package is required for "
+            "LLM_BACKEND='gemini'. "
+            "Install it with: pip install google-generativeai"
+        ) from exc
+
+    api_key = getattr(settings, "GEMINI_API_KEY", None)
+    if not api_key:
+        raise RuntimeError(
+            "GEMINI_API_KEY is not set in settings.py. "
+            "Add it or switch LLM_BACKEND to another provider."
+        )
+
+    model_name = getattr(settings, "GEMINI_MODEL", "gemini-1.5-flash")
+
+    logger.info(
+        "Calling Gemini API (model=%s).",
+        model_name,
+    )
+
+    genai.configure(api_key=api_key)
+
+    model = genai.GenerativeModel(model_name)
+
+    response = model.generate_content(prompt)
+
+    response_text = response.text if hasattr(response, "text") else ""
+
+    logger.info(
+        "Gemini API call complete — %d chars returned.",
+        len(response_text),
+    )
+
+    return response_text.strip()
+
+
+def _call_gpt(prompt: str) -> str:
+    """Call the OpenAI GPT API and return the response text."""
+    try:
+        from openai import OpenAI  # requires: pip install openai
+    except ImportError as exc:
+        raise RuntimeError(
+            "The 'openai' Python package is required for LLM_BACKEND='gpt'. "
+            "Install it with: pip install openai"
+        ) from exc
+
+    api_key = getattr(settings, "OPENAI_API_KEY", None)
+    if not api_key:
+        raise RuntimeError(
+            "OPENAI_API_KEY is not set in settings.py. "
+            "Add it or switch LLM_BACKEND to another provider."
+        )
+
+    model = getattr(settings, "GPT_MODEL", "gpt-4.1-mini")
+
+    logger.info("Calling OpenAI GPT API (model=%s, max_tokens=%d).", model, _MAX_TOKENS)
+
+    client = OpenAI(api_key=api_key)
+
+    response = client.chat.completions.create(
+        model=model,
+        max_tokens=_MAX_TOKENS,
+        messages=[
+            {"role": "user", "content": prompt}
+        ],
+    )
+
+    response_text = response.choices[0].message.content or ""
+
+    logger.info("GPT API call complete — %d chars returned.", len(response_text))
+    return response_text.strip()
+
 
 def _call_claude(prompt: str) -> str:
     """Call the Anthropic Claude API and return the response text."""
@@ -249,7 +333,14 @@ def generate_legal_basis(title: str, doc_type: str | None = None) -> str:
 
     if backend == "claude":
         return _call_claude(prompt)
+    
+    
+    elif backend =="gemini":
+        print('used gemini here')
+        return _call_gemini(prompt)
+    
     elif backend == "ollama":
+        print('used ollama here')
         return _call_ollama(prompt)
     else:
         raise RuntimeError(

@@ -146,6 +146,22 @@
         .sidebar-logout-text {
             transition: opacity 0.15s ease, width 0.25s ease;
         }
+.logout-link {
+    background: none !important;
+    border: none !important;
+    padding: 0 !important;
+
+    color: #555 !important;
+    font-size: 16px !important;
+
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+        .logout-link:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden text-slate-900">
@@ -353,6 +369,13 @@
                     <span class="dot-wrap"><span class="dot bg-emerald-500 ring-4 ring-emerald-50"></span></span>
                     <span class="sidebar-label">Disapproved</span>
                 </a>
+                {% if user.role == 'SECRETARIAT' or user.role == 'STAFF' %}
+                <a href="{%url 'UPLOAD-LEGACY-DOCUMENT'%}" data-tooltip="disapproved"
+                   class="sidebar-item {% if request.resolver_match.url_name == 'UPLOAD-LEGACY' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
+                    <span class="dot-wrap"><span class="dot bg-emerald-500 ring-4 ring-emerald-50"></span></span>
+                    <span class="sidebar-label">Upload Document</span>
+                </a>
+                {%endif%}
             </div>
             {%endif%}
 
@@ -370,7 +393,7 @@
                 </div>
             </div>
             <form action="{% url 'logout' %}" method="post" class="sidebar-label">
-                {% csrf_token %}
+                {%csrf_token%}
                 <button type="submit"
                     class="flex items-center justify-center w-full py-2 bg-white border border-slate-200 text-[11px] font-bold text-rose-500 hover:bg-rose-50 hover:border-rose-100 transition-all rounded-xl uppercase tracking-widest whitespace-nowrap">
                     <i class="fas fa-sign-out-alt mr-2"></i>
@@ -379,7 +402,216 @@
             </form>
         </div>
     </aside>
+<!-- Session Expired Modal -->
+<div id="sessionModal" style="display:none;" class="session-overlay">
+    <div class="session-modal">
+        <h3 id="sessionModalTitle">⏱ Session Expiring Soon</h3>
+        <p id="sessionModalMessage">You've been inactive. Do you want to stay logged in?</p>
 
+        <div id="sessionError" class="session-error" style="display:none;"></div>
+
+        <!-- Warning state: just a button to stay logged in -->
+        <div id="warningButtons" style="display:none;" class="session-modal-buttons">
+            <button onclick="stayLoggedIn()">Stay Logged In</button>
+            <form action ="{% url 'logout' %}" method="post" class="bg-color-white">
+                {% csrf_token %}
+            <button type="submit" class="logout-link">Log Out</button>
+            </form>
+        </div>
+
+        <!-- Expired state: re-login form -->
+        <div id="expiredForm" style="display:none;">
+            <input type="text" id="reloginUsername" placeholder="Username" />
+            <input type="password" id="reloginPassword" placeholder="Password" style="margin-top: 0.5rem"/>
+            <div class="session-modal-buttons" style="margin-top: 0.5rem">
+                <button onclick="submitRelogin()">Login</button>
+                <a href="/login/">Go to Login Page</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.session-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+.session-modal {
+    background: white;
+    padding: 2rem;
+    border-radius: 12px;
+    width: 340px;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+.session-modal h3 { margin: 0; font-size: 1.2rem; }
+.session-modal input {
+    padding: 0.6rem 0.8rem;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    width: 100%;
+    box-sizing: border-box;
+}
+.session-modal-buttons {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.session-modal-buttons button {
+    padding: 0.6rem 1.4rem;
+    background: #1a56db;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+.session-error {
+    color: red;
+    font-size: 0.85rem;
+}
+</style>
+
+<script>
+const WARNING_BEFORE_SECONDS = 120;
+const CHECK_INTERVAL = 30000;
+
+let sessionCheckTimer = setInterval(checkSession, CHECK_INTERVAL);
+
+async function checkSession() {
+    try {
+        const res = await fetch("{% url 'session_status' %}", {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+
+        if (res.status == 401){
+            window.location.href = '/login/?reason=timeout';
+            return;
+        }
+        if (res.status == 403){
+            window.location.href = '/login/?reason=timeout';
+            return;
+        }
+        console.log(res.status)
+        const data = await res.json();
+        
+        if (!data.alive) {
+            showSessionModal('expired');
+           
+        } else if (data.remaining < WARNING_BEFORE_SECONDS) {
+            showSessionModal('warning');
+        }
+        
+    } catch (e) {
+        console.error('Session check failed', e);
+    }
+}
+
+let heartbeatDebounce;
+
+function sendHeartbeat(){
+    clearTimeout(heartbeatDebounce);
+    heartbeatDebounce = setTimeout(async()=>{
+        try{
+            await fetch("{% url 'session_heartbeat' %}",{
+                headers: { 'X-requested-With':  'XMLHttpRequest'}
+            });
+
+        }catch (e){
+            console.error('Heartbeat failed', e);        }
+    }, 2000)
+}
+
+['click','keydown','mousemove','scroll','touchstart'].forEach(event => {
+    document.addEventListener(event, sendHeartbeat, {passive: true});
+});
+
+function showSessionModal(type) {
+    if (type == 'expired'){
+        clearInterval(sessionCheckTimer);    
+    }
+    
+    document.getElementById('sessionModal').style.display = 'flex';
+
+    const title = document.getElementById('sessionModalTitle');
+    const message = document.getElementById('sessionModalMessage');
+    const warningButtons = document.getElementById('warningButtons');
+    const expiredForm = document.getElementById('expiredForm');
+
+    if (type === 'warning') {
+        title.textContent = '⏱ Are you still there?';
+        message.textContent = 'Your session will expire in less than 2 minutes. Stay logged in?';
+        warningButtons.style.display = 'flex';
+        expiredForm.style.display = 'none';
+    } else {
+        title.textContent = '🔒 Session Expired';
+        message.textContent = 'You have been logged out due to inactivity. Please log in again.';
+        warningButtons.style.display = 'none';
+        expiredForm.style.display = 'block';
+        document.getElementById('reloginUsername').focus();
+    }
+}
+
+async function stayLoggedIn() {
+    // Ping any authenticated endpoint to reset last_activity
+    await fetch("{% url 'session_status' %}", {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    });
+    document.getElementById('sessionModal').style.display = 'none';
+    sessionCheckTimer = setInterval(checkSession, CHECK_INTERVAL);
+}
+
+async function submitRelogin() {
+    const username = document.getElementById('reloginUsername').value;
+    const password = document.getElementById('reloginPassword').value;
+    const errorDiv = document.getElementById('sessionError');
+
+    const res = await fetch("{% url 'session_relogin' %}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken_mgmt'),
+        },
+        body: JSON.stringify({ username, password })
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+        document.getElementById('sessionModal').style.display = 'none';
+        document.getElementById('reloginUsername').value = '';
+        document.getElementById('reloginPassword').value = '';
+        errorDiv.style.display = 'none';
+        sessionCheckTimer = setInterval(checkSession, CHECK_INTERVAL);
+    } else {
+        errorDiv.style.display = 'block';
+        errorDiv.textContent = data.error || 'Invalid credentials.';
+    }
+}
+
+function getCookie(name) {
+    return document.cookie.split(';')
+        .map(c => c.trim())
+        .find(c => c.startsWith(name + '='))
+        ?.split('=')[1] || '';
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && document.getElementById('sessionModal').style.display === 'flex') {
+        const expiredForm = document.getElementById('expiredForm');
+        if (expiredForm.style.display !== 'none') {
+            submitRelogin();
+        }
+    }
+});
+</script>
     <!-- MAIN AREA -->
     <main class="flex-1 flex flex-col min-w-0">
         <header class="h-16 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-10 shrink-0">

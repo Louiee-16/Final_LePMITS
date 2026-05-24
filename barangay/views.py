@@ -13,6 +13,8 @@ from django.conf import settings
 @login_required
 def barangay_dashboard(request):
     form = MeasureUploadForm()
+    user = request.user.role
+    print(user)
     filed_measures = BarangayFiles.objects.all()
     context = {
         'form': form,

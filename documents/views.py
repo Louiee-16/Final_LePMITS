@@ -723,6 +723,24 @@ def ai_legal_basis(request):
     # Only the author or staff may request AI suggestions for a document
     if document.author != request.user and not request.user.is_staff:
         return JsonResponse({"error": "Permission denied."}, status=403)
+    from documents.rag.retriever import retrieve
+
+    retrieved_docs = retrieve(query=document.title, top_k=5)
+
+    logger.info("=== AI Legal Basis Request ===")
+    logger.info("Draft pk=%s title: %s", pk, document.title)
+    logger.info("Retrieved %d similar documents:", len(retrieved_docs))
+    for i, doc in enumerate(retrieved_docs, 1):
+        logger.info(
+            "  %d. [%.2f] %s (ref: %s) [%s]",
+            i,
+            doc.get("score", 0),
+            doc.get("title", "Unknown"),
+            doc.get("reference_no", "N/A"),
+            doc.get("source", "unknown"),
+        )
+    logger.info("==============================")
+
 
     try:
         result = generate_legal_basis(
@@ -744,3 +762,167 @@ def ai_legal_basis(request):
 
     return JsonResponse({"result": result})
 
+
+
+####################################################################################
+
+import json
+import logging
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt
+from .rag.embedder import embed_text
+from .rag.retriever import retrieve
+
+logger = logging.getLogger(__name__)
+
+
+@csrf_exempt
+@require_POST
+def ai_inline_check(request):
+    """
+    Batched inline intelligence check.
+
+    Accepts:  POST JSON { "paragraphs": [{"id": "<uuid>", "text": "<str>"}, ...] }
+    Returns:  JSON { "results": [{"id": "<uuid>", "matches": [...]}, ...] }
+
+    No LLM call — retrieval only (fast, 1–2 seconds for the whole batch).
+    All paragraphs are checked in one pass; the response mirrors the input
+    order so the frontend can zip id → matches directly.
+    """
+    try:
+        body       = json.loads(request.body)
+        paragraphs = body.get("paragraphs", [])
+
+        if not isinstance(paragraphs, list) or not paragraphs:
+            return JsonResponse({"error": "No paragraphs provided."}, status=400)
+
+        results = []
+
+        for item in paragraphs:
+            para_id = item.get("id", "")
+            text    = (item.get("text") or "").strip()
+
+            # Short-circuit: too short to be meaningful
+            if len(text) < 20:
+                results.append({"id": para_id, "matches": []})
+                continue
+
+            retrieved = retrieve(text, top_k=5)
+
+            matches = [
+                {
+                    "title":        r["title"],
+                    "reference_no": r["reference_no"],
+                    "snippet":      r["snippet"],
+                    "score":        round(r["score"], 4),
+                    "source":       r["source"],
+                }
+                for r in retrieved
+                if r["score"] >= 0.6
+            ]
+
+            logger.debug(
+                "[ai_inline_check] id=%s text='%s...' → %d match(es)",
+                para_id, text[:60], len(matches),
+            )
+
+            results.append({"id": para_id, "matches": matches})
+
+        return JsonResponse({"results": results})
+
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON."}, status=400)
+    except Exception as e:
+        logger.exception("[ai_inline_check] Unexpected error: %s", e)
+        return JsonResponse({"error": "Internal server error."}, status=500)
+
+@login_required 
+def Upload_legacy(request):
+    return render(request,'documents/upload_legacy.html')
+
+
+
+import os
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render, redirect
+
+from .models import LegacyDocument
+
+
+@login_required
+def upload_legacy_document(request):
+    if request.method == 'POST':
+        title        = request.POST.get('title', '').strip()
+        reference_no = request.POST.get('reference_no', '').strip()
+        doc_type     = request.POST.get('doc_type', '').strip()
+        year_raw     = request.POST.get('year', '').strip()
+        pdf_file     = request.FILES.get('pdf_file')
+
+        # ── Validation ────────────────────────────────────────────
+        errors = []
+
+        if not title:
+            errors.append("Document title is required.")
+
+        if not reference_no:
+            errors.append("Reference number is required.")
+
+        if doc_type not in ('ORDINANCE', 'RESOLUTION'):
+            errors.append("Please select a valid document type.")
+
+        year = None
+        if not year_raw:
+            errors.append("Year is required.")
+        else:
+            try:
+                year = int(year_raw)
+                if not (1900 <= year <= 2100):
+                    errors.append("Year must be between 1900 and 2100.")
+            except ValueError:
+                errors.append("Year must be a valid number.")
+
+        if not pdf_file:
+            errors.append("A PDF file is required.")
+        else:
+            ext = os.path.splitext(pdf_file.name)[1].lower()
+            if ext != '.pdf':
+                errors.append("Only PDF files are accepted.")
+            if pdf_file.size > 20 * 1024 * 1024:   # 20 MB
+                errors.append("File size must not exceed 20 MB.")
+
+        if errors:
+            for error in errors:
+                messages.error(request, error)
+            context = {
+                'form': {
+                    'title':        type('f', (), {'value': lambda self: title})(),
+                    'reference_no': type('f', (), {'value': lambda self: reference_no})(),
+                    'doc_type':     type('f', (), {'value': lambda self: doc_type})(),
+                    'year':         type('f', (), {'value': lambda self: year_raw})(),
+                    'pdf_file':     type('f', (), {'errors': [], 'value': lambda self: None})(),
+                }
+            }
+            return render(request, 'documents/upload_legacy.html', context)
+
+        # ── Save ──────────────────────────────────────────────────
+        LegacyDocument.objects.create(
+            title        = title,
+            reference_no = reference_no,
+            doc_type     = doc_type,
+            year         = year,
+            pdf_file     = pdf_file,
+            # extracted_text and embedding are populated later
+            # by: python manage.py embed_documents --legacy-only
+        )
+
+        messages.success(
+            request,
+            f'{doc_type.capitalize()} "{reference_no}" uploaded successfully. '
+            f"Run embed_documents --legacy-only to make it searchable."
+        )
+        return redirect('UPLOAD-LEGACY-DOCUMENT')
+
+    # ── GET ───────────────────────────────────────────────────────
+    return render(request, 'documents/upload_legacy.html', {})

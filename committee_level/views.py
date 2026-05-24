@@ -290,17 +290,24 @@ def set_hearing_date(request):
 @login_required
 def committee_amendments(request, doc_id):
     """Render the floor amendments workbench for a second-reading document."""
-
+    from documents.models import PublicComment
     doc = get_object_or_404(Document, Q(id=doc_id) & (Q(status='REFERRED') | Q(status__icontains='COMMITTEE')))
     if request.user.role not in ['SECRETARIAT', 'STAFF', 'ADMIN']:
         messages.error(request, "You don't have permission to make amendments.")
         return redirect('second_reading')
 
     amendments = doc.amendment_notes.select_related('author').all()
-
+    comments = PublicComment.objects.filter(
+        document=doc,
+        replyTo__isnull=True,       # top-level only, no replies
+    ).order_by('created_at')
+    print("COMMENTS COUNT:", comments.count())
+    print("ALL COMMENTS:", PublicComment.objects.filter(document=doc).count())
+    print("APPROVED ONLY:", PublicComment.objects.filter(document=doc, is_approved=True).count())
     return render(request, 'documents/committee_level/amending_table.html', {
         'doc': doc,
         'amendments': amendments,
+        'comments':comments,
     })
 
 

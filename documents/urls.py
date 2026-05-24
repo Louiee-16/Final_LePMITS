@@ -45,4 +45,10 @@ urlpatterns = [
     path('documents/<int:doc_id>/', views.download_document_pdf, name='download_document_pdf'), # download for any document version
     ##################################################################################
     path("ai-legal-basis/", views.ai_legal_basis, name="ai_legal_basis"),
+
+    path("ai-inline-check/", views.ai_inline_check, name="ai_inline_check"),
+
+    path("document/upload/legacy",views.Upload_legacy, name = "UPLOAD-LEGACY"),
+    path('upload-legacy/', views.upload_legacy_document, name='UPLOAD-LEGACY-DOCUMENT'),
+
 ]

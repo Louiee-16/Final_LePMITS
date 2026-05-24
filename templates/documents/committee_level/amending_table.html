@@ -27,7 +27,6 @@
                 Last Saved: <span class="text-slate-600">{{ doc.updated_at|date:"M d, H:i" }}</span>
             </p>
 
-            <!-- Current status badge -->
             {% if doc.amendment_status %}
             <span class="px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest
                 {% if doc.amendment_status == 'IN_PROGRESS' %}bg-amber-50 text-amber-600 border border-amber-200
@@ -41,7 +40,17 @@
             </span>
             {% endif %}
 
-            <!-- Save — opens status modal -->
+            <!-- Public Comments button -->
+            <button type="button" onclick="openCommentsModal()"
+                class="relative px-5 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:border-sky-300 hover:text-sky-600 transition-all shadow-sm">
+                <i class="fas fa-comments mr-2"></i> Public Comments
+                {% if comments %}
+                <span class="absolute -top-1.5 -right-1.5 w-5 h-5 bg-sky-500 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow">
+                    {{ comments|length }}
+                </span>
+                {% endif %}
+            </button>
+
             <button type="button" onclick="openSaveModal()"
                 class="px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all">
                 <i class="fas fa-save mr-2"></i> Save
@@ -112,6 +121,93 @@
 
         </div>
     </form>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     PUBLIC COMMENTS MODAL
+══════════════════════════════════════════════ -->
+<div id="commentsModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+    <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="closeCommentsModal()"></div>
+    <div class="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-lg modal-card flex flex-col" style="max-height: 80vh;">
+
+        <!-- Modal header -->
+        <div class="px-8 pt-8 pb-5 border-b border-slate-100 shrink-0">
+            <div class="flex items-start justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-11 h-11 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center shrink-0">
+                        <i class="fas fa-comments text-sky-500"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-base font-black text-slate-900 tracking-tight">Public Comments</h2>
+                        <p class="text-[10px] text-slate-400 font-medium mt-0.5">
+                            Submitted via the San Juan City Gazette
+                        </p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeCommentsModal()"
+                    class="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-all shrink-0 mt-0.5">
+                    <i class="fas fa-times text-xs"></i>
+                </button>
+            </div>
+
+            <!-- Comment count summary -->
+            <div class="mt-4 flex items-center gap-2 px-3 py-2 bg-sky-50 border border-sky-100 rounded-xl">
+                <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+                <span class="text-[10px] font-black uppercase tracking-widest text-sky-600">
+                    {% if comments %}
+                        {{ comments|length }} comment{{ comments|length|pluralize }} from the public
+                    {% else %}
+                        No public comments yet
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+
+        <!-- Comments list — scrollable -->
+        <div class="flex-1 overflow-y-auto px-8 py-6 space-y-4">
+            {% if comments %}
+                {% for comment in comments %}
+                <div class="flex items-start gap-4 p-4 bg-slate-50 border border-slate-100 rounded-2xl">
+                    <!-- Avatar initial -->
+                    <div class="w-9 h-9 rounded-xl bg-sky-100 border border-sky-200 flex items-center justify-center shrink-0 text-sky-600 font-black text-sm uppercase">
+                        {{ comment.name|first }}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-1.5">
+                            <span class="text-[11px] font-black text-slate-700">{{ comment.name }}</span>
+                            <span class="text-[9px] text-slate-300 font-medium">·</span>
+                            <span class="text-[10px] text-slate-400 font-medium">
+                                {% if comment.barangay %}Brgy. {{ comment.barangay }}{% else %}Citizen{% endif %}
+                            </span>
+                        </div>
+                        <p class="text-[12px] text-slate-600 font-medium leading-relaxed">{{ comment.comment }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <!-- Empty state -->
+                <div class="flex flex-col items-center justify-center py-12 text-center">
+                    <div class="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+                        <i class="fas fa-comment-slash text-slate-300 text-2xl"></i>
+                    </div>
+                    <p class="text-sm font-black text-slate-400 uppercase tracking-widest mb-1">No Comments Yet</p>
+                    <p class="text-[11px] text-slate-300 font-medium max-w-xs leading-relaxed">
+                        Public comments submitted through the Gazette will appear here once citizens respond.
+                    </p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Footer -->
+        <div class="px-8 py-5 border-t border-slate-100 shrink-0">
+            <button type="button" onclick="closeCommentsModal()"
+                class="w-full px-4 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-all">
+                Close
+            </button>
+        </div>
+
+    </div>
 </div>
 
 
@@ -235,6 +331,24 @@
     quill.on('selection-change', range => { if (range) highlightOriginalParagraph(getActiveParagraphIndex()); });
     quill.on('text-change', () => highlightOriginalParagraph(getActiveParagraphIndex()));
 
+    // ── Generic modal helpers ────────────────────────────────────────
+    function openModalById(id) {
+        const modal = document.getElementById(id);
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeModalById(id) {
+        const modal = document.getElementById(id);
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        document.body.style.overflow = '';
+    }
+
+    // ── Comments modal ───────────────────────────────────────────────
+    function openCommentsModal()  { openModalById('commentsModal'); }
+    function closeCommentsModal() { closeModalById('commentsModal'); }
+
     // ── Save modal ───────────────────────────────────────────────────
     function openSaveModal() {
         const current = document.getElementById('amendmentStatusField').value;
@@ -244,7 +358,6 @@
         });
         openModalById('saveModal');
     }
-
     function closeSaveModal() { closeModalById('saveModal'); }
 
     function confirmSave() {
@@ -271,23 +384,11 @@
         });
     });
 
-    // ── Generic modal helpers ────────────────────────────────────────
-    function openModalById(id) {
-        const modal = document.getElementById(id);
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-        document.body.style.overflow = 'hidden';
-    }
-
-    function closeModalById(id) {
-        const modal = document.getElementById(id);
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-        document.body.style.overflow = '';
-    }
-
     document.addEventListener('keydown', e => {
-        if (e.key === 'Escape') closeModalById('saveModal');
+        if (e.key === 'Escape') {
+            closeModalById('commentsModal');
+            closeModalById('saveModal');
+        }
     });
 </script>
 

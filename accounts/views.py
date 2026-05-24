@@ -26,8 +26,48 @@ def dashboard_redirect(request):
         return render(request, 'dashboards/staff.html')
     elif user.role == "BARANGAY":
         return redirect('barangay-dashboard')
+    
     elif user.role == "COUNCILOR":
         return redirect('councilor-dashboard')
     else:
         return redirect('login')
     
+
+
+
+from django.http import HttpResponseRedirect, JsonResponse
+import json
+from django.contrib.auth import authenticate, login
+import time
+def session_status(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'alive': False, 'remaining': 0})
+    
+    last_activity = request.session.get('last_activity', int(time.time()))
+    remaining = 1800 - (int(time.time()) - last_activity)
+    print(remaining)
+    return JsonResponse({
+        'alive': True,
+        'remaining': max(remaining, 0)
+    })
+
+def session_relogin(request):
+    if request.method == "POST":
+        data = json.loads(request.body)
+        username = data.get('username')
+        password = data.get('password')
+        user = authenticate(request,username=username, password=password)
+
+        if user:
+            login(request, user)
+            request.session['last_activity'] = int(time.time())
+            return JsonResponse({'success':True})
+
+        return JsonResponse({'success':False, 'error':'Invalid credentials.'})
+    return JsonResponse({'error':'Method not allowed.'}, status =405)
+
+
+def session_heartbeat(request):
+    if request.user.is_authenticated:
+        return JsonResponse({'alive': True})
+    return JsonResponse({'alive': False})

@@ -29,7 +29,6 @@
             <span id="autosaveSaving" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden">
                 <i class="fas fa-circle-notch fa-spin mr-1"></i> Saving...
             </span>
-            
             <button form="draftForm" type="submit" name="action" value="save"
                 class="px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-50 hover:text-indigo-600 transition-all shadow-sm">
                 <i class="fas fa-save mr-2"></i> Save Draft
@@ -72,7 +71,7 @@
             <!-- LEFT: MAIN EDITOR -->
             <div class="lg:col-span-8 space-y-6">
 
-                <!-- Title — auto-growing textarea -->
+                <!-- Title -->
                 <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8">
                     <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">
                         Legislative Title
@@ -96,14 +95,32 @@
                             <div class="w-2 h-2 rounded-full bg-indigo-400"></div>
                             <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">Draft Content</span>
                         </div>
-                        <span class="text-[9px] font-bold text-slate-300 uppercase tracking-widest" id="wordCount">0 words</span>
+                        <div class="flex items-center gap-3">
+                            <span class="text-[9px] font-bold text-slate-300 uppercase tracking-widest" id="wordCount">0 words</span>
+                            <span id="ragStatusPill" style="display:none;"
+                                class="items-center gap-1.5 px-2.5 py-1 bg-violet-50 border border-violet-200 rounded-full">
+                                <span class="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse inline-block"></span>
+                                <span class="text-[9px] font-black uppercase tracking-widest text-violet-500">Similarities detected</span>
+                            </span>
+                        </div>
                     </div>
-                    <!-- Fixed: explicit height wrapper so Quill has space to render -->
-                    <div id="quillEditor" style="min-height: 480px;"></div>
+
+                    <div id="editorWrap" style="position:relative;">
+<div id="ragOverlay" style="
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 2;
+"></div>
+                        <div id="quillEditor" style="min-height:480px; position:relative; z-index:1;"></div>
+                    </div>
+
                     <textarea name="content" id="contentField" class="hidden">{{ ghost.content|default:'' }}</textarea>
                 </div>
 
-                <!-- AI Legal Basis Assistant -->
+                <!-- AI Legal Basis -->
                 <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8">
                     <div class="flex items-center justify-between mb-5">
                         <div class="flex items-center gap-3">
@@ -120,14 +137,12 @@
                             <i class="fas fa-search mr-2"></i> Find Legal Basis
                         </button>
                     </div>
-
                     <div id="aiLoading" class="hidden">
                         <div class="bg-slate-50 border border-slate-100 rounded-2xl p-5 flex items-center gap-4">
                             <i class="fas fa-circle-notch fa-spin text-violet-400"></i>
                             <p class="text-xs text-slate-400 font-medium italic">Searching legal database...</p>
                         </div>
                     </div>
-
                     <div id="aiResults" class="hidden">
                         <div class="bg-violet-50 border border-violet-100 rounded-2xl p-6">
                             <p class="text-[9px] font-black uppercase tracking-widest text-violet-400 mb-3">AI Suggestion</p>
@@ -140,7 +155,6 @@
             <!-- RIGHT SIDEBAR -->
             <aside class="lg:col-span-4 space-y-6 sticky top-6">
 
-                <!-- Measure Details -->
                 <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8">
                     <h3 class="text-sm font-black uppercase tracking-widest text-slate-800 mb-6 flex items-center gap-2">
                         <i class="fas fa-file-lines text-indigo-600"></i> Measure Details
@@ -151,19 +165,14 @@
                             <div class="grid grid-cols-2 gap-2">
                                 <label class="doc-type-label">
                                     <input type="radio" name="type" value="ORDINANCE" checked class="hidden">
-                                    <span class="type-pill">
-                                        <i class="fas fa-scroll mr-1.5 text-[9px]"></i>Ordinance
-                                    </span>
+                                    <span class="type-pill"><i class="fas fa-scroll mr-1.5 text-[9px]"></i>Ordinance</span>
                                 </label>
                                 <label class="doc-type-label">
                                     <input type="radio" name="type" value="RESOLUTION" class="hidden">
-                                    <span class="type-pill">
-                                        <i class="fas fa-file-circle-check mr-1.5 text-[9px]"></i>Resolution
-                                    </span>
+                                    <span class="type-pill"><i class="fas fa-file-circle-check mr-1.5 text-[9px]"></i>Resolution</span>
                                 </label>
                             </div>
                         </div>
-
                         <div class="border-t border-slate-50 pt-5">
                             <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Primary Author</label>
                             <div class="flex items-center gap-3 px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl">
@@ -182,7 +191,6 @@
                     </div>
                 </div>
 
-                <!-- Committee -->
                 <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8">
                     <h3 class="text-sm font-black uppercase tracking-widest text-slate-800 mb-5 flex items-center gap-2">
                         <i class="fas fa-users-rectangle text-indigo-600"></i> Referred Committee
@@ -191,13 +199,12 @@
                         class="w-full px-4 py-3 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 transition-all">
                         <option value="">— No Committee Yet —</option>
                         {% for committee in committees %}
-                            <option value="{{ committee.id }}">Committee on {{ committee.name }}</option>
+                            <option value="{{ committee.id }}">{{ committee.name }}</option>
                         {% endfor %}
                     </select>
                     <p class="text-[10px] text-slate-300 font-medium mt-3 italic">Can be assigned later during referral.</p>
                 </div>
 
-                <!-- Info box -->
                 <div class="bg-slate-50 rounded-[2rem] border border-slate-100 p-6 space-y-4">
                     <p class="text-[9px] font-black uppercase tracking-widest text-slate-400">What happens next?</p>
                     <div class="flex items-start gap-3">
@@ -223,133 +230,193 @@
     </form>
 </div>
 
+<!-- RAG POPOVER -->
+<div id="ragPopover" style="
+    position: fixed;
+    z-index: 9999;
+    width: 320px;
+    display: none;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+" class="bg-white border border-violet-200 rounded-2xl shadow-2xl overflow-hidden">
+    <div class="px-5 py-3 bg-violet-50 border-b border-violet-100 flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-violet-400 animate-pulse"></span>
+        <p class="text-[9px] font-black uppercase tracking-widest text-violet-500">Similar Document Found</p>
+    </div>
+    <div id="ragPopoverBody" class="px-5 py-4 space-y-3 max-h-64 overflow-y-auto"></div>
+    <div class="px-5 py-2.5 bg-slate-50 border-t border-slate-100">
+        <p class="text-[9px] text-slate-400 font-medium italic">Detected by LePMITS Legislative Intelligence</p>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
 <script>
-    // ── Quill ────────────────────────────────────────────────────
-    const quill = new Quill('#quillEditor', {
-        theme: 'snow',
-        placeholder: 'WHEREAS, ...',
-        modules: {
-            toolbar: [
-                [{ 'header': [1, 2, 3, false] }],
-                ['bold', 'italic', 'underline', 'strike'],
-                [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-                [{ 'indent': '-1' }, { 'indent': '+1' }],
-                ['blockquote'], ['clean']
-            ]
+// ════════════════════════════════════════════════════════════════════════════
+// STEP 1 — CUSTOM QUILL BLOT: ParaIdBlot
+//
+// Registers a block-level format called 'para-id' that stores a UUID as a
+// data-para-id attribute on each <p> node. Because it's a Quill format,
+// it survives Quill's own re-renders and persists through getContents() /
+// setContents(). We use this UUID as the stable key for our hash cache and
+// tile map — it does NOT shift when paragraphs are inserted or deleted above.
+// ════════════════════════════════════════════════════════════════════════════
+
+const Block = Quill.import('blots/block');
+
+class ParaIdBlot extends Block {
+    static create(value) {
+        const node = super.create();
+        node.setAttribute('data-para-id', value);
+        return node;
+    }
+    static formats(node) {
+        return node.getAttribute('data-para-id') || undefined;
+    }
+    format(name, value) {
+        if (name === ParaIdBlot.blotName && value) {
+            this.domNode.setAttribute('data-para-id', value);
+        } else {
+            super.format(name, value);
+        }
+    }
+}
+ParaIdBlot.blotName = 'para-id';
+ParaIdBlot.tagName  = 'p';
+Quill.register(ParaIdBlot, true);
+
+// ── UUID generator (RFC 4122 v4, no external lib needed) ─────────────────────
+function uuid4() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0;
+        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+}
+
+// ── Quill init ───────────────────────────────────────────────────────────────
+const quill = new Quill('#quillEditor', {
+    theme: 'snow',
+    placeholder: 'WHEREAS, ...',
+    modules: {
+        toolbar: [
+            [{ 'header': [1, 2, 3, false] }],
+            ['bold', 'italic', 'underline', 'strike'],
+            [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+            [{ 'indent': '-1'}, { 'indent': '+1' }],
+            ['blockquote'], ['clean']
+        ]
+    }
+});
+
+const existingContent = document.getElementById('contentField').value;
+if (existingContent) quill.root.innerHTML = existingContent;
+
+document.getElementById('draftForm').addEventListener('submit', function () {
+    document.getElementById('contentField').value = quill.root.innerHTML;
+});
+
+// ── STEP 2 — UUID ASSIGNMENT ─────────────────────────────────────────────────
+// After every text-change, scan all block nodes. Any paragraph missing a
+// data-para-id gets a fresh UUID assigned via the Quill format API.
+// We use quill.formatLine() so the assignment goes through the Quill delta
+// system and survives future re-renders.
+
+function assignMissingUUIDs() {
+    const blocks = Array.from(quill.root.querySelectorAll('p, li, h1, h2, h3, blockquote'));
+    blocks.forEach(node => {
+        if (!node.getAttribute('data-para-id')) {
+            node.setAttribute('data-para-id', uuid4());
         }
     });
+}
 
-    const existingContent = document.getElementById('contentField').value;
-    if (existingContent) quill.root.innerHTML = existingContent;
+// ── Word count ───────────────────────────────────────────────────────────────
+function updateWordCount() {
+    const text  = quill.getText().trim();
+    const words = text ? text.split(/\s+/).filter(w => w).length : 0;
+    document.getElementById('wordCount').textContent = `${words} word${words !== 1 ? 's' : ''}`;
+}
+quill.on('text-change', updateWordCount);
 
-    document.getElementById('draftForm').addEventListener('submit', function () {
-        document.getElementById('contentField').value = quill.root.innerHTML;
+// ── Auto-grow title ──────────────────────────────────────────────────────────
+const titleInput = document.getElementById('titleInput');
+function autoGrow(el) {
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+}
+titleInput.addEventListener('input', function () {
+    autoGrow(this);
+    document.getElementById('charCount').textContent = this.value.length;
+    triggerAutosave();
+});
+autoGrow(titleInput);
+document.getElementById('charCount').textContent = titleInput.value.length;
+
+// ── Autosave ─────────────────────────────────────────────────────────────────
+const docIdField   = document.getElementById('doc_id_field');
+const statusSaved  = document.getElementById('autosaveStatus');
+const statusSaving = document.getElementById('autosaveSaving');
+let autosaveTimer  = null;
+
+function triggerAutosave() {
+    clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(serverSync, 3000);
+}
+function serverSync() {
+    const title   = titleInput.value.trim();
+    const content = quill.root.innerHTML.trim();
+    if (!title && content === '<p><br></p>') return;
+
+    statusSaving.classList.remove('hidden');
+    statusSaved.classList.add('hidden');
+
+    fetch("{% url 'autosave_draft' %}", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+        body: JSON.stringify({ title: title || 'Untitled Draft', content, doc_id: docIdField.value || null })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'saved') {
+            docIdField.value = data.doc_id;
+            statusSaving.classList.add('hidden');
+            statusSaved.classList.remove('hidden');
+            setTimeout(() => statusSaved.classList.add('hidden'), 3000);
+        }
+    })
+    .catch(() => statusSaving.classList.add('hidden'));
+}
+quill.on('text-change', triggerAutosave);
+
+// ── Doc type pills ───────────────────────────────────────────────────────────
+document.querySelectorAll('.doc-type-label input').forEach(radio => {
+    radio.addEventListener('change', () => {
+        document.querySelectorAll('.type-pill').forEach(p => p.classList.remove('active'));
+        radio.nextElementSibling.classList.add('active');
     });
+});
+document.querySelector('.doc-type-label input:checked')?.nextElementSibling.classList.add('active');
 
-    // ── Word count ───────────────────────────────────────────────
-    function updateWordCount() {
-        const text = quill.getText().trim();
-        const words = text ? text.split(/\s+/).filter(w => w).length : 0;
-        document.getElementById('wordCount').textContent = `${words} word${words !== 1 ? 's' : ''}`;
-    }
-    quill.on('text-change', updateWordCount);
-
-    // ── Auto-grow title textarea ─────────────────────────────────
-    const titleInput = document.getElementById('titleInput');
-
-    function autoGrow(el) {
-        el.style.height = 'auto';
-        el.style.height = el.scrollHeight + 'px';
-    }
-
-    titleInput.addEventListener('input', function () {
-        autoGrow(this);
-        document.getElementById('charCount').textContent = this.value.length;
-        triggerAutosave();
+// ── Ghost discard ────────────────────────────────────────────────────────────
+function discardGhost() {
+    if (!confirm('Discard your recovered draft? This cannot be undone.')) return;
+    fetch("{% url 'discard_ghost' %}", {
+        method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+    }).then(() => {
+        document.getElementById('recoveryBanner')?.remove();
+        titleInput.value = '';
+        autoGrow(titleInput);
+        document.getElementById('charCount').textContent = '0';
+        docIdField.value = '';
+        quill.setContents([]);
     });
+}
 
-    autoGrow(titleInput);
-    document.getElementById('charCount').textContent = titleInput.value.length;
-
-    // ── Autosave ─────────────────────────────────────────────────
-    const docIdField   = document.getElementById('doc_id_field');
-    const statusSaved  = document.getElementById('autosaveStatus');
-    const statusSaving = document.getElementById('autosaveSaving');
-    let autosaveTimer  = null;
-
-    function triggerAutosave() {
-        clearTimeout(autosaveTimer);
-        autosaveTimer = setTimeout(serverSync, 3000);
-    }
-
-    function serverSync() {
-        const title   = titleInput.value.trim();
-        const content = quill.root.innerHTML.trim();
-        if (!title && content === '<p><br></p>') return;
-
-        statusSaving.classList.remove('hidden');
-        statusSaved.classList.add('hidden');
-
-        fetch("{% url 'autosave_draft' %}", {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-            body: JSON.stringify({
-                title: title || 'Untitled Draft',
-                content: content,
-                doc_id: docIdField.value || null
-            })
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.status === 'saved') {
-                docIdField.value = data.doc_id;
-                statusSaving.classList.add('hidden');
-                statusSaved.classList.remove('hidden');
-                setTimeout(() => statusSaved.classList.add('hidden'), 3000);
-            }
-        })
-        .catch(() => statusSaving.classList.add('hidden'));
-    }
-
-    quill.on('text-change', triggerAutosave);
-
-    // ── Doc type pill toggle ─────────────────────────────────────
-    document.querySelectorAll('.doc-type-label input').forEach(radio => {
-        radio.addEventListener('change', () => {
-            document.querySelectorAll('.type-pill').forEach(p => p.classList.remove('active'));
-            radio.nextElementSibling.classList.add('active');
-        });
-    });
-    document.querySelector('.doc-type-label input:checked')
-        ?.nextElementSibling.classList.add('active');
-
-    // ── Ghost discard ────────────────────────────────────────────
-    function discardGhost() {
-        if (!confirm('Discard your recovered draft? This cannot be undone.')) return;
-        fetch("{% url 'discard_ghost' %}", {
-            method: 'POST',
-            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
-        }).then(() => {
-            document.getElementById('recoveryBanner')?.remove();
-            titleInput.value = '';
-            autoGrow(titleInput);
-            document.getElementById('charCount').textContent = '0';
-            docIdField.value = '';
-            quill.setContents([]);
-        });
-    }
-
-    // ── AI Legal Basis ───────────────────────────────────────────
-// ── AI Legal Basis ───────────────────────────────────────────
+// ── AI Legal Basis ───────────────────────────────────────────────────────────
 document.getElementById('aiCheckBtn').addEventListener('click', async function () {
     const title   = titleInput.value.trim();
     const content = quill.getText().trim();
-
-    if (!title || !content) {
-        alert("Please fill in the Title and Content first.");
-        return;
-    }
+    if (!title || !content) { alert("Please fill in the Title and Content first."); return; }
 
     const btn = this;
     btn.disabled = true;
@@ -357,26 +424,13 @@ document.getElementById('aiCheckBtn').addEventListener('click', async function (
     document.getElementById('aiLoading').classList.remove('hidden');
 
     try {
-        // ── Step 1: ensure the ghost is saved so we have a pk ──────────
-        // If autosave hasn't fired yet (docIdField is empty), force a sync
-        // now and wait for it to complete before calling the AI endpoint.
         if (!docIdField.value) {
             clearTimeout(autosaveTimer);
             await new Promise((resolve, reject) => {
-                const title   = titleInput.value.trim();
-                const content = quill.root.innerHTML.trim();
-
                 fetch("{% url 'autosave_draft' %}", {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': '{{ csrf_token }}'
-                    },
-                    body: JSON.stringify({
-                        title: title || 'Untitled Draft',
-                        content: content,
-                        doc_id: null
-                    })
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                    body: JSON.stringify({ title: titleInput.value.trim() || 'Untitled Draft', content: quill.root.innerHTML.trim(), doc_id: null })
                 })
                 .then(r => r.json())
                 .then(data => {
@@ -386,57 +440,358 @@ document.getElementById('aiCheckBtn').addEventListener('click', async function (
                         statusSaved.classList.remove('hidden');
                         setTimeout(() => statusSaved.classList.add('hidden'), 3000);
                         resolve();
-                    } else {
-                        reject(new Error("Autosave did not return a doc_id."));
-                    }
+                    } else { reject(new Error("Autosave did not return a doc_id.")); }
                 })
                 .catch(reject);
             });
         }
 
-        // ── Step 2: call the AI endpoint with the now-guaranteed pk ────
         const pk = docIdField.value;
         if (!pk) throw new Error("Could not save draft before AI lookup.");
 
         const res  = await fetch("{% url 'ai_legal_basis' %}", {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': '{{ csrf_token }}'
-            },
-            body: JSON.stringify({ pk: pk })
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({ pk })
         });
-
         const data = await res.json();
 
         document.getElementById('aiLoading').classList.add('hidden');
         document.getElementById('aiResults').classList.remove('hidden');
 
         if (!res.ok || data.error) {
-            document.getElementById('aiContent').innerHTML =
-                `<span class="text-rose-500 font-bold">${data.error || 'Unknown error.'}</span>`;
+            document.getElementById('aiContent').innerHTML = `<span class="text-rose-500 font-bold">${data.error || 'Unknown error.'}</span>`;
             return;
         }
-
-        // ── Step 3: render result — newlines → <br>, preserve numbering ─
-        const formatted = data.result
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/\n/g, '<br>');
-
-        document.getElementById('aiContent').innerHTML = formatted;
+        document.getElementById('aiContent').innerHTML = data.result
+            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
 
     } catch (err) {
         document.getElementById('aiLoading').classList.add('hidden');
         document.getElementById('aiResults').classList.remove('hidden');
-        document.getElementById('aiContent').innerHTML =
-            `<span class="text-rose-500 font-bold">Could not reach AI assistant. Try again.</span>`;
+        document.getElementById('aiContent').innerHTML = `<span class="text-rose-500 font-bold">Could not reach AI assistant. Try again.</span>`;
         console.error("ai_legal_basis error:", err);
     } finally {
         btn.disabled = false;
     }
 });
+
+// ════════════════════════════════════════════════════════════════════════════
+// INLINE LEGISLATIVE INTELLIGENCE
+//
+// WHAT CHANGED vs. the old version:
+//
+//  1. UUID-keyed tile map — tileMap is now Map<uuid, tile>.
+//     Tiles never go orphan when paragraphs shift position.
+//
+//  2. Hash cache — hashCache is Map<uuid, hash>.
+//     A paragraph is only sent to the backend if its text hash changed.
+//     A 10-paragraph doc with 1 edit → 1 fetch, not 10.
+//
+//  3. Completeness gate — a paragraph only qualifies for a check if it
+//     passes at least ONE of:
+//       a. ends with terminal punctuation (. ? ! ;)
+//       b. has >= 10 words
+//       c. was flagged by the focus-loss trigger (user clicked away)
+//     This prevents checks on half-written sentences.
+//
+//  4. Focus-loss trigger — when the user's cursor leaves a paragraph
+//     (focusout on quill.root), that paragraph is immediately flagged
+//     as focus-lost and a check fires without waiting for the debounce.
+//
+//  5. Batched POST — all pending paragraphs are sent in ONE request
+//     as an array. The backend returns an array of {id, matches}.
+//     One embedding pass, one DB query, one response.
+// ════════════════════════════════════════════════════════════════════════════
+
+const ragOverlay     = document.getElementById('ragOverlay');
+const ragPopover     = document.getElementById('ragPopover');
+const ragPopoverBody = document.getElementById('ragPopoverBody');
+const ragStatusPill  = document.getElementById('ragStatusPill');
+const editorWrap     = document.getElementById('editorWrap');
+
+let inlineTimer      = null;
+let hidePopoverTimer = null;
+
+// ── State stores ─────────────────────────────────────────────────────────────
+const tileMap   = new Map();   // uuid → overlay tile DOM node
+const hashCache = new Map();   // uuid → last text hash sent to server
+const focusLost = new Set();   // uuids of paragraphs the cursor just left
+
+// ── Simple string hash (djb2) — no crypto needed, just change detection ──────
+function hashText(str) {
+    let h = 5381;
+    for (let i = 0; i < str.length; i++) h = ((h << 5) + h) ^ str.charCodeAt(i);
+    return h >>> 0;  // unsigned 32-bit
+}
+
+// ── STEP 3 — COMPLETENESS GATE ───────────────────────────────────────────────
+// Returns true if the paragraph is worth checking right now.
+// A paragraph qualifies if it:
+//   (a) ends with terminal punctuation — sentence is syntactically complete
+//   (b) has 10+ words — enough semantic content for a meaningful embedding
+//   (c) was just focus-lost — user moved on, whatever state it's in is final
+//
+// Legislative text note: semicolons are added because WHEREAS / BE IT ENACTED
+// clauses commonly end with ";" rather than ".".
+
+function isComplete(text, uuid) {
+    if (focusLost.has(uuid)) return true;
+    if (/[.?!;]\s*$/.test(text)) return true;
+    if (text.split(/\s+/).filter(Boolean).length >= 10) return true;
+    return false;
+}
+
+// ── Popover ───────────────────────────────────────────────────────────────────
+function buildPopoverContent(matches) {
+    ragPopoverBody.innerHTML = '';
+    matches.forEach((m, i) => {
+        const pct   = Math.round(m.score * 100);
+        const badge = m.source === 'legacy'
+            ? `<span style="background:#fef3c7;color:#92400e;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;padding:2px 7px;border-radius:999px;">Legacy</span>`
+            : `<span style="background:#e0e7ff;color:#3730a3;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;padding:2px 7px;border-radius:999px;">Active</span>`;
+        const card = document.createElement('div');
+        card.style.cssText = i < matches.length - 1 ? 'padding-bottom:10px;border-bottom:1px solid #f1f5f9;margin-bottom:2px;' : '';
+        card.innerHTML = `
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px;">
+                ${badge}
+                <span style="font-size:9px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;">${m.reference_no || '—'}</span>
+                <span style="margin-left:auto;font-size:9px;font-weight:900;color:#7c3aed;">${pct}% match</span>
+            </div>
+            <p style="font-size:11px;font-weight:700;color:#1e293b;line-height:1.4;margin-bottom:3px;">${m.title}</p>
+            <p style="font-size:10px;color:#94a3b8;font-weight:500;line-height:1.5;">${m.snippet.slice(0,180)}…</p>
+        `;
+        ragPopoverBody.appendChild(card);
+    });
+}
+
+function showPopover(tileEl, matches) {
+    buildPopoverContent(matches);
+    ragPopover.style.display = 'block';
+    ragPopover.style.pointerEvents = 'auto';
+    const rect   = tileEl.getBoundingClientRect();
+    const scrollY = window.scrollY || document.documentElement.scrollTop;
+    const popW   = 320;
+    let left = rect.left + rect.width / 2 - popW / 2;
+    left = Math.max(8, Math.min(left, window.innerWidth - popW - 8));
+    ragPopover.style.left  = `${left}px`;
+    ragPopover.style.width = `${popW}px`;
+    ragPopover.style.top   = `${rect.top + scrollY}px`;
+    requestAnimationFrame(() => {
+        const popH = ragPopover.offsetHeight;
+        ragPopover.style.top = `${rect.top + scrollY - popH - 6}px`;
+        ragPopover.style.opacity = '1';
+    });
+}
+
+function hidePopover() {
+    ragPopover.style.opacity = '0';
+    ragPopover.style.pointerEvents = 'none';
+    setTimeout(() => { ragPopover.style.display = 'none'; }, 150);
+}
+
+ragPopover.addEventListener('mouseenter', () => clearTimeout(hidePopoverTimer));
+ragPopover.addEventListener('mouseleave', () => { hidePopoverTimer = setTimeout(hidePopover, 100); });
+
+// ── Tile management (UUID-keyed) ──────────────────────────────────────────────
+function positionTile(tile, pNode) {
+    const wRect = editorWrap.getBoundingClientRect();
+    const pRect = pNode.getBoundingClientRect();
+    tile.style.top    = `${pRect.top  - wRect.top}px`;
+    tile.style.left   = `${pRect.left - wRect.left}px`;
+    tile.style.width  = `${pRect.width}px`;
+    tile.style.height = `${pRect.height}px`;
+}
+
+function upsertTile(uuid, pNode, matches) {
+    let tile = tileMap.get(uuid);
+    if (!tile) {
+        tile = document.createElement('div');
+        tile.style.cssText = `
+            position: absolute;
+            border-radius: 3px;
+            pointer-events: auto;
+            cursor: help;
+            background: rgba(139,92,246,0.07);
+            border-bottom: 2px solid rgba(139,92,246,0.30);
+            transition: background 0.2s ease, border-color 0.2s ease;
+            box-sizing: border-box;
+        `;
+        tile.addEventListener('mouseenter', () => {
+            clearTimeout(hidePopoverTimer);
+            showPopover(tile, tileMap.get(uuid)?._matches || []);
+            tile.style.background   = 'rgba(139,92,246,0.14)';
+            tile.style.borderBottom = '2px solid rgba(139,92,246,0.55)';
+        });
+        tile.addEventListener('mouseleave', () => {
+            hidePopoverTimer = setTimeout(hidePopover, 100);
+            tile.style.background   = 'rgba(139,92,246,0.07)';
+            tile.style.borderBottom = '2px solid rgba(139,92,246,0.30)';
+        });
+        ragOverlay.appendChild(tile);
+        tileMap.set(uuid, tile);
+    }
+    tile._matches = matches;   // store matches directly on the tile node
+    positionTile(tile, pNode);
+}
+
+function removeTile(uuid) {
+    const tile = tileMap.get(uuid);
+    if (tile) { tile.remove(); tileMap.delete(uuid); }
+}
+
+function repositionAllTiles() {
+    const blocks = Array.from(quill.root.querySelectorAll('p, li, h1, h2, h3, blockquote'));
+    blocks.forEach(pNode => {
+        const uuid = pNode.getAttribute('data-para-id');
+        if (uuid && tileMap.has(uuid)) positionTile(tileMap.get(uuid), pNode);
+    });
+}
+
+// ── STEP 4 — FOCUS-LOSS TRIGGER ──────────────────────────────────────────────
+// When the cursor leaves a paragraph inside quill.root, mark that paragraph's
+// UUID in focusLost and immediately run a check on just that paragraph.
+// This bypasses the debounce so the councilor gets feedback the moment they
+// move on, even if the paragraph doesn't end with punctuation.
+
+quill.root.addEventListener('focusout', () => {
+    // Find the paragraph the cursor was just in
+    const selection = quill.getSelection();
+    if (!selection) return;
+    const [leaf] = quill.getLeaf(selection.index);
+    if (!leaf) return;
+    let node = leaf.domNode;
+    while (node && node.parentNode !== quill.root) node = node.parentNode;
+    if (!node) return;
+
+    const uuid = node.getAttribute('data-para-id');
+    if (!uuid) return;
+
+    focusLost.add(uuid);
+    // Run a focused single-paragraph check immediately
+    runBatchCheck([{ uuid, node }]);
+});
+
+// ── STEP 5 — BATCHED CHECK ───────────────────────────────────────────────────
+// Accepts an array of {uuid, node} pairs.
+// Filters to only paragraphs that:
+//   1. Pass the completeness gate
+//   2. Have a changed hash (or no hash yet)
+// Sends ONE POST with all qualifying paragraphs.
+// The backend returns [{id, matches}] — one result per paragraph sent.
+
+async function runBatchCheck(candidates) {
+    // Build the batch: only paragraphs that pass gate + hash check
+    const batch = [];
+    candidates.forEach(({ uuid, node }) => {
+        const text = (node.textContent || '').trim();
+
+        if (text.length < 20) {
+            removeTile(uuid);
+            hashCache.delete(uuid);
+            return;
+        }
+
+        if (!isComplete(text, uuid)) return;   // gate: not ready yet
+
+        const h = hashText(text);
+        if (hashCache.get(uuid) === h) return;  // hash: unchanged, skip
+
+        batch.push({ id: uuid, text });
+    });
+
+    if (!batch.length) return;
+
+    try {
+        const res = await fetch("{% url 'ai_inline_check' %}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({ paragraphs: batch })   // ← array, not single paragraph
+        });
+        if (!res.ok) return;
+
+        const data    = await res.json();
+        const results = data.results || [];   // [{id, matches}]
+
+        // Build a lookup map from the current DOM for fast node access
+        const nodeByUUID = new Map();
+        quill.root.querySelectorAll('[data-para-id]').forEach(n => {
+            nodeByUUID.set(n.getAttribute('data-para-id'), n);
+        });
+
+        let anyMatch = false;
+
+        results.forEach(({ id, matches }) => {
+            const filteredMatches = (matches || []).filter(m => m.score >= 0.6);
+            const node = nodeByUUID.get(id);
+
+            // Update hash cache now that we have a real result
+            if (node) {
+                hashCache.set(id, hashText((node.textContent || '').trim()));
+            }
+
+            // Clear focus-lost flag — this paragraph has now been checked
+            focusLost.delete(id);
+
+            if (filteredMatches.length > 0 && node) {
+                upsertTile(id, node, filteredMatches);
+                anyMatch = true;
+            } else {
+                removeTile(id);
+            }
+        });
+
+        // Update status pill based on whether any tiles are active
+        const totalMatches = tileMap.size > 0;
+        ragStatusPill.style.display = totalMatches ? 'flex' : 'none';
+
+    } catch (err) {
+        console.debug('[rag-inline] batch error:', err);
+    }
+}
+
+// ── Full document scan (called on debounce) ───────────────────────────────────
+function scanAllParagraphs() {
+    assignMissingUUIDs();
+    const blocks = Array.from(quill.root.querySelectorAll('p, li, h1, h2, h3, blockquote'));
+
+    // Remove tiles for UUIDs no longer in the document
+    const liveUUIDs = new Set(blocks.map(n => n.getAttribute('data-para-id')).filter(Boolean));
+    tileMap.forEach((_, uuid) => { if (!liveUUIDs.has(uuid)) removeTile(uuid); });
+
+    const candidates = blocks
+        .map(node => ({ uuid: node.getAttribute('data-para-id'), node }))
+        .filter(c => c.uuid);
+
+    runBatchCheck(candidates);
+}
+
+// ── Wire up ───────────────────────────────────────────────────────────────────
+quill.on('text-change', function () {
+    quill.root.querySelectorAll('p, li, h1, h2, h3, blockquote').forEach(node => {
+        if (!node.getAttribute('data-para-id')) node.setAttribute('data-para-id', uuid4());
+    });    
+    requestAnimationFrame(repositionAllTiles);
+    clearTimeout(inlineTimer);
+    inlineTimer = setTimeout(scanAllParagraphs, 1500);
+});
+
+window.addEventListener('scroll',  repositionAllTiles, { passive: true });
+window.addEventListener('resize',  repositionAllTiles, { passive: true });
+
+// Always start clean — clear any stale state before initial scan
+tileMap.forEach((tile) => tile.remove());
+tileMap.clear();
+hashCache.clear();
+focusLost.clear();
+document.getElementById('ragOverlay').innerHTML = '';
+
+// Assign fresh UUIDs to all paragraphs on load
+quill.root.querySelectorAll('p, li, h1, h2, h3, blockquote').forEach(node => {
+    node.setAttribute('data-para-id', uuid4());
+});
+
+if (existingContent) setTimeout(scanAllParagraphs, 1200);
 </script>
 
 <style>

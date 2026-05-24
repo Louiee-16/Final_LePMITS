@@ -6,7 +6,7 @@ class User(AbstractUser):
         ('SECRETARIAT', 'Secretariat'),
         ('STAFF', 'Legislative Staff'),
         ('COUNCILOR', 'Councilor'),
-        ('BRGY_SEC', 'Barangay Secretary'),
+        ('BARANGAY', 'Barangay'),
         ('ADMIN', 'Admin')
     )
     role = models.CharField(max_length=20, choices=ROLES, default='STAFF')

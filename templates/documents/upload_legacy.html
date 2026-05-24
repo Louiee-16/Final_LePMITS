@@ -1,0 +1,324 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+
+<div class="w-full px-8 py-8">
+
+    <!-- HEADER -->
+    <div class="flex items-center gap-4 mb-8 border-b border-slate-100 pb-6">
+        <a href="{% url 'dashboard' %}" class="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-all shadow-sm">
+            <i class="fas fa-arrow-left text-xs"></i>
+        </a>
+        <div>
+            <nav class="flex text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 gap-2 mb-1">
+                <a href="{% url 'dashboard' %}" class="hover:text-indigo-600 transition-colors">Legislative</a>
+                <span class="text-slate-200">/</span>
+                <span class="text-indigo-600">Upload Legacy Document</span>
+            </nav>
+            <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Upload Legacy Document</h1>
+        </div>
+    </div>
+
+    <!-- MESSAGES -->
+    {% if messages %}
+        {% for message in messages %}
+        <div class="mb-6 px-5 py-4 rounded-2xl text-xs font-bold
+            {% if message.tags == 'success' %}bg-emerald-50 border border-emerald-200 text-emerald-700
+            {% else %}bg-rose-50 border border-rose-200 text-rose-700{% endif %}">
+            <i class="fas {% if message.tags == 'success' %}fa-check-circle{% else %}fa-circle-exclamation{% endif %} mr-2"></i>
+            {{ message }}
+        </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- MAIN GRID -->
+    <form method="POST" enctype="multipart/form-data" id="uploadForm" action = "{%url 'UPLOAD-LEGACY-DOCUMENT'%}">
+        {% csrf_token %}
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+            <!-- LEFT: FORM FIELDS -->
+            <div class="lg:col-span-8 space-y-6">
+
+                <!-- Title -->
+                <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8">
+                    <label for="title" class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">
+                        Document Title <span class="text-rose-400">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        id="title"
+                        name="title"
+                        required
+                        maxlength="1000"
+                        placeholder="An Ordinance/Resolution providing for..."
+                        value="{{ form.title.value|default:'' }}"
+                        class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 transition-all placeholder:font-normal placeholder:text-slate-300">
+                    {% if form.title.errors %}
+                        <p class="text-[10px] text-rose-500 font-bold mt-2">{{ form.title.errors|join:", " }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Reference No. + Year -->
+                <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8">
+                    <div class="grid grid-cols-2 gap-6">
+                        <div>
+                            <label for="reference_no" class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">
+                                Reference No. <span class="text-rose-400">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                id="reference_no"
+                                name="reference_no"
+                                required
+                                maxlength="100"
+                                placeholder="e.g. ORD-2018-042"
+                                value="{{ form.reference_no.value|default:'' }}"
+                                class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 transition-all placeholder:font-normal placeholder:text-slate-300">
+                            {% if form.reference_no.errors %}
+                                <p class="text-[10px] text-rose-500 font-bold mt-2">{{ form.reference_no.errors|join:", " }}</p>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <label for="year" class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">
+                                Year <span class="text-rose-400">*</span>
+                            </label>
+                            <input
+                                type="number"
+                                id="year"
+                                name="year"
+                                required
+                                min="1900"
+                                max="2100"
+                                placeholder="e.g. 2018"
+                                value="{{ form.year.value|default:'' }}"
+                                class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 transition-all placeholder:font-normal placeholder:text-slate-300">
+                            {% if form.year.errors %}
+                                <p class="text-[10px] text-rose-500 font-bold mt-2">{{ form.year.errors|join:", " }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PDF Upload -->
+                <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8">
+                    <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">
+                        PDF File <span class="text-rose-400">*</span>
+                    </label>
+
+                    <!-- Drop zone -->
+                    <label for="pdf_file" id="dropZone"
+                        class="flex flex-col items-center justify-center gap-4 w-full px-6 py-16 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:border-indigo-300 hover:bg-indigo-50/40 transition-all group">
+
+                        <div id="dropIcon" class="w-16 h-16 rounded-2xl bg-slate-100 group-hover:bg-indigo-100 flex items-center justify-center transition-all">
+                            <i class="fas fa-file-pdf text-slate-400 group-hover:text-indigo-500 text-2xl transition-all"></i>
+                        </div>
+
+                        <div id="dropText" class="text-center">
+                            <p class="text-sm font-black text-slate-600 group-hover:text-indigo-700 transition-colors">
+                                Drop your PDF here, or <span class="text-indigo-600 underline underline-offset-2">browse</span>
+                            </p>
+                            <p class="text-[11px] text-slate-400 font-medium mt-1">PDF only · Max 20 MB</p>
+                        </div>
+
+                        <!-- Selected file name -->
+                        <div id="fileNameDisplay" class="hidden items-center gap-3 px-5 py-3 bg-indigo-50 border border-indigo-100 rounded-xl w-full max-w-md">
+                            <i class="fas fa-file-pdf text-indigo-500 text-sm shrink-0"></i>
+                            <span id="fileNameText" class="text-xs font-bold text-indigo-700 truncate"></span>
+                            <button type="button" id="clearFile"
+                                class="ml-auto text-[10px] font-black text-slate-400 hover:text-rose-500 transition-colors shrink-0">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+
+                        <input type="file" id="pdf_file" name="pdf_file" accept=".pdf" class="hidden" required>
+                    </label>
+
+                    {% if form.pdf_file.errors %}
+                        <p class="text-[10px] text-rose-500 font-bold mt-2">{{ form.pdf_file.errors|join:", " }}</p>
+                    {% endif %}
+
+                    <!-- OCR notice -->
+                    <div class="flex items-start gap-3 mt-5 px-4 py-3 bg-amber-50 border border-amber-100 rounded-xl">
+                        <i class="fas fa-circle-info text-amber-400 text-xs mt-0.5 shrink-0"></i>
+                        <p class="text-[10px] text-amber-700 font-medium leading-snug">
+                            Text will be extracted automatically. Run <code class="font-black bg-amber-100 px-1 rounded">python manage.py embed_documents --legacy-only</code> afterwards to make this document searchable by the AI.
+                        </p>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- RIGHT SIDEBAR -->
+            <aside class="lg:col-span-4 space-y-6 sticky top-6">
+
+                <!-- Document Type -->
+                <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8">
+                    <h3 class="text-sm font-black uppercase tracking-widest text-slate-800 mb-6 flex items-center gap-2">
+                        <i class="fas fa-file-lines text-indigo-600"></i> Document Type
+                    </h3>
+                    <div class="space-y-2">
+                        <label class="doc-type-label w-full">
+                            <input type="radio" name="doc_type" value="ORDINANCE" class="hidden"
+                                {% if form.doc_type.value == 'ORDINANCE' or not form.doc_type.value %}checked{% endif %}>
+                            <span class="type-pill w-full">
+                                <i class="fas fa-scroll mr-2 text-[9px]"></i>Ordinance
+                            </span>
+                        </label>
+                        <label class="doc-type-label w-full">
+                            <input type="radio" name="doc_type" value="RESOLUTION" class="hidden"
+                                {% if form.doc_type.value == 'RESOLUTION' %}checked{% endif %}>
+                            <span class="type-pill w-full">
+                                <i class="fas fa-file-circle-check mr-2 text-[9px]"></i>Resolution
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Info box -->
+                <div class="bg-slate-50 rounded-[2rem] border border-slate-100 p-6 space-y-4">
+                    <p class="text-[9px] font-black uppercase tracking-widest text-slate-400">About Legacy Documents</p>
+                    <div class="flex items-start gap-3">
+                        <div class="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                            <i class="fas fa-archive text-[8px] text-slate-400"></i>
+                        </div>
+                        <p class="text-[11px] text-slate-500 font-medium leading-snug">
+                            <span class="font-black text-slate-700">Legacy documents</span> are historical ordinances and resolutions uploaded as PDFs for archiving and AI reference.
+                        </p>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <div class="w-6 h-6 rounded-lg bg-violet-100 border border-violet-200 flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                            <i class="fas fa-robot text-[8px] text-violet-500"></i>
+                        </div>
+                        <p class="text-[11px] text-slate-500 font-medium leading-snug">
+                            Once embedded, the AI Legal Basis Assistant and Inline Intelligence will be able to reference this document when drafting new measures.
+                        </p>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <div class="w-6 h-6 rounded-lg bg-amber-100 border border-amber-200 flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                            <i class="fas fa-wand-magic-sparkles text-[8px] text-amber-500"></i>
+                        </div>
+                        <p class="text-[11px] text-slate-500 font-medium leading-snug">
+                            If the PDF is scanned, <span class="font-black text-slate-700">OCR</span> will run automatically to extract the text.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="flex flex-col gap-3">
+                    <button type="submit" id="submitBtn"
+                        class="w-full px-6 py-3.5 bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0 text-center">
+                        <i class="fas fa-upload mr-2"></i> Upload Document
+                    </button>
+                    <a href="{% url 'dashboard' %}"
+                        class="w-full px-6 py-3.5 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm text-center">
+                        Cancel
+                    </a>
+                </div>
+
+            </aside>
+        </div>
+
+    </form>
+</div>
+
+<script>
+    // ── Doc type pill toggle ─────────────────────────────────────
+    document.querySelectorAll('.doc-type-label input').forEach(radio => {
+        radio.addEventListener('change', () => {
+            document.querySelectorAll('.type-pill').forEach(p => p.classList.remove('active'));
+            radio.nextElementSibling.classList.add('active');
+        });
+    });
+    document.querySelector('.doc-type-label input:checked')
+        ?.nextElementSibling.classList.add('active');
+
+    // ── PDF drop zone ────────────────────────────────────────────
+    const fileInput       = document.getElementById('pdf_file');
+    const dropZone        = document.getElementById('dropZone');
+    const dropText        = document.getElementById('dropText');
+    const dropIcon        = document.getElementById('dropIcon');
+    const fileNameDisplay = document.getElementById('fileNameDisplay');
+    const fileNameText    = document.getElementById('fileNameText');
+    const clearFileBtn    = document.getElementById('clearFile');
+
+    function showFile(name) {
+        dropText.classList.add('hidden');
+        dropIcon.classList.add('hidden');
+        fileNameDisplay.classList.remove('hidden');
+        fileNameDisplay.classList.add('flex');
+        fileNameText.textContent = name;
+    }
+
+    function clearFile() {
+        fileInput.value = '';
+        fileNameDisplay.classList.add('hidden');
+        fileNameDisplay.classList.remove('flex');
+        dropText.classList.remove('hidden');
+        dropIcon.classList.remove('hidden');
+    }
+
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files.length) showFile(fileInput.files[0].name);
+    });
+
+    clearFileBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        clearFile();
+    });
+
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('border-indigo-400', 'bg-indigo-50');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('border-indigo-400', 'bg-indigo-50');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('border-indigo-400', 'bg-indigo-50');
+        const file = e.dataTransfer.files[0];
+        if (!file) return;
+        if (file.type !== 'application/pdf') {
+            alert('Please upload a PDF file only.');
+            return;
+        }
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        fileInput.files = dt.files;
+        showFile(file.name);
+    });
+
+    // ── Submit loading state ─────────────────────────────────────
+    document.getElementById('uploadForm').addEventListener('submit', function () {
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-2"></i> Uploading...';
+    });
+</script>
+
+<style>
+    .type-pill {
+        display: block;
+        text-align: center;
+        padding: 10px 12px;
+        border-radius: 12px;
+        font-size: 10px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        cursor: pointer;
+        border: 2px solid #e2e8f0;
+        color: #94a3b8;
+        transition: all 0.15s ease;
+        background: white;
+    }
+    .type-pill:hover  { border-color: #c7d2fe; color: #6366f1; }
+    .type-pill.active { background: #eef2ff; border-color: #6366f1; color: #4f46e5; }
+</style>
+
+{% endblock %}
