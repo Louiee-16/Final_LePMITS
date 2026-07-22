@@ -36,25 +36,30 @@ def public_participation(request, doc_id):
 def Secretariat_dashboard(request):
     now = datetime.now()
 
-
-    days_ahead = 0 - now.weekday() 
+    days_ahead = 0 - now.weekday()
     if days_ahead <= 0:
         days_ahead += 7
-
     next_monday = now + timedelta(days=days_ahead)
-
     session_datetime = next_monday.replace(hour=9, minute=30, second=0, microsecond=0)
 
+    active_statuses = ['FILED', 'FIRST_READING', 'REFERRED', 'COMMITTEE', 'SECOND_READING', 'THIRD_READING']
+
     context = {
-
-        'latest_docs': Document.objects.exclude(status='PENDING').order_by('-updated_at')[:5],
-        'drafts_count': Document.objects.filter(status='DRAFT').count(),
-        'in_committee': Document.objects.filter(status='REFERRED').count(),
-
-        "month": session_datetime.strftime("%B"),
-        "day": session_datetime.strftime("%d"),
-        "weekday": session_datetime.strftime("%A"),
-        "time": session_datetime.strftime("%I:%M %p"),
+        'latest_docs': Document.objects.exclude(status__in=['GHOST', 'DRAFT']).order_by('-updated_at')[:8],
+        'active_count':        Document.objects.filter(status__in=active_statuses).count(),
+        'first_reading_count': Document.objects.filter(status='FIRST_READING').count(),
+        'in_committee':        Document.objects.filter(status__in=['REFERRED', 'COMMITTEE']).count(),
+        'approved_count':      Document.objects.filter(status='APPROVED').count(),
+        'pipeline': [
+            {'label': 'First Reading',    'count': Document.objects.filter(status='FIRST_READING').count(),    'color': 'bg-slate-400'},
+            {'label': 'In Committee',     'count': Document.objects.filter(status__in=['REFERRED','COMMITTEE']).count(), 'color': 'bg-slate-500'},
+            {'label': 'Second Reading',   'count': Document.objects.filter(status='SECOND_READING').count(),   'color': 'bg-slate-600'},
+            {'label': 'Third Reading',    'count': Document.objects.filter(status='THIRD_READING').count(),    'color': 'bg-slate-700'},
+        ],
+        "month":            session_datetime.strftime("%B"),
+        "day":              session_datetime.strftime("%d"),
+        "weekday":          session_datetime.strftime("%A"),
+        "time":             session_datetime.strftime("%I:%M %p"),
         "session_datetime": session_datetime,
     }
 
@@ -213,47 +218,39 @@ def generate_agenda_pdf(request, session_id):
 
 @login_required
 def send_agenda_email(request, session_id):
-    """Generate agenda PDF and email it to all councilors."""
-    from councilors.models import Councilor # adjust to your user model path
- 
+    """Email the Order of Business PDF to all active councilors."""
+    from councilors.models import Councilor
+
     session = get_object_or_404(Session, id=session_id)
-    context = get_agenda_context(session)
- 
-    # Get all councilor emails
+
     councilor_emails = list(
-        Councilor.objects.filter(
-            role='COUNCILOR',
-            email__isnull=False
-        ).exclude(email='').values_list('email', flat=True)
+        Councilor.objects.filter(is_active=True)
+        .exclude(email__isnull=True).exclude(email='')
+        .values_list('email', flat=True)
     )
- 
+
     if not councilor_emails:
         messages.warning(request, 'No councilor email addresses found.')
-        return redirect('agenda_list')
- 
-    # Generate PDF
-    html_string = render_to_string('agenda/agenda_pdf.html', context)
- 
-    try:
-        from xhtml2pdf import pisa
-        import io
- 
+        return redirect('order-of-business')
+
+    # Use the already-finalized PDF if available, otherwise generate one
+    if session.order_of_business:
+        pdf_bytes = session.order_of_business.read()
+        session.order_of_business.seek(0)
+    else:
+        context = get_agenda_context()
+        html_string = get_template('documents/pdf/order_of_business.html').render(context)
         pdf_buffer = io.BytesIO()
         pisa.CreatePDF(html_string, dest=pdf_buffer)
         pdf_buffer.seek(0)
         pdf_bytes = pdf_buffer.read()
- 
-    except ImportError:
-        messages.error(request, 'PDF generation failed. Make sure xhtml2pdf is installed.')
-        return redirect('agenda_list')
- 
-    # Build email
+
     subject = (
         f"Order of Business — "
         f"{session.session_number}th Regular Session, "
         f"{session.session_date.strftime('%B %d, %Y')}"
     )
- 
+
     body = (
         f"Dear Honorable Councilors,\n\n"
         f"Please find attached the Order of Business for the "
@@ -264,9 +261,9 @@ def send_agenda_email(request, session_id):
         f"Office of the Sangguniang Panlungsod\n"
         f"City of San Juan, Metro Manila"
     )
- 
+
     filename = f"Order-of-Business-{session.session_date}.pdf"
- 
+
     email = EmailMessage(
         subject=subject,
         body=body,
@@ -274,14 +271,11 @@ def send_agenda_email(request, session_id):
         to=councilor_emails,
     )
     email.attach(filename, pdf_bytes, 'application/pdf')
- 
+
     try:
         email.send()
-        messages.success(
-            request,
-            f'Order of Business sent to {len(councilor_emails)} councilor(s).'
-        )
+        messages.success(request, f'Order of Business emailed to {len(councilor_emails)} councilor(s).')
     except Exception as e:
         messages.error(request, f'Failed to send email: {str(e)}')
- 
-    return redirect('agenda_list')
+
+    return redirect('order-of-business')

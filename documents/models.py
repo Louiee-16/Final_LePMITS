@@ -36,7 +36,7 @@ class Document(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     amended_content = models.TextField(blank=True, null=True)
-    embedding = VectorField(dimensions=384,null=True,blank=True)
+    embedding = VectorField(dimensions=4096,null=True,blank=True)
     amendment_status = models.CharField(
         max_length=20,
         choices=[
@@ -83,6 +83,9 @@ class Document(models.Model):
         return f"{self.title} ({self.status})"
     
 
+
+
+
     
 class AmendmentNote(models.Model):
     doc = models.ForeignKey(
@@ -105,6 +108,20 @@ class AmendmentNote(models.Model):
         return f"Amendment note on {self.doc} by {self.author}"
 
 
+class ReturnReason(models.Model):
+    document    = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='return_reasons')
+    reason      = models.TextField()
+    returned_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
+    previous_status = models.CharField(max_length=20, default='FIRST_READING')
+    created_at  = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Returned: {self.document.title[:50]}"
+
+
 class LegacyDocument(models.Model):
     DOC_TYPE_CHOICES = [
         ('ORDINANCE','Ordinance'),
@@ -117,7 +134,7 @@ class LegacyDocument(models.Model):
     year = models.IntegerField(null=True, blank=True)
     pdf_file = models.FileField(upload_to='legacy_documents/%Y/', max_length = 500)
     extracted_text = models.TextField(blank=True)  # OCR result stored here
-    embedding = VectorField(dimensions=384, null=True, blank=True)
+    embedding = VectorField(dimensions=4096, null=True, blank=True)
     ocr_processed = models.BooleanField(default=False)
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
@@ -150,3 +167,62 @@ class PublicComment(models.Model):
     class Meta:
         managed = False                      # ← never touch the real table
         db_table = 'gazette_publiccomment'   # ← must match exactly
+
+
+
+
+class NationalLaw(models.Model):
+    title       = models.CharField(max_length=500)
+    law_number  = models.CharField(max_length=100, help_text="e.g. Republic Act No. 7160")
+    year        = models.IntegerField(null=True, blank=True)
+    description = models.TextField(blank=True, help_text="Brief description of what the law covers")
+    pdf_file    = models.FileField(upload_to='national_laws/', null=True, blank=True,
+                                   help_text="Upload PDF — text will be extracted automatically")
+    content     = models.TextField(blank=True, help_text="Extracted or manually entered full text")
+    ocr_processed = models.BooleanField(default=False)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['law_number']
+
+    def __str__(self):
+        return f"{self.law_number} — {self.title}"
+
+
+class NationalLawChunk(models.Model):
+    law        = models.ForeignKey(NationalLaw, on_delete=models.CASCADE, related_name='chunks')
+    chunk_text = models.TextField()
+    chunk_type = models.CharField(max_length=50, default='SECTION')
+    chunk_index = models.IntegerField()
+    embedding  = VectorField(dimensions=4096, null=True, blank=True)
+
+    class Meta:
+        ordering = ['chunk_index']
+
+    def __str__(self):
+        return f"{self.law.law_number} — chunk {self.chunk_index}"
+
+
+class DocumentChunk(models.Model):
+    document = models.ForeignKey(
+        Document,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="chunks",
+    )
+    legacy_document = models.ForeignKey(
+        LegacyDocument,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="chunks",
+    )
+    chunk_type = models.CharField(max_length=50)
+    chunk_text = models.TextField()
+    embedding = VectorField(dimensions=4096, null=True, blank=True)
+    chunk_index = models.IntegerField()
+
+    class Meta:
+        db_table = "document_chunk"
+        ordering = ["chunk_index"]

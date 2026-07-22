@@ -9,13 +9,13 @@
             <!-- Status badge -->
             <span class="px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest
                 {% if doc.status == 'DRAFT' %}bg-slate-100 text-slate-500
-                {% elif doc.status == 'FILED' %}bg-blue-50 text-blue-600
-                {% elif doc.status == 'FIRST_READING' %}bg-amber-50 text-amber-600
-                {% elif doc.status == 'REFERRED' %}bg-orange-50 text-orange-500
-                {% elif doc.status == 'COMMITTEE' %}bg-yellow-50 text-yellow-600
-                {% elif doc.status == 'SECOND_READING' %}bg-violet-50 text-violet-600
-                {% elif doc.status == 'THIRD_READING' %}bg-purple-50 text-purple-600
-                {% elif doc.status == 'APPROVED' %}bg-emerald-50 text-emerald-600
+                {% elif doc.status == 'FILED' %}bg-slate-50 text-slate-600
+                {% elif doc.status == 'FIRST_READING' %}bg-slate-50 text-slate-600
+                {% elif doc.status == 'REFERRED' %}bg-slate-50 text-slate-500
+                {% elif doc.status == 'COMMITTEE' %}bg-slate-50 text-slate-600
+                {% elif doc.status == 'SECOND_READING' %}bg-slate-50 text-slate-600
+                {% elif doc.status == 'THIRD_READING' %}bg-slate-50 text-slate-600
+                {% elif doc.status == 'APPROVED' %}bg-slate-50 text-slate-600
                 {% else %}bg-slate-100 text-slate-500{% endif %}">
                 {{ doc.status }}
             </span>
@@ -23,7 +23,7 @@
             <!-- Download PDF -->
             <a href="" target="_blank"
                 class="px-4 py-2.5 bg-slate-900 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-700 transition-all shadow-sm flex items-center gap-2">
-                <i class="fas fa-file-pdf"></i> Download PDF
+                <i data-lucide="file-down" style="width:13px;height:13px;vertical-align:middle;"></i> Download PDF
             </a>
         </div>
     </div>

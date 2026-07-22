@@ -7,9 +7,9 @@
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
             <nav class="flex text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 gap-2 mb-2">
-                <a href="{% url 'dashboard' %}" class="hover:text-indigo-600 transition-colors">Admin</a>
+                <a href="{% url 'dashboard' %}" class="hover:text-slate-600 transition-colors">Admin</a>
                 <span>/</span>
-                <span class="text-indigo-600">Audit Logs</span>
+                <span class="text-slate-600">Audit Logs</span>
             </nav>
             <h1 class="text-3xl font-black text-slate-900 tracking-tight">System Activity Logs</h1>
             <p class="text-slate-500 mt-1 font-medium">Tracking every action, change, and system event for transparency.</p>
@@ -17,10 +17,10 @@
         
         <div class="flex items-center gap-3">
             <a href="{%url 'export-logs-csv'%}" class="px-5 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2">
-                <i class="fas fa-download text-slate-400"></i> Export CSV
+                <i data-lucide="download" style="width:13px;height:13px;color:#94a3b8;vertical-align:middle;"></i> Export CSV
             </a>
-            <button class="px-5 py-2.5 bg-rose-50 border border-rose-100 text-rose-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-rose-100 transition-all flex items-center gap-2">
-                <i class="fas fa-trash-alt"></i> Clear Logs
+            <button class="px-5 py-2.5 bg-slate-50 border border-slate-100 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-100 transition-all flex items-center gap-2">
+                <i data-lucide="trash-2" style="width:13px;height:13px;vertical-align:middle;"></i> Clear Logs
             </button>
         </div>
     </div>
@@ -28,8 +28,8 @@
     <!-- ── QUICK OVERVIEW ── -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
-            <div class="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 text-xl">
-                <i class="fas fa-fingerprint"></i>
+            <div class="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-600 text-xl">
+                <i data-lucide="fingerprint" style="width:22px;height:22px;"></i>
             </div>
             <div>
                 <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Events Today</p>
@@ -37,21 +37,21 @@
             </div>
         </div>
         <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
-            <div class="w-12 h-12 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-600 text-xl">
-                <i class="fas fa-exclamation-triangle"></i>
+            <div class="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-600 text-xl">
+                <i data-lucide="triangle-alert" style="width:22px;height:22px;"></i>
             </div>
             <div>
                 <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Security Alerts</p>
-                <p class="text-2xl font-black text-rose-600">{{security_alerts}}</p>
+                <p class="text-2xl font-black text-slate-600">{{security_alerts}}</p>
             </div>
         </div>
         <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
-            <div class="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 text-xl">
-                <i class="fas fa-check-double"></i>
+            <div class="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-600 text-xl">
+                <i data-lucide="check-check" style="width:22px;height:22px;"></i>
             </div>
             <div>
                 <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Successful Sync</p>
-                <p class="text-2xl font-black text-emerald-600">100%</p>
+                <p class="text-2xl font-black text-slate-600">100%</p>
             </div>
         </div>
     </div>
@@ -59,9 +59,9 @@
     <!-- ── SEARCH & FILTER ── -->
     <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row gap-4 items-center">
         <div class="relative flex-1 w-full">
-            <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+            <i data-lucide="search" style="width:14px;height:14px;color:#94a3b8;position:absolute;left:16px;top:50%;transform:translateY(-50%);pointer-events:none;"></i>
             <input type="text" id="logSearch" onkeyup="filterLogs()" placeholder="Search by user, action, or document title..." 
-                class="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all">
+                class="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-2 focus:ring-slate-500/20 outline-none transition-all">
         </div>
         <div class="flex items-center gap-2 w-full md:w-auto">
             <select id="typeFilter" onchange="filterLogs()" class="bg-slate-50 border border-slate-100 text-slate-600 text-xs font-bold px-4 py-2.5 rounded-xl outline-none">
@@ -106,7 +106,7 @@
 
     <td class="px-6 py-4">
         <div class="flex items-center gap-2">
-            <div class="w-6 h-6 rounded bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px] font-black">
+            <div class="w-6 h-6 rounded bg-slate-100 text-slate-600 flex items-center justify-center text-[10px] font-black">
                 {{ log.user.username|slice:":2"|upper|default:"—" }}
             </div>
             <span class="text-sm font-bold text-slate-700">{{ log.user.username|default:"System" }}</span>
@@ -115,10 +115,10 @@
 
     <td class="px-6 py-4">
         <span class="text-[10px] font-black uppercase tracking-wider
-            {% if log.action == 'DELETE' %}text-rose-600
-            {% elif log.action == 'CREATE' or log.action == 'FILE' %}text-emerald-600
-            {% elif log.action == 'LOGIN' %}text-indigo-600
-            {% else %}text-amber-600{% endif %}">
+            {% if log.action == 'DELETE' %}text-slate-600
+            {% elif log.action == 'CREATE' or log.action == 'FILE' %}text-slate-600
+            {% elif log.action == 'LOGIN' %}text-slate-600
+            {% else %}text-slate-600{% endif %}">
             {{ log.get_action_display }}
         </span><br>
         <span class="text-sm font-medium text-slate-600">{{ log.target }}</span>
@@ -128,7 +128,7 @@
 
     <td class="px-6 py-4 text-right">
         <button class="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-300 hover:text-slate-600">
-            <i class="fas fa-eye text-xs"></i>
+            <i data-lucide="eye" style="width:13px;height:13px;vertical-align:middle;"></i>
         </button>
     </td>
 </tr>
@@ -139,7 +139,7 @@
       
 
         <div class="px-6 py-4 bg-slate-50/50 border-t border-slate-100 text-center">
-            <button class="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:underline">Load More History</button>
+            <button class="text-[10px] font-black text-slate-600 uppercase tracking-widest hover:underline">Load More History</button>
         </div>
     </div>
 </div>

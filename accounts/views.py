@@ -1,17 +1,162 @@
-from django.shortcuts import render, redirect
-from django.contrib.auth.views import LoginView
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth import authenticate, login as auth_login
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.csrf import ensure_csrf_cookie, csrf_protect
+from django.core.mail import send_mail
+from django.conf import settings
 from documents.models import Document
-from django.contrib.auth.decorators import user_passes_test
 from audit.utils import log_action
+from .models import TwoFactorCode
 
-class CustomLoginView(LoginView):
-    template_name = 'accounts/login.html'
-    redirect_authenticated_user = True
+
+def _mask_email(email):
+    """Show j***e@gmail.com so the user knows where to look."""
+    try:
+        local, domain = email.split('@', 1)
+        masked = local[0] + '***' + local[-1] if len(local) > 2 else local[0] + '***'
+        return f"{masked}@{domain}"
+    except Exception:
+        return email
+
+
+@ensure_csrf_cookie
+@csrf_protect
+def login_view(request):
+    if request.user.is_authenticated:
+        return redirect('dashboard')
+
+    form = AuthenticationForm(request, data=request.POST or None)
+    error = None
+
+    if request.method == 'POST':
+        if form.is_valid():
+            user = form.get_user()
+
+            if not user.email:
+                # No email on record — log straight in (edge case for admin accounts)
+                auth_login(request, user)
+                log_action(request, 'LOGIN', target=user.username)
+                return redirect('dashboard')
+
+            # Generate OTP and send email
+            otp = TwoFactorCode.generate_for(user)
+            try:
+                send_mail(
+                    subject='LePMITS — Your Verification Code',
+                    message=(
+                        f"Hello {user.get_full_name() or user.username},\n\n"
+                        f"Your one-time verification code is:\n\n"
+                        f"  {otp.code}\n\n"
+                        f"This code is valid for 10 minutes. Do not share it with anyone.\n\n"
+                        f"If you did not attempt to sign in, please contact the Secretariat immediately.\n\n"
+                        f"— LePMITS, Sangguniang Panlungsod ng San Juan City"
+                    ),
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[user.email],
+                    fail_silently=False,
+                )
+            except Exception:
+                error = 'Could not send verification email. Contact the Secretariat.'
+                return render(request, 'accounts/login.html', {'form': form, 'error': error})
+
+            request.session['2fa_user_id'] = user.pk
+            request.session['2fa_backend'] = user.backend if hasattr(user, 'backend') else 'django.contrib.auth.backends.ModelBackend'
+            return redirect('otp-verify')
+        else:
+            error = 'Invalid username or password.'
+
+    return render(request, 'accounts/login.html', {'form': form, 'error': error})
+
+
+@csrf_protect
+def verify_otp(request):
+    user_id = request.session.get('2fa_user_id')
+    if not user_id:
+        return redirect('login')
+
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    user = get_object_or_404(User, pk=user_id)
+    masked = _mask_email(user.email)
+    error = None
+
+    if request.method == 'POST':
+        if 'resend' in request.POST:
+            otp = TwoFactorCode.generate_for(user)
+            try:
+                send_mail(
+                    subject='LePMITS — New Verification Code',
+                    message=(
+                        f"Hello {user.get_full_name() or user.username},\n\n"
+                        f"Your new verification code is:\n\n"
+                        f"  {otp.code}\n\n"
+                        f"This code is valid for 10 minutes.\n\n"
+                        f"— LePMITS, Sangguniang Panlungsod ng San Juan City"
+                    ),
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[user.email],
+                    fail_silently=True,
+                )
+            except Exception:
+                pass
+            return render(request, 'accounts/otp_verify.html', {
+                'masked_email': masked, 'resent': True
+            })
+
+        code = request.POST.get('code', '').strip()
+        otp = TwoFactorCode.objects.filter(
+            user=user, code=code, is_used=False
+        ).order_by('-created_at').first()
+
+        if not otp:
+            error = 'Invalid code. Please check your email and try again.'
+        elif otp.is_expired():
+            error = 'This code has expired. Please request a new one.'
+        else:
+            otp.is_used = True
+            otp.save()
+            backend = request.session.pop('2fa_backend', 'django.contrib.auth.backends.ModelBackend')
+            user.backend = backend
+            auth_login(request, user)
+            request.session.pop('2fa_user_id', None)
+            log_action(request, 'LOGIN', target=user.username)
+            return redirect('dashboard')
+
+    return render(request, 'accounts/otp_verify.html', {
+        'masked_email': masked,
+        'error': error,
+    })
+
+
+# Keep this alias so config/urls.py import doesn't break while we update it
+class CustomLoginView:
+    @staticmethod
+    def as_view():
+        return login_view
 
 
 def index(request):
-    return render(request, 'index.html')
+    from documents.models import Document, LegacyDocument
+    from secretariat.models import Session
+    from django.utils import timezone
+
+    approved_count   = Document.objects.filter(status='APPROVED').count()
+    legacy_count     = LegacyDocument.objects.count()
+    ordinance_count  = Document.objects.filter(status='APPROVED', doc_type='ORDINANCE').count() + \
+                       LegacyDocument.objects.filter(doc_type='ORDINANCE').count()
+    resolution_count = Document.objects.filter(status='APPROVED', doc_type='RESOLUTION').count() + \
+                       LegacyDocument.objects.filter(doc_type='RESOLUTION').count()
+
+    recent_docs = list(Document.objects.filter(status='APPROVED').order_by('-updated_at')[:5]) + \
+                  list(LegacyDocument.objects.order_by('-uploaded_at')[:3])
+
+    return render(request, 'index.html', {
+        'total_docs':      approved_count + legacy_count,
+        'ordinance_count': ordinance_count,
+        'resolution_count': resolution_count,
+        'recent_docs':     recent_docs,
+    })
 
 @login_required
 def dashboard_redirect(request):
@@ -45,7 +190,7 @@ def session_status(request):
     
     last_activity = request.session.get('last_activity', int(time.time()))
     remaining = 1800 - (int(time.time()) - last_activity)
-    print(remaining)
+    
     return JsonResponse({
         'alive': True,
         'remaining': max(remaining, 0)

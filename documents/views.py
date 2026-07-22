@@ -1,6 +1,7 @@
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
+from django.views.decorators.clickjacking import xframe_options_exempt
 import json
 from django.db.models import Q
 from .models import Document, AmendmentNote
@@ -135,14 +136,93 @@ def create_draft(request):
     committees = Committee.objects.all()
     ghost = Document.objects.filter(
         author=request.user,
-        status='GHOST'
+        status__in=['GHOST', 'DRAFT']
     ).order_by('-updated_at').first()
+
+    # Check if the draft was returned with a reason
+    return_reason = None
+    if ghost:
+        from .models import ReturnReason
+        return_reason = ReturnReason.objects.filter(document=ghost).first()
 
     return render(request, 'documents/draft.html', {
         'committees': committees,
         'ghost': ghost,
+        'return_reason': return_reason,
     })
 ############# MOVING FUNCTIONS$#########################
+@login_required
+def return_filed_doc(request, doc_id):
+    """Return a FILED document back to DRAFT with a reason."""
+    if request.method == 'POST' and request.user.role in ['SECRETARIAT', 'STAFF']:
+        from .models import ReturnReason
+        doc    = get_object_or_404(Document, id=doc_id, status='FILED')
+        reason = request.POST.get('return_reason', '').strip()
+
+        if not reason:
+            messages.error(request, 'A reason is required when returning a document.')
+            return redirect('incoming_docs')
+
+        doc.status = 'DRAFT'
+        doc.save()
+
+        ReturnReason.objects.create(
+            document=doc,
+            reason=reason,
+            returned_by=request.user,
+            previous_status='FILED',
+        )
+        log_action(request, action='RETURN', target=doc.title,
+                   detail=f'Returned to draft. Reason: {reason}')
+        messages.success(request, f'"{doc.title}" returned to the councilor.')
+    return redirect('incoming_docs')
+
+
+@login_required
+def return_from_first_reading(request, doc_id):
+    """Return a FIRST_READING document to DRAFT with a reason."""
+    if request.method != 'POST' or request.user.role not in ['SECRETARIAT', 'STAFF']:
+        return redirect('first_reading')
+
+    from .models import ReturnReason
+    doc    = get_object_or_404(Document, id=doc_id)
+    reason = request.POST.get('return_reason', '').strip()
+
+    if not reason:
+        messages.error(request, 'A reason is required when returning a document.')
+        return redirect('first_reading')
+
+    previous = doc.status
+    doc.status = 'DRAFT'
+    doc.save()
+
+    ReturnReason.objects.create(
+        document=doc,
+        reason=reason,
+        returned_by=request.user,
+        previous_status=previous,
+    )
+
+    log_action(
+        request, action='RETURN', target=doc.title,
+        detail=f'Returned from {previous} to DRAFT. Reason: {reason}'
+    )
+    messages.success(request, f'"{doc.title}" returned to the councilor with reason.')
+    return redirect('first_reading')
+
+
+@login_required
+def return_barangay_file(request, doc_id):
+    """Return a FILED barangay document back to DRAFT status."""
+    if request.method == 'POST' and request.user.role in ['SECRETARIAT', 'STAFF']:
+        doc = get_object_or_404(BarangayFiles, id=doc_id, status='FILED')
+        doc.status = 'DRAFT'
+        doc.save()
+        log_action(request, action='RETURN', target=str(doc.title or doc.id),
+                   detail=f'Barangay file #{doc.id} returned by {request.user.username}')
+    return redirect('incoming_docs')
+
+
 @login_required
 def return_to_committee(request, doc_id):
     doc = get_object_or_404(Document, id=doc_id)
@@ -550,21 +630,30 @@ from django.utils import timezone
 
 @login_required
 def approved_registry(request):
-    approved = Document.objects.filter(status='APPROVED').order_by('-updated_at')
-    
+    from .models import LegacyDocument
 
-    ordinances_total = Document.objects.filter(status='APPROVED', doc_type='ORDINANCE').count()
-    resolutions_total = Document.objects.filter(status='APPROVED', doc_type='RESOLUTION').count()
+    active_docs = list(Document.objects.filter(status='APPROVED').order_by('-updated_at'))
+    legacy_docs = list(LegacyDocument.objects.all().order_by('-uploaded_at'))
 
+    ordinances_total = (
+        Document.objects.filter(status='APPROVED', doc_type='ORDINANCE').count() +
+        LegacyDocument.objects.filter(doc_type='ORDINANCE').count()
+    )
+    resolutions_total = (
+        Document.objects.filter(status='APPROVED', doc_type='RESOLUTION').count() +
+        LegacyDocument.objects.filter(doc_type='RESOLUTION').count()
+    )
 
-    available_years = Document.objects.filter(status='DISAPPROVED').dates('updated_at', 'year', order='DESC')
+    active_years  = set(Document.objects.filter(status='APPROVED').dates('updated_at', 'year', order='DESC').values_list('updated_at__year', flat=True))
+    legacy_years  = set(LegacyDocument.objects.exclude(year__isnull=True).values_list('year', flat=True))
+    available_years = sorted(active_years | legacy_years, reverse=True)
 
     return render(request, 'documents/tracking/approved.html', {
-        'approved': approved,
+        'approved':         active_docs,
+        'legacy_docs':      legacy_docs,
         'ordinances_count': ordinances_total,
         'resolutions_count': resolutions_total,
-        'available_years': available_years,
-
+        'available_years':  available_years,
     })
     
 ################# HISTORY SYSTEM #############
@@ -578,6 +667,24 @@ def modal_document_viewer(request, doc_id):
     except (IndexError, ValueError):
         doc.ref_number = doc.reference_no
     return render(request, 'documents/modal_document_viewer.html', {'doc': doc})
+
+
+@login_required
+def modal_legacy_viewer(request, pk):
+    from .models import LegacyDocument
+    doc = get_object_or_404(LegacyDocument, pk=pk)
+    return render(request, 'documents/modal_legacy_viewer.html', {'doc': doc})
+
+
+@login_required
+@xframe_options_exempt
+def serve_legacy_pdf(request, pk):
+    from .models import LegacyDocument
+    from django.http import FileResponse, Http404
+    doc = get_object_or_404(LegacyDocument, pk=pk)
+    if not doc.pdf_file:
+        raise Http404
+    return FileResponse(doc.pdf_file.open('rb'), content_type='application/pdf')
 
 
 
@@ -720,27 +827,10 @@ def ai_legal_basis(request):
 
     document = get_object_or_404(Document, pk=pk)
 
-    # Only the author or staff may request AI suggestions for a document
     if document.author != request.user and not request.user.is_staff:
         return JsonResponse({"error": "Permission denied."}, status=403)
-    from documents.rag.retriever import retrieve
 
-    retrieved_docs = retrieve(query=document.title, top_k=5)
-
-    logger.info("=== AI Legal Basis Request ===")
-    logger.info("Draft pk=%s title: %s", pk, document.title)
-    logger.info("Retrieved %d similar documents:", len(retrieved_docs))
-    for i, doc in enumerate(retrieved_docs, 1):
-        logger.info(
-            "  %d. [%.2f] %s (ref: %s) [%s]",
-            i,
-            doc.get("score", 0),
-            doc.get("title", "Unknown"),
-            doc.get("reference_no", "N/A"),
-            doc.get("source", "unknown"),
-        )
-    logger.info("==============================")
-
+    logger.info("ai_legal_basis: pk=%s title=%r", pk, document.title)
 
     try:
         result = generate_legal_basis(
@@ -748,19 +838,12 @@ def ai_legal_basis(request):
             doc_type=document.doc_type,
         )
     except ValueError as exc:
-        logger.warning("ai_legal_basis: ValueError pk=%s: %s", pk, exc)
         return JsonResponse({"error": str(exc)}, status=400)
-    except RuntimeError as exc:
-        logger.error("ai_legal_basis: RuntimeError pk=%s: %s", pk, exc)
-        return JsonResponse(
-            {"error": "The AI backend is unavailable. Try again in a moment."},
-            status=500,
-        )
-    except Exception as exc:  # noqa: BLE001
-        logger.exception("ai_legal_basis: unexpected error pk=%s: %s", pk, exc)
-        return JsonResponse({"error": "Unexpected server error."}, status=500)
+    except Exception as exc:
+        logger.error("ai_legal_basis error pk=%s: %s", pk, exc)
+        return JsonResponse({"error": str(exc)}, status=500)
 
-    return JsonResponse({"result": result})
+    return JsonResponse({"national_laws": result})
 
 
 
@@ -785,11 +868,45 @@ def ai_inline_check(request):
 
     Accepts:  POST JSON { "paragraphs": [{"id": "<uuid>", "text": "<str>"}, ...] }
     Returns:  JSON { "results": [{"id": "<uuid>", "matches": [...]}, ...] }
-
-    No LLM call — retrieval only (fast, 1–2 seconds for the whole batch).
-    All paragraphs are checked in one pass; the response mirrors the input
-    order so the frontend can zip id → matches directly.
     """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from django.core.cache import cache
+    import hashlib
+
+    INLINE_TIMEOUT = 6
+
+    # Common legislative boilerplate words that appear in every ordinance —
+    # excluded from keyword overlap so they don't create false positives.
+    _STOP_WORDS = {
+        'the', 'a', 'an', 'and', 'or', 'of', 'to', 'in', 'is', 'it', 'be',
+        'that', 'this', 'for', 'on', 'are', 'with', 'as', 'by', 'at', 'from',
+        'not', 'but', 'its', 'may', 'shall', 'any', 'all', 'which', 'such',
+        'city', 'san', 'juan', 'whereas', 'section', 'ordinance', 'resolution',
+        'provided', 'hereby', 'hereof', 'thereof', 'therefore', 'now',
+        'sangguniang', 'panlungsod', 'barangay', 'pursuant', 'under',
+        'directly', 'indirectly', 'thereby', 'resulting', 'cause', 'effect',
+        'duly', 'enacted', 'ordained', 'resolved', 'government', 'local',
+    }
+
+    def _keyword_overlap(query_text: str, snippet: str, min_shared: int = 3) -> bool:
+        """Return True if query and snippet share at least min_shared meaningful words."""
+        def keywords(text):
+            return {
+                w for w in re.sub(r'[^a-z\s]', '', text.lower()).split()
+                if len(w) > 3 and w not in _STOP_WORDS
+            }
+        shared = keywords(query_text) & keywords(snippet)
+        return len(shared) >= min_shared
+
+    def _retrieve_cached(para_id, text):
+        cache_key = "rag_inline_" + hashlib.md5(text.encode()).hexdigest()
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return para_id, cached
+        result = retrieve(text, top_k=3, timeout=INLINE_TIMEOUT)
+        cache.set(cache_key, result, timeout=300)
+        return para_id, result
+
     try:
         body       = json.loads(request.body)
         paragraphs = body.get("paragraphs", [])
@@ -797,19 +914,34 @@ def ai_inline_check(request):
         if not isinstance(paragraphs, list) or not paragraphs:
             return JsonResponse({"error": "No paragraphs provided."}, status=400)
 
-        results = []
+        skip     = {item["id"]: [] for item in paragraphs if len((item.get("text") or "").strip()) < 20}
+        to_check = [item for item in paragraphs if item["id"] not in skip]
 
+        retrieved_map = {}
+        if to_check:
+            with ThreadPoolExecutor(max_workers=min(len(to_check), 6)) as pool:
+                futures = {
+                    pool.submit(_retrieve_cached, item["id"], item["text"].strip()): item["id"]
+                    for item in to_check
+                }
+                for future in as_completed(futures):
+                    try:
+                        para_id, retrieved = future.result()
+                        retrieved_map[para_id] = retrieved
+                    except Exception as e:
+                        # Ollama unreachable — treat as no matches, don't crash
+                        logger.debug("[ai_inline_check] paragraph failed: %s", e)
+                        retrieved_map[futures[future]] = []
+
+        # Build results preserving input order
+        results = []
         for item in paragraphs:
             para_id = item.get("id", "")
-            text    = (item.get("text") or "").strip()
-
-            # Short-circuit: too short to be meaningful
-            if len(text) < 20:
+            if para_id in skip:
                 results.append({"id": para_id, "matches": []})
                 continue
 
-            retrieved = retrieve(text, top_k=5)
-
+            query_text = item.get("text", "")
             matches = [
                 {
                     "title":        r["title"],
@@ -817,16 +949,13 @@ def ai_inline_check(request):
                     "snippet":      r["snippet"],
                     "score":        round(r["score"], 4),
                     "source":       r["source"],
+                    "chunk_type":   r.get("chunk_type", ""),
+                    "doc_id":       r.get("doc_id"),
                 }
-                for r in retrieved
-                if r["score"] >= 0.6
+                for r in retrieved_map.get(para_id, [])
+                if r["score"] >= 0.78
+                and _keyword_overlap(query_text, r["snippet"])
             ]
-
-            logger.debug(
-                "[ai_inline_check] id=%s text='%s...' → %d match(es)",
-                para_id, text[:60], len(matches),
-            )
-
             results.append({"id": para_id, "matches": matches})
 
         return JsonResponse({"results": results})
@@ -837,18 +966,28 @@ def ai_inline_check(request):
         logger.exception("[ai_inline_check] Unexpected error: %s", e)
         return JsonResponse({"error": "Internal server error."}, status=500)
 
-@login_required 
+@login_required
 def Upload_legacy(request):
     return render(request,'documents/upload_legacy.html')
 
 
+@login_required
+def legacy_document_detail(request, pk):
+    from .models import LegacyDocument
+    doc = get_object_or_404(LegacyDocument, pk=pk)
+    return render(request, 'documents/legacy_document_detail.html', {'doc': doc})
+
+
 
 import os
+import pytesseract
+pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 
-from .models import LegacyDocument
+from .models import LegacyDocument, DocumentChunk
+from documents.rag.embedder import embed_document_chunks
 
 
 @login_required
@@ -907,22 +1046,270 @@ def upload_legacy_document(request):
             return render(request, 'documents/upload_legacy.html', context)
 
         # ── Save ──────────────────────────────────────────────────
-        LegacyDocument.objects.create(
-            title        = title,
-            reference_no = reference_no,
-            doc_type     = doc_type,
-            year         = year,
-            pdf_file     = pdf_file,
-            # extracted_text and embedding are populated later
-            # by: python manage.py embed_documents --legacy-only
+        validated_text = request.POST.get('validated_text', '').strip()
+
+        legacy_doc = LegacyDocument.objects.create(
+            title          = title,
+            reference_no   = reference_no,
+            doc_type       = doc_type,
+            year           = year,
+            pdf_file       = pdf_file,
+            extracted_text = validated_text,
+            ocr_processed  = bool(validated_text),
         )
 
-        messages.success(
-            request,
-            f'{doc_type.capitalize()} "{reference_no}" uploaded successfully. '
-            f"Run embed_documents --legacy-only to make it searchable."
-        )
+        # ── Chunk + embed immediately ──────────────────────────────
+        if validated_text:
+            try:
+                chunk_records = embed_document_chunks(legacy_doc, source_type="legacy_document")
+                if chunk_records:
+                    DocumentChunk.objects.bulk_create([
+                        DocumentChunk(
+                            legacy_document = legacy_doc,
+                            chunk_type      = cr["chunk_type"],
+                            chunk_text      = cr["chunk_text"],
+                            embedding       = cr["embedding"],
+                            chunk_index     = cr["chunk_index"],
+                        )
+                        for cr in chunk_records
+                    ])
+                    messages.success(
+                        request,
+                        f'{doc_type.capitalize()} "{reference_no}" uploaded and indexed '
+                        f'({len(chunk_records)} chunks).'
+                    )
+                else:
+                    messages.warning(
+                        request,
+                        f'{doc_type.capitalize()} "{reference_no}" uploaded but no chunks were produced.'
+                    )
+            except Exception as e:
+                logger.warning("Embedding failed for LegacyDocument pk=%s: %s", legacy_doc.pk, e)
+                messages.warning(
+                    request,
+                    f'{doc_type.capitalize()} "{reference_no}" uploaded, but indexing failed — '
+                    f'Ollama may be unavailable. Run embed_documents manually to index it.'
+                )
+        else:
+            messages.success(
+                request,
+                f'{doc_type.capitalize()} "{reference_no}" uploaded (no text to index).'
+            )
+
         return redirect('UPLOAD-LEGACY-DOCUMENT')
 
     # ── GET ───────────────────────────────────────────────────────
     return render(request, 'documents/upload_legacy.html', {})
+
+
+##################### FOR UPLOADING OF LEGACY DOCUMENTS ##############################
+
+import re
+import pdfplumber
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+from django.contrib.auth.decorators import login_required
+
+@login_required
+@require_POST
+def extract_legacy_metadata(request):
+    """
+    POST /documents/extract-legacy-metadata/
+    Accepts a PDF file, reads first 2 pages, extracts
+    title, reference_no, year, doc_type using regex.
+    Returns JSON with extracted fields.
+    """
+    pdf_file = request.FILES.get('pdf_file')
+    if not pdf_file:
+        return JsonResponse({'error': 'No file provided.'}, status=400)
+
+    try:
+        with pdfplumber.open(pdf_file) as pdf:
+            total_pages = len(pdf.pages)
+            all_pages_text = []   # all pages — for display
+            meta_pages_text = []  # first 2 pages — for metadata extraction
+
+            for i, page in enumerate(pdf.pages):
+                text = page.extract_text() or ""
+                if text.strip():
+                    all_pages_text.append(text)
+                    if i < 2:
+                        meta_pages_text.append(text)
+                else:
+                    # fallback to Tesseract OCR for image-only pages
+                    try:
+                        import pytesseract
+                        pil_image = page.to_image(resolution=200).original.convert("RGB")
+                        ocr_text = pytesseract.image_to_string(pil_image, lang="eng")
+                        if ocr_text.strip():
+                            all_pages_text.append(ocr_text)
+                            if i < 2:
+                                meta_pages_text.append(ocr_text)
+                    except Exception as ocr_err:
+                        logger.warning("Tesseract OCR failed for page %d: %s", i + 1, ocr_err)
+
+        # Full text with page separators — for user display
+        display_text = "\n\n--- Page Break ---\n\n".join(all_pages_text).strip()
+
+        # Metadata extraction uses only first 2 pages
+        full_text = " ".join(meta_pages_text)
+        # normalize whitespace
+        full_text = re.sub(r'\s+', ' ', full_text).strip()
+
+        if not full_text:
+            return JsonResponse({
+                'title': '',
+                'reference_no': '',
+                'year': str(timezone.now().year),
+                'doc_type': 'ORDINANCE',
+                'full_text': display_text,
+                'total_pages': total_pages,
+                'word_count': len(display_text.split()),
+                'warning': 'Could not extract text from PDF. Check that OCR service is reachable.',
+            })
+
+        year_pattern = re.search(
+            r'(?:Series\s+of|s\.?)\s+(\d{4})',
+            full_text,
+            re.IGNORECASE
+        )
+        # ── Extract reference number ──────────────────────────────
+        # Matches: "City Ordinance No. 1", "Resolution No. 45-2021"
+        ref_pattern = re.search(
+            r'((?:CITY\s+)?(?:ORDINANCE|RESOLUTION)\s+NO[\.\s]+[\w\-]+)',
+            full_text,
+            re.IGNORECASE
+        )
+        reference_no = ref_pattern.group(1).strip() if ref_pattern else ""
+
+        refnumber_match = re.search(
+            r'NO\.\s*(\d+)',
+            reference_no,
+            re.IGNORECASE | re.DOTALL
+        )
+
+        refnumber = refnumber_match.group(1) if refnumber_match else "0"
+        refnumber = int(refnumber)
+
+        # format number with leading zeros
+        if refnumber > 99:
+            refnumber = str(refnumber)
+        elif refnumber > 9:
+            refnumber = f"0{refnumber}"
+        else:
+            refnumber = f"00{refnumber}"
+
+        # ── Extract year ──────────────────────────────────────────
+        # fallback: plain 4-digit year if "Series of YYYY" not found
+        if not year_pattern:
+            year_pattern = re.search(r'\b((?:19|20)\d{2})\b', full_text)
+        year = year_pattern.group(1) if year_pattern else str(timezone.now().year)
+
+        if "ORDINANCE" in reference_no.upper():
+            first = "CO"
+        else:
+            first = "CR"
+        reference_no = f"{first}-{refnumber}-{year}"
+
+        # ── Extract doc_type ──────────────────────────────────────
+        doc_type = "ORDINANCE"
+        if re.search(r'\bRESOLUTION\b', full_text, re.IGNORECASE):
+            doc_type = "RESOLUTION"
+
+        # ── Extract title ─────────────────────────────────────────
+        # Title is "AN ORDINANCE/RESOLUTION..." up to "Sponsored by"
+        title_pattern = re.search(
+            r'Series\s+of\s+\d{4}\s*(.*?)\s*Sponsored',
+            full_text,
+            re.IGNORECASE | re.DOTALL
+        )
+        title = ""
+        if title_pattern:
+            title = re.sub(r'\s+', ' ', title_pattern.group(1)).strip()
+            # Remove trailing punctuation
+            title = title.rstrip('.,;')
+
+        return JsonResponse({
+            'title': title,
+            'reference_no': reference_no,
+            'year': year,
+            'doc_type': doc_type,
+            'full_text': display_text,
+            'total_pages': total_pages,
+            'word_count': len(display_text.split()),
+        })
+    
+    except Exception as e:
+        logger.error("extract_legacy_metadata error: %s", e, exc_info=True)
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def validate_ocr_with_ai(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    # Accept pre-extracted text directly — no PDF scan needed
+    raw_text = request.POST.get('raw_text', '').strip()
+
+    if not raw_text:
+        return JsonResponse({'error': 'No text provided.'}, status=400)
+
+    import requests as req
+
+    endpoint  = getattr(settings, 'OLLAMA_ENDPOINT',  'http://localhost:11434/api/generate')
+    ocr_model = getattr(settings, 'OLLAMA_OCR_MODEL', 'ministral-3')
+    logger.info("validate_ocr_with_ai: %d chars → AI", len(raw_text))
+
+    prompt = (
+        "/set nothink \n"
+        "You are a text correction engine for Philippine legislative documents.\n"
+        "The text below was extracted by Tesseract OCR from a scanned document.\n"
+        "Do the following:\n"
+        "1. Fix garbled characters, broken words, and OCR typos.\n"
+        "2. Remove all signature blocks, councilor names (HON. prefix), "
+        "position/title lines, certification lines, and everything from "
+        "'ENACTED BY THE COUNCIL' onward.\n"
+        "3. Keep all legislative content: headers, document type and number, "
+        "title, WHEREAS clauses, NOW THEREFORE, SECTION text, "
+        "penalty and effectivity clauses.\n"
+        "4. Keep '--- Page Break ---' markers exactly as-is.\n"
+        "Return only the cleaned text, nothing else.\n\n"
+        f"{raw_text}"
+    )
+
+    try:
+        resp = req.post(
+            endpoint,
+            json={
+                'model': ocr_model,
+                'prompt': prompt,
+                'stream': False,
+                'options': {
+                    'temperature': 0.1,
+                    'num_predict': 4096,
+                    'num_ctx': 8192,
+                    'think': False,
+                    'thinking': False,
+                },
+
+
+            },
+            timeout=300
+        )
+        resp.raise_for_status()
+        result = resp.json()
+        cleaned_text = (
+            result.get('response') or
+            result.get('message', {}).get('content') or
+            raw_text
+        ).strip()
+        print(ocr_model)
+        cleaned_text = re.sub(r'<think>.*?</think>', '', cleaned_text, flags=re.DOTALL).strip()
+        logger.info("AI cleanup done: %d chars %s", len(cleaned_text))
+
+    except Exception as e:
+        logger.warning("AI cleanup failed (%s) — returning raw text.", e)
+        cleaned_text = raw_text
+
+    return JsonResponse({'cleaned_text': cleaned_text})

@@ -5,8 +5,8 @@
     
     <!-- Back Button & Header -->
     <div class="mb-12">
-        <a href="javascript:history.back()" class="text-slate-400 hover:text-indigo-600 text-xs font-bold uppercase tracking-widest flex items-center gap-2 mb-6 transition-colors">
-            <i class="fas fa-arrow-left"></i> Back to Registry
+        <a href="javascript:history.back()" class="text-slate-400 hover:text-slate-600 text-xs font-bold uppercase tracking-widest flex items-center gap-2 mb-6 transition-colors">
+            <i data-lucide="arrow-left" style="width:14px;height:14px;vertical-align:middle;"></i> Back to Registry
         </a>
         <h1 class="text-3xl font-[900] text-slate-900 tracking-tight leading-tight">
             Legislative Paper Trail
@@ -19,7 +19,7 @@
         <div>
             <h2 class="text-lg font-black text-slate-800 mb-1">{{ doc.title }}</h2>
             <div class="flex items-center gap-3">
-                <span class="text-[10px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg border border-indigo-100">
+                <span class="text-[10px] font-black uppercase tracking-widest text-slate-600 bg-slate-50 px-3 py-1 rounded-lg border border-slate-100">
                     {{ doc.reference_no|default:"No Official Number" }}
                 </span>
                 <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
@@ -44,7 +44,7 @@
                 
                 <!-- Version Marker -->
                 <div class="relative z-10">
-                    <div class="w-16 h-16 rounded-2xl bg-white border-2 {% if entry.status == 'APPROVED' %}border-emerald-500 text-emerald-600{% else %}border-slate-200 text-slate-400{% endif %} flex items-center justify-center flex-col shadow-sm group-hover:scale-110 transition-transform bg-white">
+                    <div class="w-16 h-16 rounded-2xl bg-white border-2 {% if entry.status == 'APPROVED' %}border-slate-500 text-slate-600{% else %}border-slate-200 text-slate-400{% endif %} flex items-center justify-center flex-col shadow-sm group-hover:scale-110 transition-transform bg-white">
                         <span class="text-[9px] font-black uppercase tracking-tighter">Ver</span>
                         <span class="text-xl font-black">{{ entry.version }}</span>
                     </div>
@@ -54,13 +54,13 @@
                 <div class="flex-1 bg-white rounded-3xl border border-slate-100 shadow-sm p-8 hover:shadow-md transition-shadow">
                     <div class="flex justify-between items-start mb-4">
                         <div>
-                            <span class="text-[9px] font-black uppercase tracking-[0.2em] {% if entry.status == 'APPROVED' %}text-emerald-500{% elif entry.status == 'FILED' %}text-blue-500{% else %}text-amber-500{% endif %} mb-1 block">
+                            <span class="text-[9px] font-black uppercase tracking-[0.2em] {% if entry.status == 'APPROVED' %}text-slate-500{% elif entry.status == 'FILED' %}text-slate-500{% else %}text-slate-500{% endif %} mb-1 block">
                                 {{ entry.status }}
                             </span>
                             <h3 class="text-md font-bold text-slate-800">{{ entry.title }}</h3>
                         </div>
                         <p class="text-[10px] font-medium text-slate-400 whitespace-nowrap">
-                            <i class="far fa-clock mr-1"></i> {{ entry.archived_at|date:"M d, Y • h:i A" }}
+                            <i data-lucide="clock" style="width:11px;height:11px;margin-right:4px;vertical-align:middle;"></i> {{ entry.archived_at|date:"M d, Y • h:i A" }}
                         </p>
                     </div>
 
@@ -74,8 +74,8 @@
                         
                         <!-- Action: View this specific version -->
                         <a href="{% url 'trail-version' entry.id %}" 
-                           class="text-[10px] font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-800 transition-colors flex items-center gap-2">
-                            Review Snapshot <i class="fas fa-chevron-right text-[8px]"></i>
+                           class="text-[10px] font-black uppercase tracking-widest text-slate-600 hover:text-slate-800 transition-colors flex items-center gap-2">
+                            Review Snapshot <i data-lucide="chevron-right" style="width:11px;height:11px;vertical-align:middle;"></i>
                         </a>
                     </div>
                 </div>

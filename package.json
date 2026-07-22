@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@floating-ui/dom": "^1.7.6",
+    "shepherd.js": "^15.2.2"
+  }
+}

@@ -7,16 +7,16 @@
     <!-- TOP HEADER BAR -->
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-slate-100 pb-5 gap-4">
         <div class="flex items-center gap-4">
-            <a href="{%url 'second-reading'%}" class="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-all shadow-sm">
-                <i class="fas fa-arrow-left text-xs"></i>
+            <a href="{%url 'second-reading'%}" class="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-all shadow-sm">
+                <i data-lucide="arrow-left" style="width:14px;height:14px;"></i>
             </a>
             <div>
                 <nav class="flex text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 gap-2 mb-1">
-                    <a href="{% url 'dashboard' %}" class="hover:text-indigo-600 transition-colors">Legislative</a>
+                    <a href="{% url 'dashboard' %}" class="hover:text-slate-600 transition-colors">Legislative</a>
                     <span class="text-slate-200">/</span>
-                    <a href="{%url 'second-reading'%}" class="hover:text-indigo-600 transition-colors">Second Reading</a>
+                    <a href="{%url 'second-reading'%}" class="hover:text-slate-600 transition-colors">Second Reading</a>
                     <span class="text-slate-200">/</span>
-                    <span class="text-indigo-600">Floor Amendments</span>
+                    <span class="text-slate-600">Floor Amendments</span>
                 </nav>
                 <h1 class="text-xl font-extrabold text-slate-900 tracking-tight leading-tight max-w-2xl">{{ doc.title }}</h1>
             </div>
@@ -30,31 +30,31 @@
             <!-- Current status badge (read-only, shows saved state) -->
             {% if doc.amendment_status %}
             <span class="px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest
-                {% if doc.amendment_status == 'IN_PROGRESS' %}bg-amber-50 text-amber-600 border border-amber-200
-                {% elif doc.amendment_status == 'FINALIZED' %}bg-emerald-50 text-emerald-600 border border-emerald-200
+                {% if doc.amendment_status == 'IN_PROGRESS' %}bg-slate-50 text-slate-600 border border-slate-200
+                {% elif doc.amendment_status == 'FINALIZED' %}bg-slate-50 text-slate-600 border border-slate-200
                 {% elif doc.amendment_status == 'NO_AMENDMENTS' %}bg-slate-100 text-slate-500 border border-slate-200
                 {% endif %}">
-                {% if doc.amendment_status == 'IN_PROGRESS' %}<i class="fas fa-circle-half-stroke mr-1"></i> In Progress
-                {% elif doc.amendment_status == 'FINALIZED' %}<i class="fas fa-check-circle mr-1"></i> Finalized
-                {% elif doc.amendment_status == 'NO_AMENDMENTS' %}<i class="fas fa-minus-circle mr-1"></i> No Amendments
+                {% if doc.amendment_status == 'IN_PROGRESS' %}<i data-lucide="gauge" style="width:11px;height:11px;margin-right:4px;vertical-align:middle;"></i> In Progress
+                {% elif doc.amendment_status == 'FINALIZED' %}<i data-lucide="check-circle-2" style="width:11px;height:11px;margin-right:4px;vertical-align:middle;"></i> Finalized
+                {% elif doc.amendment_status == 'NO_AMENDMENTS' %}<i data-lucide="minus-circle" style="width:11px;height:11px;margin-right:4px;vertical-align:middle;"></i> No Amendments
                 {% endif %}
             </span>
             {% endif %}
 
             <!-- Save triggers the status modal -->
             <button type="button" onclick="openSaveModal()"
-                class="px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all">
-                <i class="fas fa-save mr-2"></i> Save
+                class="px-5 py-2.5 bg-slate-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-slate-100 hover:bg-slate-700 hover:-translate-y-0.5 transition-all">
+                <i data-lucide="save" style="width:13px;height:13px;margin-right:8px;vertical-align:middle;"></i> Save
             </button>
 
             <div class="flex flex-col gap-2">
                 <button type="button" onclick="openThirdReadingModal()"
-                    class="px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-700 hover:-translate-y-0.5 transition-all">
-                    <i class="fas fa-paper-plane mr-2"></i> Move to Third Reading
+                    class="px-5 py-2.5 bg-slate-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-slate-100 hover:bg-slate-700 hover:-translate-y-0.5 transition-all">
+                    <i data-lucide="send" style="width:13px;height:13px;margin-right:8px;vertical-align:middle;"></i> Move to Third Reading
                 </button>
                 <button type="button" onclick="openCommitteeModal()"
-                    class="px-5 py-2.5 bg-rose-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-rose-100 hover:bg-rose-700 hover:-translate-y-0.5 transition-all">
-                    <i class="fas fa-rotate-left mr-2"></i> Return to Committee
+                    class="px-5 py-2.5 bg-slate-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-slate-100 hover:bg-slate-700 hover:-translate-y-0.5 transition-all">
+                    <i data-lucide="rotate-ccw" style="width:13px;height:13px;margin-right:8px;vertical-align:middle;"></i> Return to Committee
                 </button>
             </div>
         </div>
@@ -68,12 +68,12 @@
         </div>
         <div class="w-px h-4 bg-slate-200"></div>
         <div class="flex items-center gap-2">
-            <div class="w-3 h-3 rounded-full bg-indigo-400"></div>
+            <div class="w-3 h-3 rounded-full bg-slate-400"></div>
             <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">Amended Version — Editable</span>
         </div>
         <div class="w-px h-4 bg-slate-200"></div>
         <div class="flex items-center gap-2">
-            <div class="w-3 h-3 rounded bg-amber-100 border border-amber-300"></div>
+            <div class="w-3 h-3 rounded bg-slate-100 border border-slate-300"></div>
             <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">Active Section Highlight</span>
         </div>
     </div>
@@ -104,11 +104,11 @@
             <div class="flex flex-col bg-white overflow-hidden">
                 <div class="px-6 py-4 border-b border-slate-100 bg-white flex items-center justify-between shrink-0">
                     <div class="flex items-center gap-2.5">
-                        <div class="w-2 h-2 rounded-full bg-indigo-400"></div>
+                        <div class="w-2 h-2 rounded-full bg-slate-400"></div>
                         <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">Amended Version</span>
                     </div>
-                    <span class="text-[9px] font-black uppercase tracking-widest text-indigo-400 bg-indigo-50 px-2.5 py-1 rounded-full">
-                        <i class="fas fa-pen-nib mr-1"></i> Editable
+                    <span class="text-[9px] font-black uppercase tracking-widest text-slate-400 bg-slate-50 px-2.5 py-1 rounded-full">
+                        <i data-lucide="feather" style="width:11px;height:11px;margin-right:4px;vertical-align:middle;"></i> Editable
                     </span>
                 </div>
                 <div class="flex-1 overflow-hidden flex flex-col">
@@ -128,8 +128,8 @@
     <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="closeSaveModal()"></div>
     <div class="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-sm p-8 modal-card">
 
-        <div class="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mb-5">
-            <i class="fas fa-tag text-indigo-500"></i>
+        <div class="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center mb-5">
+            <i data-lucide="tag" style="width:18px;height:18px;color:#6366f1;"></i>
         </div>
 
         <h2 class="text-base font-black text-slate-900 tracking-tight mb-1">Mark Amendment Status</h2>
@@ -142,8 +142,8 @@
 
             <label class="save-status-label flex items-start gap-4 p-4 border-2 border-slate-100 rounded-2xl cursor-pointer hover:bg-slate-50 transition-all">
                 <input type="radio" name="saveStatus" value="IN_PROGRESS" class="hidden" checked>
-                <div class="w-9 h-9 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0 mt-0.5">
-                    <i class="fas fa-circle-half-stroke text-amber-500 text-sm"></i>
+                <div class="w-9 h-9 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 mt-0.5">
+                    <i data-lucide="gauge" style="width:16px;height:16px;color:#f59e0b;"></i>
                 </div>
                 <div>
                     <p class="text-xs font-black uppercase tracking-widest text-slate-700">In Progress</p>
@@ -153,8 +153,8 @@
 
             <label class="save-status-label flex items-start gap-4 p-4 border-2 border-slate-100 rounded-2xl cursor-pointer hover:bg-slate-50 transition-all">
                 <input type="radio" name="saveStatus" value="FINALIZED" class="hidden">
-                <div class="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0 mt-0.5">
-                    <i class="fas fa-check-circle text-emerald-500 text-sm"></i>
+                <div class="w-9 h-9 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 mt-0.5">
+                    <i data-lucide="check-circle-2" style="width:16px;height:16px;color:#10b981;"></i>
                 </div>
                 <div>
                     <p class="text-xs font-black uppercase tracking-widest text-slate-700">Finalized</p>
@@ -165,7 +165,7 @@
             <label class="save-status-label flex items-start gap-4 p-4 border-2 border-slate-100 rounded-2xl cursor-pointer hover:bg-slate-50 transition-all">
                 <input type="radio" name="saveStatus" value="NO_AMENDMENTS" class="hidden">
                 <div class="w-9 h-9 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0 mt-0.5">
-                    <i class="fas fa-minus-circle text-slate-400 text-sm"></i>
+                    <i data-lucide="minus-circle" style="width:16px;height:16px;color:#94a3b8;"></i>
                 </div>
                 <div>
                     <p class="text-xs font-black uppercase tracking-widest text-slate-700">No Amendments</p>
@@ -181,8 +181,8 @@
                 Cancel
             </button>
             <button type="button" onclick="confirmSave()"
-                class="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">
-                <i class="fas fa-save mr-2"></i> Save
+                class="flex-1 px-4 py-3 bg-slate-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-slate-100 hover:bg-slate-700 transition-all">
+                <i data-lucide="save" style="width:13px;height:13px;margin-right:8px;vertical-align:middle;"></i> Save
             </button>
         </div>
     </div>
@@ -196,8 +196,8 @@
     <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="closeThirdReadingModal()"></div>
     <div class="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-md p-8 modal-card">
 
-        <div class="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center mb-6">
-            <i class="fas fa-paper-plane text-emerald-500 text-xl"></i>
+        <div class="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center mb-6">
+            <i data-lucide="send" style="width:22px;height:22px;color:#10b981;"></i>
         </div>
 
         <h2 class="text-lg font-black text-slate-900 tracking-tight mb-2">Move to Third Reading</h2>
@@ -209,15 +209,15 @@
         <div class="bg-slate-50 rounded-2xl border border-slate-100 p-5 mb-6 space-y-3">
             <p class="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-3">Before proceeding, confirm:</p>
             <label class="flex items-start gap-3 cursor-pointer group">
-                <input type="checkbox" id="check1" class="mt-0.5 w-4 h-4 accent-emerald-500 shrink-0" onchange="checkAllConfirmed()">
+                <input type="checkbox" id="check1" class="mt-0.5 w-4 h-4 accent-slate-500 shrink-0" onchange="checkAllConfirmed()">
                 <span class="text-xs text-slate-600 font-medium group-hover:text-slate-800 transition-colors">All floor amendments have been applied and saved.</span>
             </label>
             <label class="flex items-start gap-3 cursor-pointer group">
-                <input type="checkbox" id="check2" class="mt-0.5 w-4 h-4 accent-emerald-500 shrink-0" onchange="checkAllConfirmed()">
+                <input type="checkbox" id="check2" class="mt-0.5 w-4 h-4 accent-slate-500 shrink-0" onchange="checkAllConfirmed()">
                 <span class="text-xs text-slate-600 font-medium group-hover:text-slate-800 transition-colors">The amended version has been reviewed by the committee chair.</span>
             </label>
             <label class="flex items-start gap-3 cursor-pointer group">
-                <input type="checkbox" id="check3" class="mt-0.5 w-4 h-4 accent-emerald-500 shrink-0" onchange="checkAllConfirmed()">
+                <input type="checkbox" id="check3" class="mt-0.5 w-4 h-4 accent-slate-500 shrink-0" onchange="checkAllConfirmed()">
                 <span class="text-xs text-slate-600 font-medium group-hover:text-slate-800 transition-colors">The document is ready for final deliberation.</span>
             </label>
         </div>
@@ -230,8 +230,8 @@
             <form action="{% url 'move_to_third_reading' doc.id %}" method="POST" class="flex-1">
                 {% csrf_token %}
                 <button type="submit" id="confirmBtn" disabled
-                    class="w-full px-5 py-3 bg-emerald-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:bg-emerald-600">
-                    <i class="fas fa-paper-plane mr-2"></i> Confirm & Move
+                    class="w-full px-5 py-3 bg-slate-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-slate-100 hover:bg-slate-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:bg-slate-600">
+                    <i data-lucide="send" style="width:13px;height:13px;margin-right:8px;vertical-align:middle;"></i> Confirm & Move
                 </button>
             </form>
         </div>
@@ -246,8 +246,8 @@
     <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="closeCommitteeModal()"></div>
     <div class="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-md p-8 modal-card">
 
-        <div class="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center mb-6">
-            <i class="fas fa-rotate-left text-rose-500 text-xl"></i>
+        <div class="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center mb-6">
+            <i data-lucide="rotate-ccw" style="width:22px;height:22px;color:#f43f5e;"></i>
         </div>
 
         <h2 class="text-lg font-black text-slate-900 tracking-tight mb-2">Return to Committee</h2>
@@ -261,11 +261,11 @@
                 class="flex-1 px-5 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-all">
                 Cancel
             </button>
-            <form action="" method="POST" class="flex-1">
+            <form action="{% url 'return-to-committee' doc.id %}" method="POST" class="flex-1">
                 {% csrf_token %}
                 <button type="submit"
-                    class="w-full px-5 py-3 bg-rose-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-rose-100 hover:bg-rose-700 transition-all">
-                    <i class="fas fa-rotate-left mr-2"></i> Confirm & Return
+                    class="w-full px-5 py-3 bg-slate-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-slate-100 hover:bg-slate-700 transition-all">
+                    <i data-lucide="rotate-ccw" style="width:13px;height:13px;margin-right:8px;vertical-align:middle;"></i> Confirm & Return
                 </button>
             </form>
         </div>
@@ -351,10 +351,10 @@
     function updateSaveStatusCard(radio) {
         const label = radio.closest('label');
         if (radio.checked) {
-            label.classList.add('border-indigo-300', 'bg-indigo-50/50');
+            label.classList.add('border-slate-300', 'bg-slate-50/50');
             label.classList.remove('border-slate-100');
         } else {
-            label.classList.remove('border-indigo-300', 'bg-indigo-50/50');
+            label.classList.remove('border-slate-300', 'bg-slate-50/50');
             label.classList.add('border-slate-100');
         }
     }

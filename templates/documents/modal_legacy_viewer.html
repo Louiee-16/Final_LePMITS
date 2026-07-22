@@ -1,0 +1,27 @@
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+
+<!-- TOOLBAR -->
+<div style="padding:18px 60px 14px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #f1f5f9;">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span style="padding:4px 12px;border-radius:999px;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;background:#fef3c7;color:#92400e;border:1px solid #fde68a;">Legacy Document</span>
+        <span style="padding:4px 12px;border-radius:999px;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;background:#f8fafc;color:#475569;border:1px solid #e2e8f0;">{{ doc.get_doc_type_display }}</span>
+        {% if doc.year %}<span style="padding:4px 12px;border-radius:999px;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;background:#f8fafc;color:#475569;border:1px solid #e2e8f0;">{{ doc.year }}</span>{% endif %}
+        {% if doc.reference_no %}<span style="padding:4px 12px;border-radius:999px;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;background:#f8fafc;color:#475569;border:1px solid #e2e8f0;">{{ doc.reference_no }}</span>{% endif %}
+    </div>
+    {% if doc.pdf_file %}
+    <a href="/legacy/{{ doc.pk }}/pdf/" target="_blank"
+        style="padding:8px 18px;background:#334155;color:#fff;border-radius:10px;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;text-decoration:none;display:flex;align-items:center;gap:6px;">
+        ↓ Download PDF
+    </a>
+    {% endif %}
+</div>
+
+<!-- PDF -->
+{% if doc.pdf_file %}
+<iframe src="/legacy/{{ doc.pk }}/pdf/#zoom=page-width"
+    style="width:100%;height:calc(90vh - 70px);border:none;display:block;"></iframe>
+{% else %}
+<div style="display:flex;align-items:center;justify-content:center;height:calc(90vh - 70px);">
+    <p style="color:#94a3b8;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.1em;">No PDF available</p>
+</div>
+{% endif %}

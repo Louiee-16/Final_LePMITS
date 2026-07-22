@@ -190,13 +190,35 @@ CKEDITOR_CONFIGS = {
     },
 }
 
+# FOR OLLAMA
+OLLAMA_ENDPOINT = "http://100.118.208.125:11434/api/generate"
+OLLAMA_MODEL = "gemma4:e4b"
+OLLAMA_VISION_MODEL = "qwen3.5:9b"  
+OLLAMA_OCR_MODEL = "gemma4:e4b"
+OLLAMA_EMBED_MODEL = "qwen3-embedding"
+ # must support images; used for PDF page OCR
+OLLAMA_OPTIONS = {
+    "temperature": 0.3,
+    "num_predict": 1000,
+    "num_ctx": 8192,
+    "think": False,
+}
 
-LLM_BACKEND = "gemini"          # or "claude"
+
+
+LLM_BACKEND = "ollama"          # used for general LLM calls
+LEGAL_BASIS_BACKEND = "ollama"  # used specifically for AI Legal Basis feature
 ANTHROPIC_API_KEY = "sk-ant-…"  # only needed for "claude"
 CLAUDE_MODEL = "claude-opus-4-5"        # optional override
-OLLAMA_MODEL = "llama3.2:1b"    # optional override
+
+
+
 OPENAI_API_KEY = "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"
 GPT_MODEL = "gpt-4.1-mini"
-OLLAMA_ENDPOINT = "http://localhost:11434/api/generate"  # optional override
+OLLAMA_ENDPOINT = "http://100.118.208.125:11434/api/generate"  # optional override
 GEMINI_API_KEY = "AIzaSyAglFkfjSZ1XF-KS27p_T_4wYuwbLNHcoE"
 GEMINI_MODEL = "gemini-2.5-flash"
+
+
+OCR_CLEANUP_BACKEND = "ollama"
+

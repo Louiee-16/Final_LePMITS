@@ -2,323 +2,690 @@
 {% load static %}
 
 {% block content %}
+<div class="w-full flex flex-col gap-5">
 
-<div class="w-full px-8 py-8">
-
-    <!-- HEADER -->
-    <div class="flex items-center gap-4 mb-8 border-b border-slate-100 pb-6">
-        <a href="{% url 'dashboard' %}" class="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-all shadow-sm">
-            <i class="fas fa-arrow-left text-xs"></i>
+    <!-- ── HEADER ── -->
+    <div class="flex items-center gap-4 border-b border-slate-100 pb-5 shrink-0">
+        <a href="{% url 'dashboard' %}" class="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-all shadow-sm">
+            <i data-lucide="arrow-left" style="width:13px;height:13px;"></i>
         </a>
         <div>
-            <nav class="flex text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 gap-2 mb-1">
-                <a href="{% url 'dashboard' %}" class="hover:text-indigo-600 transition-colors">Legislative</a>
+            <nav class="flex text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 gap-2 mb-0.5">
+                <a href="{% url 'dashboard' %}" class="hover:text-slate-600 transition-colors">Legislative</a>
                 <span class="text-slate-200">/</span>
-                <span class="text-indigo-600">Upload Legacy Document</span>
+                <span class="text-slate-600">Upload Legacy Document</span>
             </nav>
-            <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Upload Legacy Document</h1>
+            <h1 class="text-xl font-extrabold text-slate-900 tracking-tight">Upload Legacy Document</h1>
+        </div>
+        <div id="topStatusBar" class="ml-auto hidden">
+            <div id="topStatusMsg" class="px-4 py-2 rounded-xl text-[10px] font-bold border"></div>
         </div>
     </div>
 
     <!-- MESSAGES -->
     {% if messages %}
         {% for message in messages %}
-        <div class="mb-6 px-5 py-4 rounded-2xl text-xs font-bold
-            {% if message.tags == 'success' %}bg-emerald-50 border border-emerald-200 text-emerald-700
-            {% else %}bg-rose-50 border border-rose-200 text-rose-700{% endif %}">
-            <i class="fas {% if message.tags == 'success' %}fa-check-circle{% else %}fa-circle-exclamation{% endif %} mr-2"></i>
+        <div class="px-5 py-3.5 rounded-2xl text-xs font-bold bg-slate-50 border border-slate-200 text-slate-700">
+            <i data-lucide="{% if message.tags == 'success' %}check-circle-2{% else %}alert-circle{% endif %}" style="width:13px;height:13px;margin-right:8px;vertical-align:middle;"></i>
             {{ message }}
         </div>
         {% endfor %}
     {% endif %}
 
-    <!-- MAIN GRID -->
-    <form method="POST" enctype="multipart/form-data" id="uploadForm" action = "{%url 'UPLOAD-LEGACY-DOCUMENT'%}">
+    <form method="POST" enctype="multipart/form-data" id="uploadForm" action="{% url 'UPLOAD-LEGACY-DOCUMENT' %}">
         {% csrf_token %}
 
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-
-            <!-- LEFT: FORM FIELDS -->
-            <div class="lg:col-span-8 space-y-6">
+        <!-- ── TOP FORM STRIP ── -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 shrink-0">
+            <div class="grid grid-cols-12 gap-4 items-start">
 
                 <!-- Title -->
-                <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8">
-                    <label for="title" class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">
-                        Document Title <span class="text-rose-400">*</span>
-                    </label>
-                    <input
-                        type="text"
-                        id="title"
-                        name="title"
-                        required
-                        maxlength="1000"
+                <div class="col-span-12 lg:col-span-5">
+                    <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Document Title <span class="text-slate-300">*</span></label>
+                    <textarea id="title" name="title" required rows="2" maxlength="1000"
                         placeholder="An Ordinance/Resolution providing for..."
-                        value="{{ form.title.value|default:'' }}"
-                        class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 transition-all placeholder:font-normal placeholder:text-slate-300">
-                    {% if form.title.errors %}
-                        <p class="text-[10px] text-rose-500 font-bold mt-2">{{ form.title.errors|join:", " }}</p>
-                    {% endif %}
+                        class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-100 transition-all placeholder:font-normal placeholder:text-slate-300 resize-none">{{ form.title.value|default:'' }}</textarea>
                 </div>
 
-                <!-- Reference No. + Year -->
-                <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8">
-                    <div class="grid grid-cols-2 gap-6">
-                        <div>
-                            <label for="reference_no" class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">
-                                Reference No. <span class="text-rose-400">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                id="reference_no"
-                                name="reference_no"
-                                required
-                                maxlength="100"
-                                placeholder="e.g. ORD-2018-042"
-                                value="{{ form.reference_no.value|default:'' }}"
-                                class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 transition-all placeholder:font-normal placeholder:text-slate-300">
-                            {% if form.reference_no.errors %}
-                                <p class="text-[10px] text-rose-500 font-bold mt-2">{{ form.reference_no.errors|join:", " }}</p>
-                            {% endif %}
-                        </div>
-                        <div>
-                            <label for="year" class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">
-                                Year <span class="text-rose-400">*</span>
-                            </label>
-                            <input
-                                type="number"
-                                id="year"
-                                name="year"
-                                required
-                                min="1900"
-                                max="2100"
-                                placeholder="e.g. 2018"
-                                value="{{ form.year.value|default:'' }}"
-                                class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 transition-all placeholder:font-normal placeholder:text-slate-300">
-                            {% if form.year.errors %}
-                                <p class="text-[10px] text-rose-500 font-bold mt-2">{{ form.year.errors|join:", " }}</p>
-                            {% endif %}
-                        </div>
-                    </div>
+                <!-- Ref No -->
+                <div class="col-span-6 lg:col-span-2">
+                    <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Reference No. <span class="text-slate-300">*</span></label>
+                    <input type="text" id="reference_no" name="reference_no" required maxlength="100"
+                        placeholder="ORD-2018-042" value="{{ form.reference_no.value|default:'' }}"
+                        class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-100 transition-all placeholder:font-normal placeholder:text-slate-300">
                 </div>
 
-                <!-- PDF Upload -->
-                <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8">
-                    <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">
-                        PDF File <span class="text-rose-400">*</span>
-                    </label>
-
-                    <!-- Drop zone -->
-                    <label for="pdf_file" id="dropZone"
-                        class="flex flex-col items-center justify-center gap-4 w-full px-6 py-16 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:border-indigo-300 hover:bg-indigo-50/40 transition-all group">
-
-                        <div id="dropIcon" class="w-16 h-16 rounded-2xl bg-slate-100 group-hover:bg-indigo-100 flex items-center justify-center transition-all">
-                            <i class="fas fa-file-pdf text-slate-400 group-hover:text-indigo-500 text-2xl transition-all"></i>
-                        </div>
-
-                        <div id="dropText" class="text-center">
-                            <p class="text-sm font-black text-slate-600 group-hover:text-indigo-700 transition-colors">
-                                Drop your PDF here, or <span class="text-indigo-600 underline underline-offset-2">browse</span>
-                            </p>
-                            <p class="text-[11px] text-slate-400 font-medium mt-1">PDF only · Max 20 MB</p>
-                        </div>
-
-                        <!-- Selected file name -->
-                        <div id="fileNameDisplay" class="hidden items-center gap-3 px-5 py-3 bg-indigo-50 border border-indigo-100 rounded-xl w-full max-w-md">
-                            <i class="fas fa-file-pdf text-indigo-500 text-sm shrink-0"></i>
-                            <span id="fileNameText" class="text-xs font-bold text-indigo-700 truncate"></span>
-                            <button type="button" id="clearFile"
-                                class="ml-auto text-[10px] font-black text-slate-400 hover:text-rose-500 transition-colors shrink-0">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
-
-                        <input type="file" id="pdf_file" name="pdf_file" accept=".pdf" class="hidden" required>
-                    </label>
-
-                    {% if form.pdf_file.errors %}
-                        <p class="text-[10px] text-rose-500 font-bold mt-2">{{ form.pdf_file.errors|join:", " }}</p>
-                    {% endif %}
-
-                    <!-- OCR notice -->
-                    <div class="flex items-start gap-3 mt-5 px-4 py-3 bg-amber-50 border border-amber-100 rounded-xl">
-                        <i class="fas fa-circle-info text-amber-400 text-xs mt-0.5 shrink-0"></i>
-                        <p class="text-[10px] text-amber-700 font-medium leading-snug">
-                            Text will be extracted automatically. Run <code class="font-black bg-amber-100 px-1 rounded">python manage.py embed_documents --legacy-only</code> afterwards to make this document searchable by the AI.
-                        </p>
-                    </div>
+                <!-- Year -->
+                <div class="col-span-3 lg:col-span-1">
+                    <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Year <span class="text-slate-300">*</span></label>
+                    <input type="number" id="year" name="year" required min="1900" max="2100"
+                        placeholder="2018" value="{{ form.year.value|default:'' }}"
+                        class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-100 transition-all placeholder:font-normal placeholder:text-slate-300">
                 </div>
 
-            </div>
-
-            <!-- RIGHT SIDEBAR -->
-            <aside class="lg:col-span-4 space-y-6 sticky top-6">
-
-                <!-- Document Type -->
-                <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8">
-                    <h3 class="text-sm font-black uppercase tracking-widest text-slate-800 mb-6 flex items-center gap-2">
-                        <i class="fas fa-file-lines text-indigo-600"></i> Document Type
-                    </h3>
-                    <div class="space-y-2">
-                        <label class="doc-type-label w-full">
+                <!-- Doc Type -->
+                <div class="col-span-3 lg:col-span-2">
+                    <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Type <span class="text-slate-300">*</span></label>
+                    <div class="flex flex-col gap-1">
+                        <label class="doc-type-label">
                             <input type="radio" name="doc_type" value="ORDINANCE" class="hidden"
                                 {% if form.doc_type.value == 'ORDINANCE' or not form.doc_type.value %}checked{% endif %}>
                             <span class="type-pill w-full">
-                                <i class="fas fa-scroll mr-2 text-[9px]"></i>Ordinance
+                                <i data-lucide="scroll" style="width:8px;height:8px;margin-right:5px;vertical-align:middle;"></i>Ordinance
                             </span>
                         </label>
-                        <label class="doc-type-label w-full">
+                        <label class="doc-type-label">
                             <input type="radio" name="doc_type" value="RESOLUTION" class="hidden"
                                 {% if form.doc_type.value == 'RESOLUTION' %}checked{% endif %}>
                             <span class="type-pill w-full">
-                                <i class="fas fa-file-circle-check mr-2 text-[9px]"></i>Resolution
+                                <i data-lucide="file-check-2" style="width:8px;height:8px;margin-right:5px;vertical-align:middle;"></i>Resolution
                             </span>
                         </label>
-                    </div>
-                </div>
-
-                <!-- Info box -->
-                <div class="bg-slate-50 rounded-[2rem] border border-slate-100 p-6 space-y-4">
-                    <p class="text-[9px] font-black uppercase tracking-widest text-slate-400">About Legacy Documents</p>
-                    <div class="flex items-start gap-3">
-                        <div class="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
-                            <i class="fas fa-archive text-[8px] text-slate-400"></i>
-                        </div>
-                        <p class="text-[11px] text-slate-500 font-medium leading-snug">
-                            <span class="font-black text-slate-700">Legacy documents</span> are historical ordinances and resolutions uploaded as PDFs for archiving and AI reference.
-                        </p>
-                    </div>
-                    <div class="flex items-start gap-3">
-                        <div class="w-6 h-6 rounded-lg bg-violet-100 border border-violet-200 flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
-                            <i class="fas fa-robot text-[8px] text-violet-500"></i>
-                        </div>
-                        <p class="text-[11px] text-slate-500 font-medium leading-snug">
-                            Once embedded, the AI Legal Basis Assistant and Inline Intelligence will be able to reference this document when drafting new measures.
-                        </p>
-                    </div>
-                    <div class="flex items-start gap-3">
-                        <div class="w-6 h-6 rounded-lg bg-amber-100 border border-amber-200 flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
-                            <i class="fas fa-wand-magic-sparkles text-[8px] text-amber-500"></i>
-                        </div>
-                        <p class="text-[11px] text-slate-500 font-medium leading-snug">
-                            If the PDF is scanned, <span class="font-black text-slate-700">OCR</span> will run automatically to extract the text.
-                        </p>
                     </div>
                 </div>
 
                 <!-- Actions -->
-                <div class="flex flex-col gap-3">
+                <div class="col-span-12 lg:col-span-2 flex flex-col gap-2 lg:pt-5">
                     <button type="submit" id="submitBtn"
-                        class="w-full px-6 py-3.5 bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0 text-center">
-                        <i class="fas fa-upload mr-2"></i> Upload Document
+                        class="w-full px-4 py-2.5 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-sm hover:opacity-90 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0 flex items-center justify-center gap-1.5"
+                        style="background:#7C0D0E;">
+                        <i data-lucide="upload" style="width:11px;height:11px;"></i> Upload
                     </button>
                     <a href="{% url 'dashboard' %}"
-                        class="w-full px-6 py-3.5 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm text-center">
+                        class="w-full px-4 py-2.5 bg-white border border-slate-200 text-slate-500 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm text-center">
                         Cancel
                     </a>
                 </div>
-
-            </aside>
+            </div>
         </div>
 
+        <!-- ── PHASE 1: DROP ZONE (hidden after PDF selected) ── -->
+        <div id="uploadPhase">
+            <label for="pdf_file" id="dropZone"
+                class="flex flex-col items-center justify-center gap-4 w-full px-6 py-20 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:border-slate-300 hover:bg-slate-50/40 transition-all group bg-white">
+                <div id="dropIcon" class="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center">
+                    <i data-lucide="file-down" style="width:28px;height:28px;color:#94a3b8;"></i>
+                </div>
+                <div id="dropText" class="text-center">
+                    <p class="text-sm font-black text-slate-600 group-hover:text-slate-700 transition-colors">
+                        Drop your PDF here, or <span class="underline underline-offset-2">browse</span>
+                    </p>
+                    <p class="text-[11px] text-slate-400 font-medium mt-1">PDF only · Max 20 MB</p>
+                </div>
+                <input type="file" id="pdf_file" name="pdf_file" accept=".pdf" class="hidden" required>
+            </label>
+        </div>
+
+        <!-- ── PHASE 2: SIDE-BY-SIDE COMPARISON ── -->
+        <div id="comparisonPhase" class="hidden">
+            <div class="grid grid-cols-2 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden" style="height:72vh;min-height:520px;grid-template-rows:1fr;">
+
+                <!-- ── LEFT: PDF VIEWER ── -->
+                <div class="flex flex-col border-r border-slate-200 overflow-hidden min-h-0">
+
+                    <!-- PDF panel header -->
+                    <div class="flex items-center gap-3 px-5 py-3 bg-slate-50 border-b border-slate-200 shrink-0">
+                        <div class="w-7 h-7 rounded-lg shrink-0 flex items-center justify-center" style="background:#7C0D0E;">
+                            <i data-lucide="file-text" style="width:12px;height:12px;color:white;"></i>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-[10px] font-black text-slate-700 uppercase tracking-widest">PDF Document</p>
+                            <p id="pdfFileName" class="text-[9px] text-slate-400 font-medium truncate mt-0.5"></p>
+                        </div>
+                        <button type="button" id="changePdfBtn"
+                            class="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[9px] font-black text-slate-500 uppercase tracking-widest hover:bg-slate-50 transition-all">
+                            <i data-lucide="refresh-cw" style="width:9px;height:9px;"></i> Change PDF
+                        </button>
+                    </div>
+
+                    <!-- iframe PDF viewer -->
+                    <iframe id="pdfViewer" src="about:blank" class="flex-1 w-full min-h-0 block" style="border:none;overflow:auto;"></iframe>
+                </div>
+
+                <!-- ── RIGHT: OCR TEXT ── -->
+                <div class="flex flex-col overflow-hidden min-h-0">
+
+                    <!-- OCR panel header -->
+                    <div class="flex items-center gap-2 px-5 py-3 bg-slate-50 border-b border-slate-200 shrink-0 flex-wrap">
+                        <div class="w-7 h-7 rounded-lg bg-slate-100 shrink-0 flex items-center justify-center">
+                            <i data-lucide="scan-text" style="width:12px;height:12px;color:#475569;"></i>
+                        </div>
+                        <div>
+                            <p class="text-[10px] font-black text-slate-700 uppercase tracking-widest">Extracted Text</p>
+                            <p id="scanMeta" class="text-[9px] text-slate-400 font-medium mt-0.5"></p>
+                        </div>
+                        <div class="ml-auto flex items-center gap-2 flex-wrap">
+                            <span id="suspectBadge" class="hidden text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
+                                <i data-lucide="triangle-alert" style="width:9px;height:9px;margin-right:3px;vertical-align:middle;"></i>
+                                <span id="suspectCount">0</span> possible errors
+                            </span>
+                            <span id="cleanBadge" class="hidden text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+                                <i data-lucide="check-circle-2" style="width:9px;height:9px;margin-right:3px;vertical-align:middle;"></i>Clean
+                            </span>
+                            <span id="inconsistentBadge" class="hidden text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full bg-red-50 text-red-700 border border-red-200 whitespace-nowrap">
+                                <i data-lucide="alert-triangle" style="width:9px;height:9px;margin-right:3px;vertical-align:middle;"></i>
+                                <span id="inconsistentCount">0</span> not in scan
+                            </span>
+                            <button type="button" id="compareBtn"
+                                class="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[9px] font-black text-slate-500 uppercase tracking-widest transition-all hover:bg-slate-50 hidden"
+                                title="Highlight words not found in Tesseract scan">
+                                <i data-lucide="diff" style="width:9px;height:9px;"></i> Compare
+                            </button>
+                            <button type="button" id="aiReviewBtn"
+                                class="flex items-center gap-1.5 px-3 py-1.5 text-white rounded-lg text-[9px] font-black uppercase tracking-widest transition-all shadow-sm hover:opacity-90"
+                                style="background:#7C0D0E;">
+                                <i data-lucide="sparkles" style="width:9px;height:9px;"></i> AI Review
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Instruction strip -->
+                    <div class="px-5 py-2.5 bg-amber-50/60 border-b border-amber-100 shrink-0 flex items-center gap-3">
+                        <i data-lucide="pencil" style="width:11px;height:11px;color:#d97706;" class="shrink-0"></i>
+                        <p class="text-[10px] text-slate-600 font-medium leading-snug flex-1">
+                            Compare with the PDF on the left. <strong>Click highlighted words</strong> to fix OCR errors. Text is fully editable before upload.
+                        </p>
+                        <button type="button" id="copyScannedText"
+                            class="shrink-0 flex items-center gap-1 px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[9px] font-black text-slate-500 uppercase tracking-widest hover:bg-slate-50 transition-all">
+                            <i data-lucide="copy" style="width:9px;height:9px;"></i> Copy
+                        </button>
+                    </div>
+
+                    <!-- Legend strip -->
+                    <div class="px-5 py-2 border-b border-slate-100 bg-white shrink-0 flex items-center gap-4 flex-wrap">
+                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest shrink-0">Legend:</p>
+                        <span class="flex items-center gap-1.5">
+                            <mark class="ocr-suspect text-[9px] font-mono px-1.5 py-0.5 pointer-events-none">word</mark>
+                            <p class="text-[9px] text-slate-400 font-medium">= suspicious OCR pattern</p>
+                        </span>
+                        <span id="compareLegend" class="hidden flex items-center gap-1.5">
+                            <mark class="ocr-inconsistent text-[9px] font-mono px-1.5 py-0.5 pointer-events-none">word</mark>
+                            <p class="text-[9px] text-slate-400 font-medium">= not found in Tesseract scan</p>
+                        </span>
+                    </div>
+
+                    <!-- OCR text body (scrollable) -->
+                    <div class="flex-1 overflow-y-auto custom-scrollbar p-5">
+                        <div id="scannedTextBody"
+                            contenteditable="true"
+                            spellcheck="true"
+                            class="ocr-editor w-full text-xs text-slate-700 font-mono leading-relaxed focus:outline-none"
+                            style="min-height:100%;word-break:break-word;white-space:pre-wrap;"></div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <textarea name="validated_text" id="validated_text" class="hidden" aria-hidden="true"></textarea>
     </form>
 </div>
 
+
 <script>
-    // ── Doc type pill toggle ─────────────────────────────────────
+// ── OCR Highlight Engine ──────────────────────────────────────────────────
+function escapeHTML(str) {
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+}
+
+function isSuspiciousWord(word) {
+    if (word.length <= 2) return false;
+    if (/^\d+$/.test(word)) return false;
+    if (/^(19|20)\d{2}$/.test(word)) return false;
+    if (/^[A-Z]{1,4}-[\dA-Z]/.test(word)) return false;
+    if (/^[Nn]o\.$/.test(word)) return false;
+    return (
+        (/[a-zA-Z]/.test(word) && /[0-9]/.test(word)) ||
+        /[|\\`~@#$%^&*=<>{}\[\]]/.test(word) ||
+        word.length > 25 ||
+        /(.)\1{3,}/.test(word) ||
+        /[bcdfghjklmnpqrstvwxyz]{8,}/i.test(word)
+    );
+}
+
+function buildHighlightedHTML(rawText) {
+    let suspectCount = 0;
+    const html = rawText.split('\n').map(line => {
+        if (line.trim() === '--- Page Break ---') {
+            return `<span class="page-break-line">─── Page Break ───</span>`;
+        }
+        return line.split(/(\s+)/).map(token => {
+            if (/^\s+$/.test(token)) return token;
+            const core = token.replace(/^[^\w]+|[^\w]+$/g, '');
+            if (core && isSuspiciousWord(core)) {
+                suspectCount++;
+                return `<mark class="ocr-suspect" title="Possible OCR error — click to edit">${escapeHTML(token)}</mark>`;
+            }
+            return escapeHTML(token);
+        }).join('');
+    }).join('<br>');
+    return { html, suspectCount };
+}
+
+function buildAIHighlightedHTML(cleanText, uncertainWords) {
+    const uncertainSet = new Set((uncertainWords || []).map(w => w.toLowerCase().trim()));
+    let suspectCount = 0;
+    const html = cleanText.split('\n').map(line => {
+        if (line.trim() === '--- Page Break ---') {
+            return `<span class="page-break-line">─── Page Break ───</span>`;
+        }
+        return line.split(/(\s+)/).map(token => {
+            if (/^\s+$/.test(token)) return token;
+            const core = token.replace(/^[^\w]+|[^\w]+$/g, '');
+            if (core && uncertainSet.has(core.toLowerCase())) {
+                suspectCount++;
+                return `<mark class="ocr-suspect" title="AI flagged — needs manual review">${escapeHTML(token)}</mark>`;
+            }
+            return escapeHTML(token);
+        }).join('');
+    }).join('<br>');
+    return { html, suspectCount };
+}
+
+// ── Tesseract word set (populated from metadata extraction) ───────────────
+let tesseractWordSet = new Set();
+let tesseractRawText = '';
+let compareMode = false;
+let aiRenderedHTML = '';  // saved AI HTML so we can toggle back
+
+function normalizeWord(w) {
+    return w.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function buildComparisonHTML(text) {
+    let inconsistentCount = 0;
+    const html = text.split('\n').map(line => {
+        if (line.trim() === '--- Page Break ---') {
+            return `<span class="page-break-line">─── Page Break ───</span>`;
+        }
+        return line.split(/(\s+)/).map(token => {
+            if (/^\s+$/.test(token)) return token;
+            const core = token.replace(/^[^\w]+|[^\w]+$/g, '');
+            const norm = normalizeWord(core);
+            if (norm.length > 2 && !tesseractWordSet.has(norm)) {
+                inconsistentCount++;
+                return `<mark class="ocr-inconsistent" title="Not found in Tesseract scan — possible hallucination or OCR difference">${escapeHTML(token)}</mark>`;
+            }
+            return escapeHTML(token);
+        }).join('');
+    }).join('<br>');
+    return { html, inconsistentCount };
+}
+
+function toggleCompare() {
+    const textBody   = document.getElementById('scannedTextBody');
+    const btn        = document.getElementById('compareBtn');
+    const legend     = document.getElementById('compareLegend');
+    const badge      = document.getElementById('inconsistentBadge');
+    const countEl    = document.getElementById('inconsistentCount');
+
+    if (!tesseractWordSet.size) {
+        alert('Tesseract scan not yet ready. Please wait for the document to finish loading.');
+        return;
+    }
+
+    compareMode = !compareMode;
+
+    if (compareMode) {
+        // Save current HTML and switch to comparison view
+        aiRenderedHTML = textBody.innerHTML;
+        const rawText = textBody.innerText;
+        const { html, inconsistentCount } = buildComparisonHTML(rawText);
+        textBody.innerHTML = html;
+
+        btn.style.background = '#7C0D0E';
+        btn.style.color = '#fff';
+        btn.style.borderColor = '#7C0D0E';
+        btn.innerHTML = '<i data-lucide="diff" style="width:9px;height:9px;"></i> Compare: ON';
+        legend.classList.remove('hidden');
+        if (inconsistentCount > 0 && badge) {
+            countEl.textContent = inconsistentCount;
+            badge.classList.remove('hidden');
+        }
+    } else {
+        // Restore AI HTML
+        textBody.innerHTML = aiRenderedHTML || textBody.innerHTML;
+        btn.style.background = '';
+        btn.style.color = '';
+        btn.style.borderColor = '';
+        btn.innerHTML = '<i data-lucide="diff" style="width:9px;height:9px;"></i> Compare';
+        legend.classList.add('hidden');
+        if (badge) badge.classList.add('hidden');
+    }
+    lucide.createIcons();
+}
+
+// ── Status helpers ────────────────────────────────────────────────────────
+function showStatus(message, type) {
+    const bar = document.getElementById('topStatusBar');
+    const msg = document.getElementById('topStatusMsg');
+    const styles = {
+        loading: { bg:'#f0f4ff', color:'#3b5bdb', border:'#c5d3f9' },
+        success: { bg:'#f0fff4', color:'#2d6a4f', border:'#b7e4c7' },
+        error:   { bg:'#fff0f0', color:'#c0392b', border:'#f9c5c5' },
+    };
+    const s = styles[type];
+    msg.style.cssText = `background:${s.bg};color:${s.color};border-color:${s.border};`;
+    msg.textContent = message;
+    bar.classList.remove('hidden');
+    if (type === 'success') setTimeout(() => bar.classList.add('hidden'), 5000);
+}
+
+// ── Switch phases ─────────────────────────────────────────────────────────
+let pdfObjectURL = null;
+
+function enterComparisonMode(file) {
+    document.getElementById('uploadPhase').classList.add('hidden');
+    document.getElementById('comparisonPhase').classList.remove('hidden');
+
+    // Set PDF viewer
+    if (pdfObjectURL) URL.revokeObjectURL(pdfObjectURL);
+    pdfObjectURL = URL.createObjectURL(file);
+    document.getElementById('pdfViewer').src = pdfObjectURL;
+    document.getElementById('pdfFileName').textContent = file.name;
+}
+
+function exitComparisonMode() {
+    document.getElementById('comparisonPhase').classList.add('hidden');
+    document.getElementById('uploadPhase').classList.remove('hidden');
+    document.getElementById('pdfViewer').src = 'about:blank';
+    document.getElementById('scannedTextBody').innerHTML = '';
+    document.getElementById('scanMeta').textContent = '';
+    document.getElementById('suspectBadge').classList.add('hidden');
+    document.getElementById('cleanBadge').classList.add('hidden');
+    const ib = document.getElementById('inconsistentBadge');
+    if (ib) ib.classList.add('hidden');
+    const cb = document.getElementById('compareBtn');
+    cb.classList.add('hidden');
+    cb.style.background = ''; cb.style.color = ''; cb.style.borderColor = '';
+    cb.innerHTML = '<i data-lucide="diff" style="width:9px;height:9px;"></i> Compare';
+    document.getElementById('compareLegend').classList.add('hidden');
+    tesseractWordSet = new Set();
+    tesseractRawText = '';
+    compareMode = false;
+    aiRenderedHTML = '';
+    if (pdfObjectURL) { URL.revokeObjectURL(pdfObjectURL); pdfObjectURL = null; }
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function () {
+    const pdfInput    = document.getElementById('pdf_file');
+    const titleField  = document.getElementById('title');
+    const refNoField  = document.getElementById('reference_no');
+    const yearField   = document.getElementById('year');
+
+    // "Change PDF" button → re-trigger file input
+    document.getElementById('changePdfBtn').addEventListener('click', () => {
+        pdfInput.value = '';
+        exitComparisonMode();
+        setTimeout(() => pdfInput.click(), 50);
+    });
+
+    pdfInput.addEventListener('change', async function () {
+        const file = this.files[0];
+        if (!file || file.type !== 'application/pdf') return;
+
+        enterComparisonMode(file);
+        showStatus('📄 Reading and scanning document…', 'loading');
+
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        const formData  = new FormData();
+        formData.append('pdf_file', file);
+
+        // Step 1 — Tesseract + metadata (one scan for both)
+        let tesseractText = '';
+        try {
+            const metaResp = await fetch('/documents/extract-legacy-metadata/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrfToken },
+                body: formData,
+            });
+            const data = await metaResp.json();
+            if (!data.error) {
+                let filled = [];
+                if (data.title        && titleField && !titleField.value.trim())  { titleField.value  = data.title;        filled.push('title'); }
+                if (data.reference_no && refNoField && !refNoField.value.trim())  { refNoField.value  = data.reference_no; filled.push('reference no'); }
+                if (data.year         && yearField  && !yearField.value)           { yearField.value   = data.year;         filled.push('year'); }
+                if (data.total_pages) {
+                    document.getElementById('scanMeta').textContent =
+                        `${data.total_pages} page${data.total_pages !== 1 ? 's' : ''} · ${(data.word_count || 0).toLocaleString()} words`;
+                }
+                if (data.full_text) {
+                    tesseractText    = data.full_text;
+                    tesseractRawText = data.full_text;
+                    tesseractWordSet = new Set(
+                        data.full_text.split(/\s+/).map(w => normalizeWord(w)).filter(w => w.length > 2)
+                    );
+                    document.getElementById('compareBtn').classList.remove('hidden');
+                }
+                showStatus(
+                    filled.length > 0
+                        ? `✅ Auto-filled: ${filled.join(', ')} — please review before saving.`
+                        : '✅ Metadata extracted — fields already filled in.',
+                    'success'
+                );
+            }
+        } catch (e) {
+            showStatus('⚠️ Could not read PDF — fill in manually.', 'error');
+        }
+
+        // Step 2 — send Tesseract text to AI (no second PDF scan)
+        await runAIReview(tesseractText, titleField.value.trim());
+    });
+
+    // ── AI review ────────────────────────────────────────────────────────
+    async function runAIReview(rawText, docTitle) {
+        const textBody = document.getElementById('scannedTextBody');
+        const aiBtn    = document.getElementById('aiReviewBtn');
+
+        if (!rawText) {
+            showStatus('⚠️ No text to review.', 'error');
+            return;
+        }
+
+        textBody.innerHTML = `
+            <div style="display:flex;align-items:center;justify-content:center;gap:10px;padding:60px 0;color:#7C0D0E;">
+                <svg style="width:18px;height:18px;animation:spin 1s linear infinite;flex-shrink:0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                <span style="font-size:12px;font-weight:700;">AI is reviewing the scanned text…</span>
+            </div>`;
+        aiBtn.disabled = true;
+        aiBtn.innerHTML = '<svg style="width:9px;height:9px;animation:spin 1s linear infinite;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Reviewing…';
+
+        try {
+            const fd = new FormData();
+            fd.append('raw_text', rawText);
+            fd.append('doc_title', docTitle);
+
+            const resp = await fetch('/documents/validate-ocr/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
+                body: fd,
+            });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.error || `Server error ${resp.status}`);
+            }
+
+            const data        = await resp.json();
+            const cleanedText = data.cleaned_text || rawText;
+
+            const { html, suspectCount } = buildHighlightedHTML(cleanedText);
+            textBody.innerHTML = html;
+
+            if (suspectCount > 0) {
+                document.getElementById('suspectCount').textContent = suspectCount;
+                document.getElementById('suspectBadge').classList.remove('hidden');
+                document.getElementById('cleanBadge').classList.add('hidden');
+            } else {
+                document.getElementById('cleanBadge').classList.remove('hidden');
+                document.getElementById('suspectBadge').classList.add('hidden');
+            }
+            lucide.createIcons();
+
+        } catch (err) {
+            const { html, suspectCount } = buildHighlightedHTML(rawText);
+            textBody.innerHTML = html;
+            if (suspectCount > 0) {
+                document.getElementById('suspectCount').textContent = suspectCount;
+                document.getElementById('suspectBadge').classList.remove('hidden');
+                document.getElementById('cleanBadge').classList.add('hidden');
+            } else {
+                document.getElementById('cleanBadge').classList.remove('hidden');
+                document.getElementById('suspectBadge').classList.add('hidden');
+            }
+            lucide.createIcons();
+        } finally {
+            aiBtn.disabled = false;
+            aiBtn.innerHTML = '<i data-lucide="sparkles" style="width:9px;height:9px;"></i> AI Review';
+            lucide.createIcons();
+        }
+    }
+
+    // Re-run AI
+    document.getElementById('aiReviewBtn').addEventListener('click', async () => {
+        // Reset comparison mode when re-running AI
+        compareMode = false;
+        const btn = document.getElementById('compareBtn');
+        btn.style.background = ''; btn.style.color = ''; btn.style.borderColor = '';
+        btn.innerHTML = '<i data-lucide="diff" style="width:9px;height:9px;"></i> Compare';
+        document.getElementById('compareLegend').classList.add('hidden');
+        const badge = document.getElementById('inconsistentBadge');
+        if (badge) badge.classList.add('hidden');
+        lucide.createIcons();
+
+        const raw = tesseractRawText || document.getElementById('scannedTextBody').innerText.trim();
+        await runAIReview(raw, titleField.value.trim());
+    });
+
+    // Compare toggle
+    document.getElementById('compareBtn').addEventListener('click', toggleCompare);
+
+    // Copy text
+    document.getElementById('copyScannedText').addEventListener('click', () => {
+        const text = document.getElementById('scannedTextBody').innerText;
+        navigator.clipboard.writeText(text).then(() => {
+            const btn = document.getElementById('copyScannedText');
+            btn.innerHTML = '<i data-lucide="check" style="width:9px;height:9px;"></i> Copied!';
+            lucide.createIcons();
+            setTimeout(() => {
+                btn.innerHTML = '<i data-lucide="copy" style="width:9px;height:9px;"></i> Copy';
+                lucide.createIcons();
+            }, 2000);
+        });
+    });
+
+    // Submit: copy validated text
+    document.getElementById('uploadForm').addEventListener('submit', function () {
+        const textBody    = document.getElementById('scannedTextBody');
+        const hiddenField = document.getElementById('validated_text');
+        if (textBody && hiddenField && textBody.innerText.trim()) {
+            hiddenField.value = textBody.innerText.trim();
+        }
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<svg style="width:11px;height:11px;animation:spin 1s linear infinite;margin-right:6px;vertical-align:middle;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Uploading…';
+    });
+});
+</script>
+
+
+<script>
+    // ── Doc type pill toggle ───────────────────────────────────────────────
     document.querySelectorAll('.doc-type-label input').forEach(radio => {
         radio.addEventListener('change', () => {
             document.querySelectorAll('.type-pill').forEach(p => p.classList.remove('active'));
             radio.nextElementSibling.classList.add('active');
         });
     });
-    document.querySelector('.doc-type-label input:checked')
-        ?.nextElementSibling.classList.add('active');
+    document.querySelector('.doc-type-label input:checked')?.nextElementSibling.classList.add('active');
 
-    // ── PDF drop zone ────────────────────────────────────────────
-    const fileInput       = document.getElementById('pdf_file');
-    const dropZone        = document.getElementById('dropZone');
-    const dropText        = document.getElementById('dropText');
-    const dropIcon        = document.getElementById('dropIcon');
-    const fileNameDisplay = document.getElementById('fileNameDisplay');
-    const fileNameText    = document.getElementById('fileNameText');
-    const clearFileBtn    = document.getElementById('clearFile');
-
-    function showFile(name) {
-        dropText.classList.add('hidden');
-        dropIcon.classList.add('hidden');
-        fileNameDisplay.classList.remove('hidden');
-        fileNameDisplay.classList.add('flex');
-        fileNameText.textContent = name;
-    }
-
-    function clearFile() {
-        fileInput.value = '';
-        fileNameDisplay.classList.add('hidden');
-        fileNameDisplay.classList.remove('flex');
-        dropText.classList.remove('hidden');
-        dropIcon.classList.remove('hidden');
-    }
-
-    fileInput.addEventListener('change', () => {
-        if (fileInput.files.length) showFile(fileInput.files[0].name);
-    });
-
-    clearFileBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        clearFile();
-    });
+    // ── Drop zone drag-and-drop ────────────────────────────────────────────
+    const fileInput = document.getElementById('pdf_file');
+    const dropZone  = document.getElementById('dropZone');
 
     dropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
-        dropZone.classList.add('border-indigo-400', 'bg-indigo-50');
+        dropZone.classList.add('border-slate-400', 'bg-slate-50');
     });
-
     dropZone.addEventListener('dragleave', () => {
-        dropZone.classList.remove('border-indigo-400', 'bg-indigo-50');
+        dropZone.classList.remove('border-slate-400', 'bg-slate-50');
     });
-
     dropZone.addEventListener('drop', (e) => {
         e.preventDefault();
-        dropZone.classList.remove('border-indigo-400', 'bg-indigo-50');
+        dropZone.classList.remove('border-slate-400', 'bg-slate-50');
         const file = e.dataTransfer.files[0];
         if (!file) return;
-        if (file.type !== 'application/pdf') {
-            alert('Please upload a PDF file only.');
-            return;
-        }
+        if (file.type !== 'application/pdf') { alert('Please upload a PDF file only.'); return; }
         const dt = new DataTransfer();
         dt.items.add(file);
         fileInput.files = dt.files;
-        showFile(file.name);
-    });
-
-    // ── Submit loading state ─────────────────────────────────────
-    document.getElementById('uploadForm').addEventListener('submit', function () {
-        const btn = document.getElementById('submitBtn');
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-2"></i> Uploading...';
+        fileInput.dispatchEvent(new Event('change'));
     });
 </script>
+
 
 <style>
     .type-pill {
         display: block;
         text-align: center;
-        padding: 10px 12px;
-        border-radius: 12px;
-        font-size: 10px;
+        padding: 7px 10px;
+        border-radius: 10px;
+        font-size: 9px;
         font-weight: 900;
         text-transform: uppercase;
         letter-spacing: 0.08em;
         cursor: pointer;
-        border: 2px solid #e2e8f0;
+        border: 1.5px solid #e2e8f0;
         color: #94a3b8;
         transition: all 0.15s ease;
         background: white;
     }
-    .type-pill:hover  { border-color: #c7d2fe; color: #6366f1; }
-    .type-pill.active { background: #eef2ff; border-color: #6366f1; color: #4f46e5; }
+    .type-pill:hover  { border-color: #7C0D0E; color: #7C0D0E; }
+    .type-pill.active { background: #fdf2f2; border-color: #7C0D0E; color: #7C0D0E; }
+
+    .ocr-suspect {
+        background: #fef3c7;
+        color: #92400e;
+        border-radius: 3px;
+        padding: 1px 3px;
+        border-bottom: 2px solid #f59e0b;
+        cursor: text;
+        text-decoration: none;
+        font-style: normal;
+    }
+    .ocr-suspect:hover { background: #fde68a; }
+
+    .ocr-inconsistent {
+        background: #fee2e2;
+        color: #991b1b;
+        border-radius: 3px;
+        padding: 1px 3px;
+        border-bottom: 2px solid #ef4444;
+        cursor: text;
+        text-decoration: none;
+        font-style: normal;
+    }
+    .ocr-inconsistent:hover { background: #fecaca; }
+
+    .page-break-line {
+        display: block;
+        text-align: center;
+        color: #94a3b8;
+        font-size: 10px;
+        padding: 8px 0;
+        letter-spacing: 0.15em;
+        pointer-events: none;
+        user-select: none;
+    }
+
+    .ocr-editor:focus { outline: none; }
+
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to   { transform: rotate(360deg); }
+    }
 </style>
 
 {% endblock %}

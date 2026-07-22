@@ -1,5 +1,4 @@
-from django.urls import path, include
-from django.contrib.auth import views
+from django.urls import path
 from . import views
 
 urlpatterns = [
@@ -10,7 +9,7 @@ urlpatterns = [
 
     ########################SYSTEM ADMIN DASHBOARD FUNCTIONS 
     path('systemadmin/createuser/page',views.create_user_page, name= 'create-user-page'),
-    path('systemadmim/create_user/',views.create_user, name = 'create-user'),
+    path('systemadmin/create_user/',views.create_user, name = 'create-user'),
 
     ###################### USER MANAGEMENT ####################
     path('systemadmin/user/<int:user_id>/edit/', views.edit_user, name='edit-user'),
@@ -19,7 +18,8 @@ urlpatterns = [
     ########## FOR BACKEND DATABASE ################################3
     path('systemadmin/backend_database',views.backend_database, name ='backend-database'),
     path('backend_database/clear_system_cache', views.clear_system_cache, name ='clear-system-cache'),
-    path('backend_database/trigget_backup/',views.trigger_backup, name='trigger-backup'),
-    
-
+    path('backend_database/trigger_backup/',views.trigger_backup, name='trigger-backup'),
+    ########## AUDIT LOGS ########################################
+    path('systemadmin/audit_logs/', views.audit_logs, name='audit-logs'),
+    path('systemadmin/audit_logs/export/', views.export_logs_csv, name='export-logs-csv'),
 ]

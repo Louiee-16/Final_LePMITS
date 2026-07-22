@@ -1,3 +1,5 @@
+
+{%load static%}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,22 +7,42 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LePMITS | Legislative Tracking System</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/shepherd.js@11.2.0/dist/css/shepherd.css">
+    <script src="https://cdn.jsdelivr.net/npm/shepherd.js@11.2.0/dist/js/shepherd.min.js"></script>
+    <script>const USER_ROLE = "{{ user.role }}";</script>
+    <script src="{%static 'onboard/js/tour.js'%}"></script>
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #fcfcfd; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
 
-        /* ── Sidebar transition ── */
+        /* ── Shepherd Tour Styles ── */
+        .shepherd-element { border-radius: 1.25rem !important; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25) !important; border: 1px solid #e2e8f0 !important; }
+        .shepherd-header { background: #0f172a !important; border-radius: 1.25rem 1.25rem 0 0 !important; padding: 1rem 1.25rem !important; }
+        .shepherd-title { font-family: 'Plus Jakarta Sans', sans-serif !important; font-size: 0.875rem !important; font-weight: 800 !important; color: #fff !important; letter-spacing: 0.01em !important; }
+        .shepherd-cancel-icon { color: rgba(255,255,255,0.5) !important; }
+        .shepherd-cancel-icon:hover { color: #fff !important; }
+        .shepherd-text { font-family: 'Plus Jakarta Sans', sans-serif !important; font-size: 0.8125rem !important; color: #475569 !important; line-height: 1.6 !important; padding: 1rem 1.25rem !important; }
+        .shepherd-text strong { color: #0f172a !important; font-weight: 700 !important; }
+        .shepherd-footer { padding: 0.75rem 1.25rem 1rem !important; gap: 0.5rem !important; border-top: 1px solid #f1f5f9 !important; }
+        .shepherd-btn-primary { background: #1e293b !important; color: #fff !important; border: none !important; border-radius: 0.625rem !important; padding: 0.5rem 1rem !important; font-size: 0.7rem !important; font-weight: 800 !important; text-transform: uppercase !important; letter-spacing: 0.08em !important; cursor: pointer !important; transition: background 0.2s !important; }
+        .shepherd-btn-primary:hover { background: #0f172a !important; }
+        .shepherd-btn-secondary { background: #f1f5f9 !important; color: #475569 !important; border: none !important; border-radius: 0.625rem !important; padding: 0.5rem 1rem !important; font-size: 0.7rem !important; font-weight: 800 !important; text-transform: uppercase !important; letter-spacing: 0.08em !important; cursor: pointer !important; }
+        .shepherd-btn-secondary:hover { background: #e2e8f0 !important; }
+        .shepherd-btn-skip { background: transparent !important; color: #94a3b8 !important; border: none !important; border-radius: 0.625rem !important; padding: 0.5rem 0.75rem !important; font-size: 0.7rem !important; font-weight: 700 !important; cursor: pointer !important; margin-right: auto !important; }
+        .shepherd-btn-skip:hover { color: #475569 !important; }
+
+        /* ── Sidebar ── */
         #sidebar {
-            width: 272px;
+            width: 268px;
+            background: #0a0f1e;
+            border-right: 1px solid rgba(255,255,255,0.06);
             transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
             overflow: hidden;
         }
-        #sidebar.collapsed {
-            width: 68px;
-        }
+        #sidebar.collapsed { width: 64px; }
 
-        /* Hide text labels when collapsed */
+        /* Hide labels when collapsed */
         #sidebar.collapsed .sidebar-label,
         #sidebar.collapsed .sidebar-section-label,
         #sidebar.collapsed .sidebar-logo-text,
@@ -40,48 +62,62 @@
             padding-left: 0;
             padding-right: 0;
         }
-        #sidebar.collapsed .sidebar-item i.nav-icon {
-            margin-right: 0;
-        }
-        #sidebar.collapsed .dot-wrap {
-            margin-right: 0;
-        }
+        #sidebar.collapsed .sidebar-item .nav-icon,
+        #sidebar.collapsed .sidebar-item svg.nav-icon { margin-right: 0; }
+        #sidebar.collapsed .dot-wrap { margin-right: 0; }
 
         /* User card collapsed */
         #sidebar.collapsed #userCard {
-            padding: 12px 8px;
+            padding: 10px 6px;
             align-items: center;
             justify-content: center;
         }
-        #sidebar.collapsed #userCard .user-avatar {
-            margin: 0 auto;
-        }
+        #sidebar.collapsed #userCard .user-avatar { margin: 0 auto; }
 
-        /* Sidebar item base */
+        /* ── Nav item base ── */
         .sidebar-item {
-            transition: all 0.2s;
+            transition: all 0.15s ease;
             border-radius: 10px;
-            margin-bottom: 4px;
-            border: 1px solid transparent;
+            margin-bottom: 2px;
             display: flex;
             align-items: center;
-            padding: 10px 14px;
+            padding: 9px 12px;
             font-size: 13px;
+            font-weight: 600;
+            color: #64748b;
             white-space: nowrap;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .sidebar-item:hover {
+            color: #f1f5f9;
+            background: rgba(255,255,255,0.06);
         }
         .sidebar-active {
-            background-color: #f1f5f9 !important;
-            color: #4f46e5 !important;
+            background: #334155 !important;
+            color: #fff !important;
             font-weight: 700;
-            border: 1px solid #e2e8f0 !important;
+            border-left: 3px solid #7C0D0E !important;
         }
-        .sidebar-active i { color: #4f46e5 !important; }
-        .sidebar-active .dot { background-color: inherit; }
+        .sidebar-active svg, .sidebar-active i { color: #fff !important; }
+
+        /* ── Nav icon (Lucide SVG) ── */
+        .nav-icon {
+            width: 16px;
+            height: 16px;
+            min-width: 16px;
+            flex-shrink: 0;
+            margin-right: 11px;
+            stroke: currentColor;
+            stroke-width: 2;
+            fill: none;
+            transition: margin 0.25s;
+        }
 
         .dot {
-            height: 8px;
-            width: 8px;
-            min-width: 8px;
+            height: 7px;
+            width: 7px;
+            min-width: 7px;
             border-radius: 50%;
             display: inline-block;
         }
@@ -89,551 +125,498 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 20px;
-            margin-right: 14px;
+            width: 16px;
+            margin-right: 11px;
             flex-shrink: 0;
-        }
-
-        .nav-icon {
-            width: 20px;
-            text-align: center;
-            flex-shrink: 0;
-            margin-right: 12px;
-            transition: margin 0.25s;
         }
 
         .sidebar-label {
-            transition: opacity 0.2s, width 0.25s;
+            transition: opacity 0.15s, width 0.25s;
             overflow: hidden;
         }
+        .sidebar-section-label,
+        .sidebar-logo-text,
+        .sidebar-user-info,
+        .sidebar-logout-text { transition: opacity 0.15s ease, width 0.25s ease; }
 
-        .sidebar-section-label {
-            transition: opacity 0.2s;
-            overflow: hidden;
-        }
-
-        /* Tooltip on collapsed */
-        #sidebar.collapsed .sidebar-item {
-            position: relative;
-        }
+        /* ── Tooltip on collapsed ── */
+        #sidebar.collapsed .sidebar-item { position: relative; }
         #sidebar.collapsed .sidebar-item:hover::after {
             content: attr(data-tooltip);
             position: absolute;
-            left: 68px;
+            left: 64px;
             top: 50%;
             transform: translateY(-50%);
             background: #1e293b;
-            color: white;
+            color: #f1f5f9;
             font-size: 11px;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.08em;
-            padding: 6px 12px;
+            padding: 5px 12px;
             border-radius: 8px;
             white-space: nowrap;
             z-index: 100;
             pointer-events: none;
+            border: 1px solid #334155;
         }
 
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
 
-        /* Sidebar label transitions */
-        .sidebar-logo-text,
-        .sidebar-label,
-        .sidebar-section-label,
-        .sidebar-user-info,
-        .sidebar-logout-text {
-            transition: opacity 0.15s ease, width 0.25s ease;
+        /* ── Lucide icon size helpers ── */
+        .icon-xs { width: 12px; height: 12px; }
+        .icon-sm { width: 14px; height: 14px; }
+        .icon-md { width: 16px; height: 16px; }
+        .icon-lg { width: 18px; height: 18px; }
+        .icon-xl { width: 20px; height: 20px; }
+        .icon-2xl { width: 24px; height: 24px; }
+        .icon-3xl { width: 32px; height: 32px; }
+        .icon-hero { width: 48px; height: 48px; }
+
+        /* inline Lucide SVGs inherit text color */
+        svg.lucide { display: inline-block; vertical-align: middle; stroke: currentColor; fill: none; }
+
+        /* logout button reset */
+        .logout-link {
+            background: none; border: none; padding: 0;
+            color: #94a3b8; font-size: 12px; font-weight: 700;
+            cursor: pointer; appearance: none; -webkit-appearance: none;
+            text-transform: uppercase; letter-spacing: 0.08em;
         }
-.logout-link {
-    background: none !important;
-    border: none !important;
-    padding: 0 !important;
+        .logout-link:hover { color: #f1f5f9; text-decoration: underline; }
 
-    color: #555 !important;
-    font-size: 16px !important;
-
-    cursor: pointer;
-    appearance: none;
-    -webkit-appearance: none;
-}
-
-        .logout-link:hover {
-            text-decoration: underline;
+        /* ── Secretariat module banner tabs ── */
+        .sec-tab {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #64748b;
+            transition: background 0.15s, color 0.15s;
+            white-space: nowrap;
+            text-decoration: none;
         }
+        .sec-tab:hover { background: rgba(255,255,255,0.08); color: #e2e8f0; }
+        .sec-tab-active { background: #7C0D0E !important; color: #fff !important; }
     </style>
+    {% block extra_styles %}{% endblock %}
 </head>
-<body class="flex h-screen overflow-hidden text-slate-900">
+<body class="flex flex-col h-screen overflow-hidden text-slate-900">
 
-    <!-- SIDEBAR -->
-    <aside id="sidebar" class="bg-white border-r border-slate-200 flex flex-col shrink-0 relative">
+    <!-- PH Gov stripe -->
+    <div style="height:4px;width:100%;background:linear-gradient(90deg,#0038A8 0% 33.33%,#CE1126 33.33% 66.66%,#FCD116 66.66% 100%);flex-shrink:0;z-index:50;position:relative;"></div>
 
-        <!-- Logo + collapse toggle -->
-        <div class="p-5 flex items-center justify-between">
+    <div class="flex flex-1 overflow-hidden">
+
+    <!-- ══════════════════════════════════════════════════════
+         SIDEBAR
+    ══════════════════════════════════════════════════════ -->
+    <aside id="sidebar" class="flex flex-col shrink-0 relative">
+
+        <!-- Logo + collapse -->
+        <div class="p-4 flex items-center justify-between border-b border-white/[0.06]">
             <div class="flex items-center gap-3 min-w-0">
-                <div class="bg-indigo-600 p-2.5 rounded-xl shadow-lg shadow-indigo-200 shrink-0">
-                    <i class="fas fa-university text-white text-lg"></i>
+                {% if settings.system_logo %}
+                <div class="p-1 rounded-xl shadow-lg shadow-slate-900/60 shrink-0" style="background:#7C0D0E;">
+                    <img src="{{ settings.system_logo.url }}" alt="Logo" style="width:26px;height:26px;object-fit:contain;border-radius:6px;">
                 </div>
+                {% else %}
+                <div class="p-2 rounded-xl shadow-lg shadow-slate-900/60 shrink-0" style="background:#7C0D0E;">
+                    <i data-lucide="landmark" class="nav-icon" style="margin-right:0;color:white;width:18px;height:18px;"></i>
+                </div>
+                {% endif %}
                 <div class="sidebar-logo-text min-w-0">
-                    <h1 class="text-lg font-extrabold tracking-tight text-slate-800 whitespace-nowrap">LePMITS</h1>
-                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest whitespace-nowrap">San Juan City</p>
+                    <h1 class="text-sm font-extrabold tracking-tight text-white whitespace-nowrap">LePMITS</h1>
+                    <p class="text-[9px] text-slate-600 font-bold uppercase tracking-widest whitespace-nowrap">San Juan City</p>
                 </div>
             </div>
             <button id="collapseBtn" onclick="toggleSidebar()"
-                class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-all shrink-0 ml-2">
-                <i class="fas fa-chevron-left text-[10px]" id="collapseIcon"></i>
+                class="w-6 h-6 rounded-lg flex items-center justify-center text-slate-600 hover:text-slate-300 hover:bg-white/[0.07] transition-all shrink-0 ml-2">
+                <i data-lucide="chevron-left" style="width:13px;height:13px;" id="collapseIcon"></i>
             </button>
         </div>
 
         <!-- Nav -->
-        <nav id="sidebar-nav" class="flex-1 px-3 overflow-y-auto custom-scrollbar space-y-6 pb-4">
+        <nav id="sidebar-nav" class="flex-1 px-3 py-3 overflow-y-auto custom-scrollbar space-y-5 pb-4">
 
-            <!-- MAIN -->
-            <div>
-                <!-- SYSTEM ADMIN SECTION -->
+            <!-- SYSTEM ADMIN -->
             {% if user.role == 'ADMIN' %}
             <div>
-                <p class="sidebar-section-label text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] px-3 mb-2">
+                <p class="sidebar-section-label text-[9px] font-black text-slate-600 uppercase tracking-[0.2em] px-2 mb-2">
                     System Administration
                 </p>
                 <a href="{% url 'admin-dashboard' %}" data-tooltip="Dashboard"
-                   class="sidebar-item {% if request.resolver_match.url_name == 'admin-dashboard' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
-                    <i class="fas fa-columns nav-icon"></i>
+                   class="sidebar-item {% if request.resolver_match.url_name == 'admin-dashboard' %}sidebar-active{% endif %}">
+                    <i data-lucide="layout-dashboard" class="nav-icon"></i>
                     <span class="sidebar-label">Dashboard</span>
                 </a>
-                <!-- User Management -->
                 <a href="{%url 'user-management'%}" data-tooltip="User Accounts"
-                class="sidebar-item {% if 'user' in request.path %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
-                    <i class="fas fa-user-gear nav-icon"></i>
+                   class="sidebar-item {% if 'user' in request.path %}sidebar-active{% endif %}">
+                    <i data-lucide="user-cog" class="nav-icon"></i>
                     <span class="sidebar-label">User Accounts</span>
                 </a>
-
-                <!-- Activity / Audit Logs -->
                 <a href="{%url 'audit-logs'%}" data-tooltip="Audit Logs"
-                class="sidebar-item {% if 'logs' in request.path %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
-                    <i class="fas fa-shield-halved nav-icon"></i>
+                   class="sidebar-item {% if 'logs' in request.path %}sidebar-active{% endif %}">
+                    <i data-lucide="shield-check" class="nav-icon"></i>
                     <span class="sidebar-label">Audit Logs</span>
                 </a>
-
-                <!-- Global Settings -->
                 <a href="{%url 'general-settings'%}" data-tooltip="System Settings"
-                class="sidebar-item {% if 'settings' in request.path %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
-                    <i class="fas fa-sliders nav-icon"></i>
+                   class="sidebar-item {% if 'settings' in request.path %}sidebar-active{% endif %}">
+                    <i data-lucide="sliders-horizontal" class="nav-icon"></i>
                     <span class="sidebar-label">General Settings</span>
                 </a>
-
-                <!-- Council Term Setup -->
                 <a href="{%url 'council-setup'%}" data-tooltip="Council Setup"
-                class="sidebar-item {% if 'setup' in request.path %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
-                    <i class="fas fa-sitemap nav-icon"></i>
+                   class="sidebar-item {% if 'setup' in request.path %}sidebar-active{% endif %}">
+                    <i data-lucide="network" class="nav-icon"></i>
                     <span class="sidebar-label">Council Setup</span>
                 </a>
-
-                <!-- Database / Maintenance -->
-                <a href="{%url 'backend-database'%}"  data-tooltip="Django Admin"
-                class="sidebar-item text-slate-500 hover:text-indigo-600 hover:bg-indigo-50">
-                    <i class="fas fa-database nav-icon"></i>
+                <a href="{%url 'backend-database'%}" data-tooltip="Django Admin"
+                   class="sidebar-item">
+                    <i data-lucide="database" class="nav-icon"></i>
                     <span class="sidebar-label">Backend Database</span>
                 </a>
             </div>
             {% endif %}
-                {%if user.role != 'ADMIN'%}
-                <p class="sidebar-section-label text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] px-3 mb-2">
+
+            <!-- MAIN -->
+            {%if user.role != 'ADMIN'%}
+            <div>
+                <p class="sidebar-section-label text-[9px] font-black text-slate-600 uppercase tracking-[0.2em] px-2 mb-2">
                     Main
                 </p>
                 <a href="{% url 'dashboard' %}" data-tooltip="Dashboard"
-                   class="sidebar-item {% if request.resolver_match.url_name == 'dashboard' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
-                    <i class="fas fa-columns nav-icon"></i>
+                   class="sidebar-item {% if request.resolver_match.url_name == 'dashboard' %}sidebar-active{% endif %}">
+                    <i data-lucide="layout-dashboard" class="nav-icon"></i>
                     <span class="sidebar-label">Dashboard</span>
                 </a>
-                {%endif%}
-                {% if user.role == 'COUNCILOR' %}
-                <a href="{% url 'filed-measures' %}" data-tooltip="Filed Drafts"
-                   class="sidebar-item {% if request.resolver_match.url_name == 'filed-measures' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
-                    <i class="fas fa-file-alt nav-icon"></i>
+            </div>
+            {%endif%}
+
+            {% if user.role == 'COUNCILOR' %}
+            <div id="councilor-section">
+                <p class="sidebar-section-label text-[9px] font-black text-slate-600 uppercase tracking-[0.2em] px-2 mb-2">
+                    My Work
+                </p>
+                <a href="{% url 'filed-measures' %}" data-tooltip="Filed Measures"
+                   class="sidebar-item {% if request.resolver_match.url_name == 'filed-measures' %}sidebar-active{% endif %}">
+                    <i data-lucide="file-text" class="nav-icon"></i>
                     <span class="sidebar-label">Filed Measures</span>
                 </a>
                 <a href="{%url 'draft-measures'%}" data-tooltip="Draft Measures"
-                   class="sidebar-item {% if request.resolver_match.url_name == 'draft-measures' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
-                    <i class="fas fa-file-alt nav-icon"></i>
+                   class="sidebar-item {% if request.resolver_match.url_name == 'draft-measures' %}sidebar-active{% endif %}">
+                    <i data-lucide="file-pen-line" class="nav-icon"></i>
                     <span class="sidebar-label">Draft Measures</span>
                 </a>
-
-                <!-- My Committees dropdown -->
                 <button onclick="toggleDropdown('committeeDropdown')"
                     data-tooltip="My Committees"
-                    class="sidebar-item w-full text-left text-slate-500 hover:text-slate-900 hover:bg-slate-50">
-                    <i class="fas fa-users nav-icon"></i>
+                    class="sidebar-item w-full text-left">
+                    <i data-lucide="users" class="nav-icon"></i>
                     <span class="sidebar-label flex-1">My Committees</span>
-                    <i class="fas fa-chevron-down text-[10px] sidebar-label transition-transform duration-200" id="chevronIcon"></i>
+                    <i data-lucide="chevron-down" class="sidebar-label icon-sm transition-transform duration-200" id="chevronIcon"></i>
                 </button>
-                <div id="committeeDropdown" class="hidden ml-3 mt-1 bg-slate-50 rounded-xl border border-slate-100 overflow-hidden">
+                <div id="committeeDropdown" class="hidden ml-3 mt-1 rounded-xl border border-white/[0.06] overflow-hidden" style="background:rgba(255,255,255,0.03)">
                     {% for committee in committees %}
-                    <a href="{%url 'referred-to-committee' committee.id%}" class="block px-4 py-2 text-xs text-slate-600 hover:bg-slate-100 font-medium">
+                    <a href="{%url 'referred-to-committee' committee.id%}" class="block px-4 py-2.5 text-xs text-slate-500 hover:text-white hover:bg-white/[0.06] font-semibold transition-colors">
                         {{ committee.name }}
                     </a>
                     {% endfor %}
                 </div>
-                {% endif %}
-
-                {% if user.role == 'BARANGAY' %}
-                <a href="{% url 'dashboard' %}" data-tooltip="Filed Measures"
-                   class="sidebar-item text-slate-500 hover:text-slate-900 hover:bg-slate-50">
-                    <i class="fas fa-file-invoice nav-icon"></i>
-                    <span class="sidebar-label">Filed Measures</span>
-                </a>
-                {% endif %}
-            </div>
-
-            <!-- SECRETARIAT -->
-            {% if user.role == 'SECRETARIAT' or user.role == 'STAFF' %}
-            <div>
-                <p class="sidebar-section-label text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] px-3 mb-2">
-                    Secretariat
-                </p>
-                <a href="{% url 'incoming_docs' %}" data-tooltip="Incoming Docs"
-                   class="sidebar-item {% if request.resolver_match.url_name == 'incoming_docs' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
-                    <i class="fas fa-folder-open nav-icon"></i>
-                    <span class="sidebar-label">Incoming Docs</span>
-                </a>
-                <a href="{% url 'order-of-business' %}" data-tooltip="Agenda"
-                   class="sidebar-item {% if request.resolver_match.url_name == 'agenda_list' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
-                    <i class="fas fa-calendar-check nav-icon"></i>
-                    <span class="sidebar-label">Agenda</span>
-                </a>
-                <a href="{% url 'committee_list' %}" data-tooltip="Committees"
-                   class="sidebar-item {% if request.resolver_match.url_name == 'committee_list' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
-                    <i class="fas fa-users-rectangle nav-icon"></i>
-                    <span class="sidebar-label">Committees</span>
-                </a>
-                <a href="{% url 'councilors_list' %}" data-tooltip="Councilor Registry"
-                   class="sidebar-item {% if request.resolver_match.url_name == 'councilors_list' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
-                    <i class="fas fa-id-badge nav-icon"></i>
-                    <span class="sidebar-label">Councilor's Registry</span>
-                </a>
-                <a href="{% url 'barangay-list' %}" data-tooltip="Barangay Registry"
-                   class="sidebar-item {% if request.resolver_match.url_name == 'barangay-list' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
-                    <i class="fas fa-map-marker-alt nav-icon"></i>
-                    <span class="sidebar-label">Barangay's Registry</span>
-                </a>
-
             </div>
             {% endif %}
 
-            <!-- TRACKING STAGES -->
-             {%if user.role != 'ADMIN'%}
+            {% if user.role == 'BARANGAY' %}
             <div>
-                <p class="sidebar-section-label text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] px-3 mb-2">
+                <a href="{% url 'dashboard' %}" data-tooltip="Filed Measures"
+                   class="sidebar-item">
+                    <i data-lucide="file-text" class="nav-icon"></i>
+                    <span class="sidebar-label">Filed Measures</span>
+                </a>
+            </div>
+            {% endif %}
+
+
+            <!-- TRACKING STAGES -->
+            {%if user.role != 'ADMIN'%}
+            <div id="tracking-stages">
+                <p class="sidebar-section-label text-[9px] font-black text-slate-600 uppercase tracking-[0.2em] px-2 mb-2">
                     Tracking Stages
                 </p>
                 <a href="{% url 'first_reading' %}" data-tooltip="First Reading"
-                   class="sidebar-item {% if request.resolver_match.url_name == 'first_reading' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
-                    <span class="dot-wrap"><span class="dot bg-blue-500 ring-4 ring-blue-50"></span></span>
+                   class="sidebar-item {% if request.resolver_match.url_name == 'first_reading' %}sidebar-active{% endif %}">
+                    <span class="dot-wrap"><span class="dot bg-slate-500"></span></span>
                     <span class="sidebar-label">First Reading</span>
                 </a>
                 {% if user.role == 'SECRETARIAT' or user.role == 'STAFF' %}
                 <a href="{% url 'view-committee' %}" data-tooltip="Committee Referrals"
-                   class="sidebar-item {% if request.resolver_match.url_name == 'view-committee' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
-                    <span class="dot-wrap"><span class="dot bg-purple-500 ring-4 ring-purple-50"></span></span>
+                   class="sidebar-item {% if request.resolver_match.url_name == 'view-committee' %}sidebar-active{% endif %}">
+                    <span class="dot-wrap"><span class="dot bg-slate-500"></span></span>
                     <span class="sidebar-label">Committee Referrals</span>
                 </a>
                 {%endif%}
                 <a href="{% url 'second-reading' %}" data-tooltip="Second Reading"
-                   class="sidebar-item {% if request.resolver_match.url_name == 'second-reading' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
-                    <span class="dot-wrap"><span class="dot bg-orange-500 ring-4 ring-orange-50"></span></span>
+                   class="sidebar-item {% if request.resolver_match.url_name == 'second-reading' %}sidebar-active{% endif %}">
+                    <span class="dot-wrap"><span class="dot bg-slate-500"></span></span>
                     <span class="sidebar-label">Second Reading</span>
                 </a>
                 <a href="{% url 'third-reading' %}" data-tooltip="Third Reading"
-                   class="sidebar-item {% if request.resolver_match.url_name == 'third-reading' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
-                    <span class="dot-wrap"><span class="dot bg-amber-500 ring-4 ring-amber-50"></span></span>
+                   class="sidebar-item {% if request.resolver_match.url_name == 'third-reading' %}sidebar-active{% endif %}">
+                    <span class="dot-wrap"><span class="dot bg-slate-500"></span></span>
                     <span class="sidebar-label">Third Reading</span>
                 </a>
                 <a href="{%url 'other-matters'%}" data-tooltip="Other Matters"
-                   class="sidebar-item {% if request.resolver_match.url_name == 'other-matters' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
-                    <span class="dot-wrap"><span class="dot bg-rose-500 ring-4 ring-rose-50"></span></span>
+                   class="sidebar-item {% if request.resolver_match.url_name == 'other-matters' %}sidebar-active{% endif %}">
+                    <span class="dot-wrap"><span class="dot bg-slate-500"></span></span>
                     <span class="sidebar-label">Other Matters</span>
                 </a>
                 <a href="{%url 'unfinished-business' %}" data-tooltip="Unfinished Business"
-                   class="sidebar-item {% if request.resolver_match.url_name == 'unfinished-business' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
-                    <span class="dot-wrap"><span class="dot bg-rose-500 ring-4 ring-rose-50"></span></span>
+                   class="sidebar-item {% if request.resolver_match.url_name == 'unfinished-business' %}sidebar-active{% endif %}">
+                    <span class="dot-wrap"><span class="dot bg-slate-500"></span></span>
                     <span class="sidebar-label">Unfinished Business</span>
                 </a>
                 <a href="{% url 'approved' %}" data-tooltip="Approved"
-                   class="sidebar-item {% if request.resolver_match.url_name == 'approved' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
-                    <span class="dot-wrap"><span class="dot bg-emerald-500 ring-4 ring-emerald-50"></span></span>
+                   class="sidebar-item {% if request.resolver_match.url_name == 'approved' %}sidebar-active{% endif %}">
+                    <span class="dot-wrap"><span class="dot bg-slate-500"></span></span>
                     <span class="sidebar-label">Approved</span>
                 </a>
-                <a href="{%url 'disapproved-docs'%}" data-tooltip="disapproved"
-                   class="sidebar-item {% if request.resolver_match.url_name == 'disapproved-docs' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
-                    <span class="dot-wrap"><span class="dot bg-emerald-500 ring-4 ring-emerald-50"></span></span>
+                <a href="{%url 'disapproved-docs'%}" data-tooltip="Disapproved"
+                   class="sidebar-item {% if request.resolver_match.url_name == 'disapproved-docs' %}sidebar-active{% endif %}">
+                    <span class="dot-wrap"><span class="dot bg-slate-500"></span></span>
                     <span class="sidebar-label">Disapproved</span>
                 </a>
-                {% if user.role == 'SECRETARIAT' or user.role == 'STAFF' %}
-                <a href="{%url 'UPLOAD-LEGACY-DOCUMENT'%}" data-tooltip="disapproved"
-                   class="sidebar-item {% if request.resolver_match.url_name == 'UPLOAD-LEGACY' %}sidebar-active{% else %}text-slate-500 hover:text-slate-900 hover:bg-slate-50{% endif %}">
-                    <span class="dot-wrap"><span class="dot bg-emerald-500 ring-4 ring-emerald-50"></span></span>
-                    <span class="sidebar-label">Upload Document</span>
-                </a>
-                {%endif%}
             </div>
             {%endif%}
 
         </nav>
 
         <!-- USER CARD -->
-        <div id="userCard" class="p-4 m-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-3 transition-all">
+        <div id="userCard" class="p-3 m-2 rounded-2xl flex flex-col gap-3 transition-all" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.07);">
             <div class="flex items-center gap-3 min-w-0">
-                <div class="user-avatar w-9 h-9 rounded-xl bg-indigo-600 shadow-sm flex items-center justify-center text-white text-sm font-black border border-indigo-500 uppercase shrink-0">
+                <div class="user-avatar w-8 h-8 rounded-xl shadow-sm flex items-center justify-center text-white text-xs font-black uppercase shrink-0" style="background:#7C0D0E;">
                     {{ user.username|slice:":1" }}
                 </div>
                 <div class="sidebar-user-info min-w-0">
-                    <p class="text-sm font-bold text-slate-800 truncate whitespace-nowrap">{{ user.username }}</p>
-                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider whitespace-nowrap">{{ user.role }}</p>
+                    <p class="text-xs font-bold text-white truncate whitespace-nowrap">{{ user.username }}</p>
+                    <p class="text-[9px] text-slate-600 font-bold uppercase tracking-wider whitespace-nowrap">{{ user.role }}</p>
                 </div>
             </div>
             <form action="{% url 'logout' %}" method="post" class="sidebar-label">
                 {%csrf_token%}
                 <button type="submit"
-                    class="flex items-center justify-center w-full py-2 bg-white border border-slate-200 text-[11px] font-bold text-rose-500 hover:bg-rose-50 hover:border-rose-100 transition-all rounded-xl uppercase tracking-widest whitespace-nowrap">
-                    <i class="fas fa-sign-out-alt mr-2"></i>
+                    class="flex items-center justify-center w-full py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest whitespace-nowrap transition-all text-slate-500 hover:text-slate-400 hover:bg-white/[0.06]">
+                    <i data-lucide="log-out" style="width:12px;height:12px;margin-right:6px;"></i>
                     <span class="sidebar-logout-text">Log Out</span>
                 </button>
             </form>
         </div>
     </aside>
-<!-- Session Expired Modal -->
-<div id="sessionModal" style="display:none;" class="session-overlay">
-    <div class="session-modal">
-        <h3 id="sessionModalTitle">⏱ Session Expiring Soon</h3>
-        <p id="sessionModalMessage">You've been inactive. Do you want to stay logged in?</p>
 
-        <div id="sessionError" class="session-error" style="display:none;"></div>
-
-        <!-- Warning state: just a button to stay logged in -->
-        <div id="warningButtons" style="display:none;" class="session-modal-buttons">
-            <button onclick="stayLoggedIn()">Stay Logged In</button>
-            <form action ="{% url 'logout' %}" method="post" class="bg-color-white">
-                {% csrf_token %}
-            <button type="submit" class="logout-link">Log Out</button>
-            </form>
-        </div>
-
-        <!-- Expired state: re-login form -->
-        <div id="expiredForm" style="display:none;">
-            <input type="text" id="reloginUsername" placeholder="Username" />
-            <input type="password" id="reloginPassword" placeholder="Password" style="margin-top: 0.5rem"/>
-            <div class="session-modal-buttons" style="margin-top: 0.5rem">
-                <button onclick="submitRelogin()">Login</button>
-                <a href="/login/">Go to Login Page</a>
+    <!-- Session Expired Modal -->
+    <div id="sessionModal" style="display:none;" class="session-overlay">
+        <div class="session-modal">
+            <h3 id="sessionModalTitle" style="margin:0;font-size:1.1rem;font-weight:800;">⏱ Session Expiring Soon</h3>
+            <p id="sessionModalMessage" style="font-size:0.85rem;color:#64748b;margin:0;">You've been inactive. Do you want to stay logged in?</p>
+            <div id="sessionError" class="session-error" style="display:none;"></div>
+            <div id="warningButtons" style="display:none;" class="session-modal-buttons">
+                <button onclick="stayLoggedIn()">Stay Logged In</button>
+                <form action="{% url 'logout' %}" method="post">
+                    {% csrf_token %}
+                    <button type="submit" class="logout-link">Log Out</button>
+                </form>
+            </div>
+            <div id="expiredForm" style="display:none;">
+                <input type="text" id="reloginUsername" placeholder="Username" />
+                <input type="password" id="reloginPassword" placeholder="Password" style="margin-top:0.5rem"/>
+                <div class="session-modal-buttons" style="margin-top:0.5rem">
+                    <button onclick="submitRelogin()">Login</button>
+                    <a href="/login/">Go to Login Page</a>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<style>
-.session-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.6);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-}
-.session-modal {
-    background: white;
-    padding: 2rem;
-    border-radius: 12px;
-    width: 340px;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-}
-.session-modal h3 { margin: 0; font-size: 1.2rem; }
-.session-modal input {
-    padding: 0.6rem 0.8rem;
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    font-size: 0.95rem;
-    width: 100%;
-    box-sizing: border-box;
-}
-.session-modal-buttons {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-.session-modal-buttons button {
-    padding: 0.6rem 1.4rem;
-    background: #1a56db;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-}
-.session-error {
-    color: red;
-    font-size: 0.85rem;
-}
-</style>
-
-<script>
-const WARNING_BEFORE_SECONDS = 120;
-const CHECK_INTERVAL = 30000;
-
-let sessionCheckTimer = setInterval(checkSession, CHECK_INTERVAL);
-
-async function checkSession() {
-    try {
-        const res = await fetch("{% url 'session_status' %}", {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' }
-        });
-
-        if (res.status == 401){
-            window.location.href = '/login/?reason=timeout';
-            return;
-        }
-        if (res.status == 403){
-            window.location.href = '/login/?reason=timeout';
-            return;
-        }
-        console.log(res.status)
-        const data = await res.json();
-        
-        if (!data.alive) {
-            showSessionModal('expired');
-           
-        } else if (data.remaining < WARNING_BEFORE_SECONDS) {
-            showSessionModal('warning');
-        }
-        
-    } catch (e) {
-        console.error('Session check failed', e);
+    <style>
+    .session-overlay {
+        position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+        display: flex; align-items: center; justify-content: center; z-index: 9999;
     }
-}
-
-let heartbeatDebounce;
-
-function sendHeartbeat(){
-    clearTimeout(heartbeatDebounce);
-    heartbeatDebounce = setTimeout(async()=>{
-        try{
-            await fetch("{% url 'session_heartbeat' %}",{
-                headers: { 'X-requested-With':  'XMLHttpRequest'}
-            });
-
-        }catch (e){
-            console.error('Heartbeat failed', e);        }
-    }, 2000)
-}
-
-['click','keydown','mousemove','scroll','touchstart'].forEach(event => {
-    document.addEventListener(event, sendHeartbeat, {passive: true});
-});
-
-function showSessionModal(type) {
-    if (type == 'expired'){
-        clearInterval(sessionCheckTimer);    
+    .session-modal {
+        background: white; padding: 2rem; border-radius: 16px; width: 340px;
+        display: flex; flex-direction: column; gap: 1rem;
+        box-shadow: 0 24px 60px rgba(0,0,0,0.25);
     }
-    
-    document.getElementById('sessionModal').style.display = 'flex';
-
-    const title = document.getElementById('sessionModalTitle');
-    const message = document.getElementById('sessionModalMessage');
-    const warningButtons = document.getElementById('warningButtons');
-    const expiredForm = document.getElementById('expiredForm');
-
-    if (type === 'warning') {
-        title.textContent = '⏱ Are you still there?';
-        message.textContent = 'Your session will expire in less than 2 minutes. Stay logged in?';
-        warningButtons.style.display = 'flex';
-        expiredForm.style.display = 'none';
-    } else {
-        title.textContent = '🔒 Session Expired';
-        message.textContent = 'You have been logged out due to inactivity. Please log in again.';
-        warningButtons.style.display = 'none';
-        expiredForm.style.display = 'block';
-        document.getElementById('reloginUsername').focus();
+    .session-modal input {
+        padding: 0.65rem 0.9rem; border: 1.5px solid #e2e8f0; border-radius: 10px;
+        font-size: 0.9rem; width: 100%; box-sizing: border-box; outline: none;
+        transition: border-color 0.15s;
     }
-}
+    .session-modal input:focus { border-color: #94a3b8; }
+    .session-modal-buttons { display: flex; justify-content: space-between; align-items: center; }
+    .session-modal-buttons button {
+        padding: 0.6rem 1.4rem; background: #1e293b; color: white;
+        border: none; border-radius: 10px; cursor: pointer; font-weight: 700; font-size: 0.85rem;
+    }
+    .session-error { color: #64748b; font-size: 0.82rem; }
+    </style>
 
-async function stayLoggedIn() {
-    // Ping any authenticated endpoint to reset last_activity
-    await fetch("{% url 'session_status' %}", {
-        headers: { 'X-Requested-With': 'XMLHttpRequest' }
-    });
-    document.getElementById('sessionModal').style.display = 'none';
-    sessionCheckTimer = setInterval(checkSession, CHECK_INTERVAL);
-}
+    <script>
+    const WARNING_BEFORE_SECONDS = 120;
+    const CHECK_INTERVAL = 30000;
+    let sessionCheckTimer = setInterval(checkSession, CHECK_INTERVAL);
 
-async function submitRelogin() {
-    const username = document.getElementById('reloginUsername').value;
-    const password = document.getElementById('reloginPassword').value;
-    const errorDiv = document.getElementById('sessionError');
+    async function checkSession() {
+        try {
+            const res = await fetch("{% url 'session_status' %}", { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            if (res.status == 401 || res.status == 403) { window.location.href = '/login/?reason=timeout'; return; }
+            const data = await res.json();
+            if (!data.alive) { showSessionModal('expired'); }
+            else if (data.remaining < WARNING_BEFORE_SECONDS) { showSessionModal('warning'); }
+        } catch (e) { console.error('Session check failed', e); }
+    }
 
-    const res = await fetch("{% url 'session_relogin' %}", {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken_mgmt'),
-        },
-        body: JSON.stringify({ username, password })
-    });
+    let heartbeatDebounce;
+    function sendHeartbeat() {
+        clearTimeout(heartbeatDebounce);
+        heartbeatDebounce = setTimeout(async () => {
+            try { await fetch("{% url 'session_heartbeat' %}", { headers: { 'X-Requested-With': 'XMLHttpRequest' } }); }
+            catch (e) { console.error('Heartbeat failed', e); }
+        }, 2000);
+    }
+    ['click','keydown','mousemove','scroll','touchstart'].forEach(e => document.addEventListener(e, sendHeartbeat, {passive:true}));
 
-    const data = await res.json();
+    function showSessionModal(type) {
+        if (type == 'expired') clearInterval(sessionCheckTimer);
+        document.getElementById('sessionModal').style.display = 'flex';
+        const title = document.getElementById('sessionModalTitle');
+        const msg = document.getElementById('sessionModalMessage');
+        const warn = document.getElementById('warningButtons');
+        const exp = document.getElementById('expiredForm');
+        if (type === 'warning') {
+            title.textContent = '⏱ Are you still there?';
+            msg.textContent = 'Your session will expire in less than 2 minutes.';
+            warn.style.display = 'flex'; exp.style.display = 'none';
+        } else {
+            title.textContent = '🔒 Session Expired';
+            msg.textContent = 'You have been logged out due to inactivity.';
+            warn.style.display = 'none'; exp.style.display = 'block';
+            document.getElementById('reloginUsername').focus();
+        }
+    }
 
-    if (data.success) {
+    async function stayLoggedIn() {
+        await fetch("{% url 'session_status' %}", { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
         document.getElementById('sessionModal').style.display = 'none';
-        document.getElementById('reloginUsername').value = '';
-        document.getElementById('reloginPassword').value = '';
-        errorDiv.style.display = 'none';
         sessionCheckTimer = setInterval(checkSession, CHECK_INTERVAL);
-    } else {
-        errorDiv.style.display = 'block';
-        errorDiv.textContent = data.error || 'Invalid credentials.';
     }
-}
 
-function getCookie(name) {
-    return document.cookie.split(';')
-        .map(c => c.trim())
-        .find(c => c.startsWith(name + '='))
-        ?.split('=')[1] || '';
-}
-
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && document.getElementById('sessionModal').style.display === 'flex') {
-        const expiredForm = document.getElementById('expiredForm');
-        if (expiredForm.style.display !== 'none') {
-            submitRelogin();
+    async function submitRelogin() {
+        const username = document.getElementById('reloginUsername').value;
+        const password = document.getElementById('reloginPassword').value;
+        const errorDiv = document.getElementById('sessionError');
+        const res = await fetch("{% url 'session_relogin' %}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken_mgmt') },
+            body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (data.success) {
+            document.getElementById('sessionModal').style.display = 'none';
+            document.getElementById('reloginUsername').value = '';
+            document.getElementById('reloginPassword').value = '';
+            errorDiv.style.display = 'none';
+            sessionCheckTimer = setInterval(checkSession, CHECK_INTERVAL);
+        } else {
+            errorDiv.style.display = 'block';
+            errorDiv.textContent = data.error || 'Invalid credentials.';
         }
     }
-});
-</script>
-    <!-- MAIN AREA -->
+
+    function getCookie(name) {
+        return document.cookie.split(';').map(c => c.trim()).find(c => c.startsWith(name + '='))?.split('=')[1] || '';
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && document.getElementById('sessionModal').style.display === 'flex') {
+            const exp = document.getElementById('expiredForm');
+            if (exp.style.display !== 'none') submitRelogin();
+        }
+    });
+    </script>
+
+    <!-- ══════════════════════════════════════════════════════
+         MAIN AREA
+    ══════════════════════════════════════════════════════ -->
     <main class="flex-1 flex flex-col min-w-0">
-        <header class="h-16 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-10 shrink-0">
-            <div class="flex items-center gap-4">
-                <span class="text-slate-300">|</span>
-                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Legislative Tracking System</h2>
+        <!-- ── Slim topbar ── -->
+        <header class="h-12 bg-white border-b border-slate-100 px-8 flex items-center justify-between shrink-0" style="background:#0a0f1e">
+            <div class="flex items-center gap-3">
+                <span class="text-lg font-thin" style="color:#7C0D0E;">|</span>
+                <h2 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Legislative Tracking System</h2>
             </div>
-            <div class="flex items-center gap-6">
+            <div class="flex items-center gap-5">
+                <button onclick="startTour()"
+                    class="flex items-center gap-2 px-4 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-wider transition-all">
+                    <i data-lucide="compass" style="width:12px;height:12px;"></i>
+                    Take a Tour
+                </button>
                 <div class="text-right">
-                    <p class="text-[10px] font-bold text-slate-400 uppercase">Current Date</p>
-                    <p class="text-sm font-bold text-slate-700">{% now "F d, Y" %}</p>
+                    <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Current Date</p>
+                    <p class="text-xs font-bold text-slate-700">{% now "F d, Y" %}</p>
                 </div>
             </div>
         </header>
 
-        <section class="flex-1 overflow-y-auto custom-scrollbar p-10">
+        <!-- ── Secretariat module banner (Humanline-style) ── -->
+        {% if user.role == 'SECRETARIAT' or user.role == 'STAFF' %}
+        {% with cur=request.resolver_match.url_name %}
+        <div class="shrink-0 px-8 py-5 flex items-center justify-between" style="background:#0a0f1e; border-bottom:1px solid rgba(255,255,255,0.06);">
+            <!-- Greeting -->
+            <div>
+                <h2 class="text-lg font-black text-white tracking-tight">
+                    Hi, {{ user.first_name|default:user.username }}
+                </h2>
+                <p class="text-xs font-medium mt-0.5" style="color:#64748b;">Legislative Management Console</p>
+            </div>
+            <!-- Module tabs -->
+            <nav id= " secretariat" class="flex items-center gap-1">
+                <a href="{% url 'dashboard' %}" class="sec-tab {% if cur == 'dashboard' %}sec-tab-active{% endif %}">
+                    <i data-lucide="layout-dashboard" style="width:11px;height:11px;"></i> Dashboard
+                </a>
+                <a href="{% url 'incoming_docs' %}" class="sec-tab {% if cur == 'incoming_docs' %}sec-tab-active{% endif %}">
+                    <i data-lucide="inbox" style="width:11px;height:11px;"></i> Incoming
+                </a>
+                <a href="{% url 'order-of-business' %}" class="sec-tab {% if cur == 'order-of-business' %}sec-tab-active{% endif %}">
+                    <i data-lucide="calendar-check" style="width:11px;height:11px;"></i> Agenda
+                </a>
+                <a href="{% url 'committee_list' %}" class="sec-tab {% if cur == 'committee_list' %}sec-tab-active{% endif %}">
+                    <i data-lucide="users" style="width:11px;height:11px;"></i> Committees
+                </a>
+                <a href="{% url 'councilors_list' %}" class="sec-tab {% if cur == 'councilors_list' %}sec-tab-active{% endif %}">
+                    <i data-lucide="badge" style="width:11px;height:11px;"></i> Councilors
+                </a>
+                <a href="{% url 'barangay-list' %}" class="sec-tab {% if cur == 'barangay-list' %}sec-tab-active{% endif %}">
+                    <i data-lucide="map-pin" style="width:11px;height:11px;"></i> Barangay
+                </a>
+                <a href="{% url 'UPLOAD-LEGACY' %}" class="sec-tab {% if cur == 'UPLOAD-LEGACY' %}sec-tab-active{% endif %}">
+                    <i data-lucide="upload" style="width:11px;height:11px;"></i> Upload Doc
+                </a>
+            </nav>
+        </div>
+        {% endwith %}
+        {% endif %}
+
+        <section class="flex-1 overflow-y-auto custom-scrollbar p-8" style="background:#f8fafc;">
             {% block content %}{% endblock %}
         </section>
     </main>
 
     <script>
-        // ── Collapse toggle ──────────────────────────────────────
+        // ── Sidebar collapse ──────────────────────────────────────
         const sidebar    = document.getElementById('sidebar');
         const icon       = document.getElementById('collapseIcon');
         const STORAGE_KEY = 'sidebar-collapsed';
@@ -644,23 +627,18 @@ document.addEventListener('keydown', (e) => {
             localStorage.setItem(STORAGE_KEY, isCollapsed ? '1' : '0');
         }
 
-        // Restore state on load
         document.addEventListener('DOMContentLoaded', function () {
             if (localStorage.getItem(STORAGE_KEY) === '1') {
                 sidebar.classList.add('collapsed');
                 icon.style.transform = 'rotate(180deg)';
             }
-
-            // Scroll persistence
             const nav = document.getElementById('sidebar-nav');
             const savedScroll = sessionStorage.getItem('sidebar-scroll');
             if (savedScroll) nav.scrollTop = parseInt(savedScroll);
-            nav.addEventListener('scroll', () => {
-                sessionStorage.setItem('sidebar-scroll', nav.scrollTop);
-            });
+            nav.addEventListener('scroll', () => sessionStorage.setItem('sidebar-scroll', nav.scrollTop));
         });
 
-        // ── Back button fix ──────────────────────────────────────
+        // ── Back button cache fix ──────────────────────────────────
         window.addEventListener('pageshow', function (event) {
             if (event.persisted || (typeof window.performance !== 'undefined' &&
                 window.performance.navigation.type === 2)) {
@@ -668,7 +646,7 @@ document.addEventListener('keydown', (e) => {
             }
         });
 
-        // ── Committee dropdown ───────────────────────────────────
+        // ── Committee dropdown ─────────────────────────────────────
         function toggleDropdown(id) {
             const dropdown = document.getElementById(id);
             const chevron  = document.getElementById('chevronIcon');
@@ -677,5 +655,10 @@ document.addEventListener('keydown', (e) => {
                 ? 'rotate(0deg)' : 'rotate(180deg)';
         }
     </script>
+
+    <!-- Initialise all Lucide icons -->
+    <script>lucide.createIcons();</script>
+
+    </div><!-- end flex wrapper -->
 </body>
 </html>

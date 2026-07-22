@@ -134,10 +134,16 @@ def filed_measures(request):
     }
     return render(request, 'councilors/filed_measures.html', context)
 def draft_measures(request):
-    draft_measures = request.user.my_docs.filter(status = 'DRAFT')
+    from documents.models import ReturnReason
+    drafts = request.user.my_docs.filter(status='DRAFT').order_by('-updated_at')
+
+    # Attach the latest return reason to each draft (if any)
+    for draft in drafts:
+        draft.return_info = ReturnReason.objects.filter(document=draft).first()
+
     context = {
-        'draft_measures' : draft_measures,
-        'author' : request.user.councilor_profile
+        'draft_measures': drafts,
+        'author': request.user.councilor_profile,
     }
     return render(request, 'councilors/draft_measures.html', context)
 

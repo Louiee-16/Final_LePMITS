@@ -1,158 +1,229 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="w-full mx-auto space-y-10">
-    <!-- Header -->
-    <div>
-        <h1 class="text-4xl font-[900] text-slate-900 tracking-tight">Incoming Documents</h1>
-        <p class="text-slate-500 mt-1 font-medium">Review and process documents filed by the Councilors.</p>
+<div class="flex gap-6 items-start">
+
+    <!-- LEFT COLUMN: Tables -->
+    <div class="flex-1 min-w-0 space-y-10">
+
+        <!-- Incoming Documents -->
+        <div>
+            <h1 class="text-4xl font-[900] text-slate-900 tracking-tight">Incoming Documents</h1>
+            <p class="text-slate-500 mt-1 font-medium">Review and process documents filed by the Councilors.</p>
+        </div>
+
+        <div id="tour-incoming-table" class="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+            <table class="w-full text-left">
+                <thead class="bg-slate-50 border-b border-slate-100">
+                    <tr>
+                        <th class="px-8 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Ref No.</th>
+                        <th class="px-8 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Title</th>
+                        <th class="px-8 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Author</th>
+                        <th class="px-8 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50">
+                    {% for doc in incoming_docs %}
+                    <tr class="hover:bg-slate-50/30 transition-colors cursor-pointer doc-row" data-doc-id="{{ doc.id }}">
+                        <td class="px-8 py-5 text-sm font-bold text-slate-600">{{ doc.reference_no }}</td>
+                        <td class="px-8 py-5">
+                            <p class="text-sm font-extrabold text-slate-800 line-clamp-1" title="{{ doc.title }}">
+                                {{ doc.title|truncatechars:30 }}
+                            </p>
+                            <span class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-bold">
+                                {{ doc.doc_type }}
+                            </span>
+                        </td>
+                        <td class="px-8 py-5 text-sm font-medium text-slate-700">Hon. {{ doc.surname }}</td>
+                        <td class="px-5 py-3 text-right">
+                            {% if user.role == 'SECRETARIAT' %}
+                            <div class="flex items-center gap-2 justify-end">
+                                <button type="button"
+                                        onclick="event.stopPropagation();openReturnModal('{{ doc.id }}', '{{ doc.title|escapejs }}')"
+                                        class="bg-white border border-slate-200 text-slate-500 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all">
+                                    <i data-lucide="undo-2" style="width:11px;height:11px;margin-right:3px;vertical-align:middle;"></i> Return
+                                </button>
+                                <form method="POST" action="{% url 'move_to_first' doc.id %}" style="margin:0;">
+                                    {% csrf_token %}
+                                    <button type="submit"
+                                            class="bg-slate-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-700 transition-colors"
+                                            onclick="event.stopPropagation(); return confirm('Move this document to First Reading?');">
+                                        Move to First Reading
+                                    </button>
+                                </form>
+                            </div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="px-8 py-10 text-center text-sm text-slate-400 font-medium">No incoming documents.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Barangay Documents -->
+        <div class="mt-10">
+            <h1 class="text-4xl font-[900] text-slate-900 tracking-tight">Barangay Documents</h1>
+            <p class="text-slate-500 mt-1 font-medium">Review and process documents filed by the Barangay Officials.</p>
+        </div>
+
+        <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+            <table class="w-full text-left">
+                <thead class="bg-slate-50 border-b border-slate-100">
+                    <tr>
+                        <th class="px-8 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Title</th>
+                        <th class="px-8 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Author</th>
+                        <th class="px-8 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50">
+                    {% for doc in barangay_docs %}
+                    <tr class="hover:bg-slate-50/30 transition-colors cursor-pointer doc-row" data-doc-id="{{ doc.id }}">
+                        <td class="px-8 py-5">
+                            <p class="text-sm font-extrabold text-slate-800 line-clamp-1" title="{{ doc.title }}">{{ doc.title }}</p>
+                        </td>
+                        <td class="px-8 py-5 text-sm font-medium text-slate-700">{{ doc.origin_barangay.barangay_name }}</td>
+                        <td class="px-8 py-5 text-right">
+                            {% if user.role == 'SECRETARIAT' %}
+                            <div class="flex flex-row gap-2 justify-end">
+                                <form method="POST" action="{% url 'move-to-other-matters' doc.id %}">
+                                    {% csrf_token %}
+                                    <button type="submit"
+                                            class="bg-slate-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-700 transition-colors"
+                                            onclick="event.stopPropagation(); return confirm('Move this document to Other Matters?');">
+                                        Move to Other Matters
+                                    </button>
+                                </form>
+                                <form method="POST" action="{% url 'return-barangay-file' doc.id %}">
+                                    {% csrf_token %}
+                                    <button type="submit"
+                                            class="bg-slate-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-600 transition-colors"
+                                            onclick="event.stopPropagation(); return confirm('Return this barangay document for revision?');">
+                                        Return
+                                    </button>
+                                </form>
+                            </div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3" class="px-8 py-10 text-center text-sm text-slate-400 font-medium">No barangay documents.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
     </div>
 
-    <!-- Incoming Documents Table -->
-    <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
-        <table class="w-full text-left">
-            <thead class="bg-slate-50 border-b border-slate-100">
-                <tr>
-                    <th class="px-10 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Ref No.</th>
-                    <th class="px-10 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Title</th>
-                    <th class="px-10 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Author</th>
-                    <th class="px-10 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400 text-right">Actions</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-50">
-                {% for doc in incoming_docs %}
-                <tr class="hover:bg-indigo-50/30 transition-colors cursor-pointer" data-doc-id="{{ doc.id }}">
-                    <!-- Reference Number -->
-                    <td class="px-10 py-6 text-sm font-bold text-indigo-600">{{ doc.reference_no }}</td>
+    <!-- RIGHT COLUMN: Document Preview Panel -->
+    <div id="docPanel" class="hidden flex-col bg-white rounded-[2rem] border border-slate-100 shadow-xl overflow-hidden" style="width: 480px; min-width: 480px; position: sticky; top: 0; max-height: calc(100vh - 2rem);">
 
-                    <!-- Title and Document Type -->
-                    <td class="px-10 py-6">
-                        <p class="text-sm font-extrabold text-slate-800 line-clamp-1" title="{{ doc.title }}">
-                            {{ doc.title|truncatechars:30 }}
-                        </p>
-                        <span class="text-[10px] bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded font-bold">
-                            {{ doc.doc_type }}
-                        </span>
-                    </td>
+        <!-- Panel Header -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50 shrink-0">
+            <div class="flex items-center gap-2">
+                <i data-lucide="file-text" style="width:15px;height:15px;color:#6366f1;"></i>
+                <span class="text-xs font-black text-slate-700 uppercase tracking-widest">Document Preview</span>
+            </div>
+            <button id="closeDocPanel" class="w-7 h-7 flex items-center justify-center rounded-full bg-slate-200 hover:bg-slate-100 hover:text-slate-500 text-slate-500 font-bold transition-colors text-sm">
+                &times;
+            </button>
+        </div>
 
-                    <!-- Surname -->
-                    <td class="px-10 py-6 text-M font-medium text-slate-700">Hon. {{ doc.surname }}</td>
-
-                    <!-- Actions -->
-                    <td class="px-5 py-3 text-right flex flex-col gap-1">
-                        {% if user.role == 'SECRETARIAT' %}
-                        <form method="POST" action="{% url 'move_to_first' doc.id %}">
-                            {% csrf_token %}
-                            <button type="submit"
-                                    class="bg-indigo-600 text-white px-2 py-1 rounded font-bold hover:bg-indigo-700"
-                                    onclick="event.stopPropagation(); return confirm('Are you sure you want to move this document to First Reading?');">
-                                Move to First Reading
-                            </button>
-                        </form>
-
-                        <form method="POST" action="">
-                            {% csrf_token %}
-                            <button type="submit"
-                                    class="bg-red-600 text-white px-2 py-1 rounded font-bold hover:bg-red-700"
-                                    onclick="event.stopPropagation(); return confirm('Are you sure you want to move this document to Second Reading?');">
-                                Return
-                            </button>
-                        </form>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <!-- Panel Content -->
+        <div id="docContent" class="flex-1 overflow-y-auto p-4"></div>
     </div>
+
 </div>
 
-<!-- Barangay Documents Section -->
-<div class="w-full mx-auto space-y-10 mt-20">
-    <!-- Header -->
-    <div>
-        <h1 class="text-4xl font-[900] text-slate-900 tracking-tight">Barangay Documents</h1>
-        <p class="text-slate-500 mt-1 font-medium">Review and process documents filed by the Barangay Officials.</p>
-    </div>
+<!-- RETURN MODAL -->
+<div id="returnModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-[2rem] shadow-2xl max-w-lg w-full p-10">
+        <div class="flex items-center gap-3 mb-2">
+            <div class="w-11 h-11 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center shrink-0">
+                <i data-lucide="undo-2" style="width:18px;height:18px;color:#ef4444;"></i>
+            </div>
+            <div>
+                <h2 class="text-xl font-[900] text-slate-800">Return Document</h2>
+                <p class="text-xs text-slate-400 mt-0.5">This will send the document back to the councilor for revision.</p>
+            </div>
+        </div>
 
-    <!-- Barangay Table -->
-    <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
-        <table class="w-full text-left">
-            <thead class="bg-slate-50 border-b border-slate-100">
-                <tr>
-                    <th class="px-10 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Title</th>
-                    <th class="px-10 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Author</th>
-                    <th class="px-10 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400 text-right">Actions</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-50">
-                {% for doc in barangay_docs %}
-                <tr class="hover:bg-indigo-50/30 transition-colors cursor-pointer" data-doc-id="{{ doc.id }}">
-                    <td class="px-10 py-6">
-                        <p class="text-sm font-extrabold text-slate-800 line-clamp-1" title="{{ doc.title }}">
-                            {{ doc.title}}
-                        </p>
-                    </td>
-                    <td class="px-10 py-6 text-sm font-medium text-slate-700">{{ doc.origin_barangay.barangay_name}}</td>
-                    <td class="px-10 py-6 text-right flex flex-row gap-1 justify-end">
-                        {% if user.role == 'SECRETARIAT' %}
-                        <form method="POST" action="{% url 'move-to-other-matters' doc.id %}">
-                            {% csrf_token %}
-                            <button type="submit"
-                                    class="bg-indigo-600 text-white px-2 py-1 rounded font-bold hover:bg-indigo-700"
-                                    onclick="event.stopPropagation(); return confirm('Are you sure you want to move this document to First Reading?');">
-                                Move to Other Matters
-                            </button>
-                        </form>
-                        <form method="POST" action="">
-                            {% csrf_token %}
-                            <button type="submit"
-                                    class="bg-red-600 text-white px-2 py-1 rounded font-bold hover:bg-red-700"
-                                    onclick="event.stopPropagation(); return confirm('Are you sure you want to move this document to Second Reading?');">
-                                Return
-                            </button>
-                        </form>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
+        <p class="text-slate-500 text-sm mt-4 mb-1">Returning:</p>
+        <p id="returnDocTitle" class="font-bold text-slate-800 text-sm mb-6 leading-snug"></p>
 
-<!-- DOCUMENT MODAL -->
-<div id="docModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden z-50 flex items-start justify-center overflow-auto p-4">
-    <div class="bg-white rounded-[2rem] shadow-2xl max-w-5xl w-full p-6 relative">
-        <button id="closeDocModal" class="absolute top-4 right-4 text-slate-500 hover:text-slate-900 text-2xl font-bold">&times;</button>
-        <div id="docContent" class="w-full"></div>
+        <form id="returnForm" method="POST" action="">
+            {% csrf_token %}
+            <div class="mb-6">
+                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                    Reason for Return <span class="text-red-400">*</span>
+                </label>
+                <textarea name="return_reason" required rows="4"
+                    placeholder="Please explain why this document is being returned (e.g., incomplete content, formatting issues, needs revision)…"
+                    class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 outline-none focus:border-red-300 focus:ring-2 focus:ring-red-100 transition-all placeholder:text-slate-300 resize-none"></textarea>
+                <p class="text-[9px] text-slate-400 mt-1.5 font-medium">This reason will be visible to the councilor who authored this document.</p>
+            </div>
+
+            <div class="flex gap-3">
+                <button type="button" onclick="closeReturnModal()"
+                    class="flex-1 py-3.5 text-slate-400 font-bold hover:text-slate-600 transition-colors">Cancel</button>
+                <button type="submit"
+                    class="flex-[2] bg-red-600 text-white py-3.5 rounded-2xl font-black hover:bg-red-700 shadow-lg shadow-red-100 transition-all flex items-center justify-center gap-2">
+                    <i data-lucide="undo-2" style="width:14px;height:14px;"></i> Confirm Return
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 
 <script>
-// Row click opens modal
-document.querySelectorAll('tr[data-doc-id]').forEach(row => {
-    row.addEventListener('click', () => {
-        const docId = row.getAttribute('data-doc-id');
-        const modal = document.getElementById('docModal');
-        const contentDiv = document.getElementById('docContent');
+    function openReturnModal(docId, title) {
+        document.getElementById('returnForm').action = `/return/${docId}/filed/`;
+        document.getElementById('returnDocTitle').innerText = title;
+        document.getElementById('returnModal').classList.remove('hidden');
+    }
+    function closeReturnModal() {
+        document.getElementById('returnModal').classList.add('hidden');
+    }
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeReturnModal(); });
+</script>
 
-        modal.classList.remove('hidden');
-        contentDiv.innerHTML = "<p class='text-center text-slate-500 mt-10'>Loading document...</p>";
+<script>
+    // Row click loads document into side panel
+    document.querySelectorAll('.doc-row').forEach(row => {
+        row.addEventListener('click', () => {
+            const docId = row.getAttribute('data-doc-id');
+            const panel = document.getElementById('docPanel');
+            const contentDiv = document.getElementById('docContent');
 
-        fetch(`/modal/document/${docId}/`)
-            .then(response => response.text())
-            .then(html => contentDiv.innerHTML = html)
-            .catch(err => contentDiv.innerHTML = "<p class='text-red-500 text-center mt-10'>Failed to load document.</p>");
+            // Highlight active row
+            document.querySelectorAll('.doc-row').forEach(r => r.classList.remove('bg-slate-50'));
+            row.classList.add('bg-slate-50');
+
+            // Show panel
+            panel.classList.remove('hidden');
+            panel.classList.add('flex');
+            contentDiv.innerHTML = "<p class='text-center text-slate-400 text-sm mt-10'>Loading document...</p>";
+
+            fetch(`/modal/document/${docId}/`)
+                .then(r => r.text())
+                .then(html => {
+                    contentDiv.innerHTML = html;
+                    lucide.createIcons();
+                })
+                .catch(() => {
+                    contentDiv.innerHTML = "<p class='text-slate-500 text-center text-sm mt-10'>Failed to load document.</p>";
+                });
+        });
     });
-});
 
-// Close modal
-document.getElementById('closeDocModal').addEventListener('click', () => {
-    const modal = document.getElementById('docModal');
-    const contentDiv = document.getElementById('docContent');
-    contentDiv.innerHTML = "";
-    modal.classList.add('hidden');
-});
+    // Close panel
+    document.getElementById('closeDocPanel').addEventListener('click', () => {
+        const panel = document.getElementById('docPanel');
+        document.getElementById('docContent').innerHTML = '';
+        document.querySelectorAll('.doc-row').forEach(r => r.classList.remove('bg-slate-50'));
+        panel.classList.add('hidden');
+        panel.classList.remove('flex');
+    });
 </script>
 {% endblock %}

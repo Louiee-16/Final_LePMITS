@@ -8,9 +8,9 @@
     <div class="flex justify-between items-end pb-4 border-b border-slate-100">
         <div>
             <nav class="flex text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 gap-2 mb-3">
-                <a href="{% url 'dashboard' %}" class="hover:text-indigo-600 transition-colors">Legislative</a>
+                <a href="{% url 'dashboard' %}" class="hover:text-slate-600 transition-colors">Legislative</a>
                 <span>/</span>
-                <span class="text-indigo-600">Third Reading</span>
+                <span class="text-slate-600">Third Reading</span>
             </nav>
             <h1 class="text-4xl font-[900] text-slate-900 tracking-tight">Third & Final Reading</h1>
             <p class="text-slate-500 mt-1 font-medium italic">Final voting stage. Documents here are in their "Clean Print" form. No further amendments allowed.</p>
@@ -19,7 +19,7 @@
         <div class="flex gap-3">
             <div class="px-5 py-3 bg-white border border-slate-200 rounded-xl shadow-sm text-center">
                 <p class="text-[9px] font-black uppercase tracking-widest text-slate-400">Final Vote Pending</p>
-                <p class="text-2xl font-black text-emerald-600">{{ third_reading|length }}</p>
+                <p class="text-2xl font-black text-slate-600">{{ third_reading|length }}</p>
             </div>
         </div>
     </div>
@@ -45,7 +45,7 @@
                     </td>
 
                     <td class="px-10 py-6">
-                        <span class="text-xs font-black text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg border border-indigo-100 uppercase tracking-widest">
+                        <span class="text-xs font-black text-slate-600 bg-slate-50 px-3 py-1 rounded-lg border border-slate-100 uppercase tracking-widest">
                             {{ doc.reference_no }}
                         </span>
                     </td>
@@ -71,16 +71,16 @@
                                 <!-- Action: Final Approval (Green) -->
                                 <button type="button" 
                                     onclick="event.stopPropagation();openApprovalModal('{{ doc.id }}', '{{ doc.title|escapejs }}')"
-                                    class="px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-700 hover:-translate-y-0.5 transition-all">
-                                    <i class="fas fa-check-double mr-1.5"></i> Final Approval
+                                    class="px-5 py-2.5 bg-slate-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-slate-100 hover:bg-slate-700 hover:-translate-y-0.5 transition-all">
+                                    <i data-lucide="check-check" style="width:13px;height:13px;margin-right:6px;vertical-align:middle;"></i> Final Approval
                                 </button>
 
                                 <!-- Action: Failure (Red) -->
                                 <form action="{%url 'move-to-disapproved' doc.id%}" method="POST" class="inline" onsubmit="return confirm('Are you sure you want to mark this measure as FAILED? This cannot be undone.')">
                                     {% csrf_token %}
                                     <button type="submit" onclick="event.stopPropagation()"
-                                        class="p-2.5 bg-white border border-rose-200 text-rose-500 rounded-xl hover:bg-rose-50 transition-all" title="Mark as Failed">
-                                        <i class="fas fa-times"></i>
+                                        class="p-2.5 bg-white border border-slate-200 text-slate-500 rounded-xl hover:bg-slate-50 transition-all" title="Mark as Failed">
+                                        <i data-lucide="x" style="width:14px;height:14px;"></i>
                                     </button>
                                 </form>
                             {% endif %}
@@ -92,7 +92,7 @@
                 <tr>
                     <td colspan="5" class="p-20 text-center">
                         <div class="inline-flex items-center justify-center w-20 h-20 bg-white rounded-3xl shadow-sm mb-6 border border-slate-100">
-                            <i class="fas fa-check-circle text-3xl text-slate-200"></i>
+                            <i data-lucide="check-circle-2" style="width:40px;height:40px;color:#e2e8f0;"></i>
                         </div>
                         <p class="text-slate-400 font-bold uppercase tracking-widest text-xs">No documents for Final Reading</p>
                     </td>
@@ -118,8 +118,8 @@
             
             <div class="flex gap-3">
                 <button type="button" onclick="closeApprovalModal()" class="flex-1 py-4 text-slate-400 font-bold hover:text-slate-600">Wait, Go Back</button>
-                <button type="submit" class="flex-[2] bg-emerald-600 text-white py-4 rounded-2xl font-black hover:bg-emerald-700 shadow-lg shadow-emerald-100">
-                    <i class="fas fa-stamp mr-2"></i> Approve & Sign
+                <button type="submit" class="flex-[2] bg-slate-600 text-white py-4 rounded-2xl font-black hover:bg-slate-700 shadow-lg shadow-slate-100">
+                    <i data-lucide="badge-check" style="width:15px;height:15px;margin-right:8px;vertical-align:middle;"></i> Approve & Sign
                 </button>
             </div>
         </form>
@@ -148,7 +148,7 @@ document.querySelectorAll("tr[data-doc-id]").forEach(row =>{
         fetch(`/modal/document/${docId}`)
             .then(response => response.text())
             .then(html => contentDiv.innerHTML = html)
-            .catch(err => contentDiv.innerHTML = "<p class='text-red-500 text-center mt-10'>Failed to load document.</p>");
+            .catch(err => contentDiv.innerHTML = "<p class='text-slate-500 text-center mt-10'>Failed to load document.</p>");
 
 
     })

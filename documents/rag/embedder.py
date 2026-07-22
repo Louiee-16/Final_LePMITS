@@ -1,216 +1,186 @@
 """
-rag/embedder.py
-LePMITS — Step 2: Embedding Pipeline
+rag/embedder.py  —  LePMITS Embedding Pipeline
 
-Responsibilities:
-  - Strip Quill HTML → plain text (BeautifulSoup)
-  - Extract text from LegacyDocument PDFs via pdfplumber + Tesseract OCR fallback
-  - Embed text with sentence-transformers (all-MiniLM-L6-v2, fully offline)
-  - Save 384-dim vector to Document.embedding / LegacyDocument.embedding
+Expects clean, pre-extracted text (stored on the model as extracted_text /
+content).  This module only:
+  1. Chunks the text by legislative markers  (chunk_legal_text)
+  2. Embeds each chunk via nomic-embed-text on Ollama  (embed_text)
+  3. Persists vectors back to the model  (embed_document_chunks)
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Optional
+import re
+from typing import Dict, List
 
-import pdfplumber
-import pytesseract
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-from bs4 import BeautifulSoup
-from PIL import Image
-from sentence_transformers import SentenceTransformer
+import requests
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Model — loaded once at module import (cached for the process lifetime).
-# all-MiniLM-L6-v2 produces 384-dim vectors; runs fully offline after first
-# download.  First import triggers a one-time model download (~90 MB).
-# ---------------------------------------------------------------------------
-_model: Optional[SentenceTransformer] = None
-
-
-def _get_model() -> SentenceTransformer:
-    global _model
-    if _model is None:
-        logger.info("Loading sentence-transformers model (all-MiniLM-L6-v2)…")
-        _model = SentenceTransformer("all-MiniLM-L6-v2")
-        logger.info("Model loaded.")
-    return _model
-
 
 # ---------------------------------------------------------------------------
-# Text extraction helpers
+# Ollama helpers
 # ---------------------------------------------------------------------------
 
-def strip_quill_html(html: str) -> str:
-    """
-    Strip Quill-generated HTML to plain text.
-
-    Quill stores rich content as HTML (e.g. <p>, <strong>, <ol>, <li>).
-    BeautifulSoup handles malformed tags gracefully.
-
-    Returns an empty string if html is None or blank.
-    """
-    if not html:
-        return ""
-    soup = BeautifulSoup(html, "html.parser")
-    # get_text with separator=" " prevents words from adjacent tags merging.
-    text = soup.get_text(separator=" ", strip=True)
-    # Collapse multiple whitespace runs into a single space.
-    return " ".join(text.split())
+def _ollama_base_url() -> str:
+    endpoint = getattr(settings, 'OLLAMA_ENDPOINT', 'http://localhost:11434/api/generate')
+    return endpoint.rsplit('/api/', 1)[0]
 
 
-def extract_pdf_text(pdf_path: str) -> str:
-    """
-    Extract text from a PDF file.
-
-    Strategy:
-      1. Try pdfplumber (fast, text-layer PDFs).
-      2. If a page yields no text, fall back to Tesseract OCR on that page's
-         rasterised image (handles scanned/image-only PDFs).
-
-    Args:
-        pdf_path: Absolute filesystem path to the PDF.
-
-    Returns:
-        Concatenated plain text from all pages, or "" on failure.
-    """
-    if not pdf_path:
-        return ""
-
-    pages_text: list[str] = []
-
-    try:
-        with pdfplumber.open(pdf_path) as pdf:
-            for page_num, page in enumerate(pdf.pages, start=1):
-                page_text = page.extract_text() or ""
-
-                if page_text.strip():
-                    pages_text.append(page_text)
-                else:
-                    # --- OCR fallback ---
-                    logger.debug(
-                        "Page %d has no text layer — falling back to OCR.", page_num
-                    )
-                    try:
-                        # Render page to PIL image at 200 dpi (good balance of
-                        # speed vs. accuracy for A4 legislative documents).
-                        pil_image: Image.Image = page.to_image(resolution=200).original
-                        pil_image = pil_image.convert("RGB")
-                        ocr_text: str = pytesseract.image_to_string(
-                            pil_image, lang="eng"
-                        )
-                        pages_text.append(ocr_text)
-                    except Exception as ocr_err:
-                        logger.warning(
-                            "OCR failed on page %d: %s", page_num, ocr_err
-                        )
-
-    except Exception as pdf_err:
-        logger.error("pdfplumber could not open '%s': %s", pdf_path, pdf_err)
-        return ""
-
-    full_text = "\n".join(pages_text)
-    return " ".join(full_text.split())  # normalise whitespace
-
-
-# ---------------------------------------------------------------------------
-# Embedding
-# ---------------------------------------------------------------------------
-
-def embed_text(text: str) -> list[float]:
-    """
-    Convert plain text to a 384-dimensional float vector.
-
-    sentence-transformers truncates inputs longer than 256 word-pieces by
-    default.  For long ordinances the most legally distinctive content is
-    usually in the first ~512 tokens, so no special chunking is needed at
-    this stage (can be added later if retrieval quality warrants it).
-
-    Returns a Python list[float] compatible with pgvector's VectorField.
-    """
+def embed_text(text: str, timeout: int = 60) -> list[float]:
+    """Return a 768-dim vector from nomic-embed-text via Ollama."""
     if not text or not text.strip():
-        raise ValueError("embed_text received empty text — cannot produce embedding.")
+        raise ValueError("embed_text: empty text.")
 
-    model = _get_model()
-    vector = model.encode(text, convert_to_numpy=True)
-    return vector.tolist()
+    model = getattr(settings, 'OLLAMA_EMBED_MODEL', 'nomic-embed-text')
+    resp = requests.post(
+        f"{_ollama_base_url()}/api/embeddings",
+        json={"model": model, "prompt": text},
+        timeout=timeout,
+    )
+    resp.raise_for_status()
+    vector = resp.json().get("embedding")
+    if not vector:
+        raise ValueError(f"Ollama returned no embedding for model '{model}'.")
+    return vector
 
 
 # ---------------------------------------------------------------------------
-# High-level entry points
+# Legal text chunker
 # ---------------------------------------------------------------------------
 
-def embed_document(doc) -> bool:
+_BOILERPLATE_RE = re.compile(
+    r"""
+    (?:I\s+HEREBY\s+CERTIFY[\s\S]*?$)
+    |
+    (?:\(participated\s+thru\s+video\s+conferencing\)\s*)+
+    |
+    (?:^[A-Z][A-Z\s\.\-]+\n(?:City Councilor|Mayor|Vice Mayor|Sergeant-at-Arms|
+        Majority Floor Leader|Minority Floor Leader|President Pro-Tempore|
+        Assistant\s+\w+\s+Floor\s+Leader)[^\n]*\n?)
+    |
+    (?:\(page\s+\d+\s+of\s+[^\)]+\))
+    """,
+    re.IGNORECASE | re.MULTILINE | re.VERBOSE,
+)
+
+_LEGAL_MARKERS: List[str] = [
+    "NOW THEREFORE", "BE IT ENACTED", "BE IT RESOLVED",
+    "SEPARABILITY CLAUSE", "SEPARABILITY", "DEFINITIONS",
+    "EFFECTIVITY CLAUSE", "EFFECTIVITY", "PENALTIES",
+    "PROVIDED", "WHEREAS", "SECTION", "ARTICLE",
+]
+
+_MARKER_RE = re.compile(
+    r"^(" + "|".join(re.escape(m) for m in _LEGAL_MARKERS) + r")"
+    r"(?:\s+(\d+[\.\-]?\d*))?\b",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+_MIN_CHUNK_LENGTH = 30
+
+
+def chunk_legal_text(text: str) -> List[Dict]:
+    """Split legislative plain text into clause-level chunks."""
+    clean = _BOILERPLATE_RE.sub("", text).strip()
+
+    segments: List[Dict] = []
+    last_end   = 0
+    last_marker  = "BODY"
+    last_number  = None
+    current_article = None
+
+    for match in _MARKER_RE.finditer(clean):
+        segment_text = clean[last_end : match.start()].strip()
+        if segment_text:
+            segments.append({
+                "chunk_type":   last_marker,
+                "chunk_number": last_number,
+                "chunk_text":   segment_text,
+                "parent": current_article if last_marker == "SECTION" else None,
+            })
+
+        last_marker = match.group(1).upper()
+        last_number = match.group(2).rstrip(".") if match.group(2) else None
+        if last_marker == "ARTICLE":
+            current_article = f"ARTICLE {last_number}" if last_number else "ARTICLE"
+        last_end = match.start()
+
+    tail = clean[last_end:].strip()
+    if tail:
+        segments.append({
+            "chunk_type":   last_marker,
+            "chunk_number": last_number,
+            "chunk_text":   tail,
+            "parent": current_article if last_marker == "SECTION" else None,
+        })
+
+    result: List[Dict] = []
+    for seg in segments:
+        if len(seg["chunk_text"]) >= _MIN_CHUNK_LENGTH:
+            seg["chunk_index"] = len(result)
+            result.append(seg)
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Entry points
+# ---------------------------------------------------------------------------
+
+def embed_document_chunks(doc, source_type: str = "document") -> List[Dict]:
     """
-    Embed a Document instance (Quill HTML content) and persist the vector.
+    Chunk and embed a Document or LegacyDocument instance.
 
-    Args:
-        doc: A documents.models.Document instance.
+    Expects clean text to already be present:
+      - Document      → doc.content  (plain text or Quill-stripped text)
+      - LegacyDocument→ doc.extracted_text
 
-    Returns:
-        True if the embedding was saved, False on failure.
+    Returns a list of dicts ready for bulk-insert into DocumentChunk.
     """
-    try:
-        plain_text = strip_quill_html(doc.content)
+    if source_type == "legacy_document":
+        plain_text = getattr(doc, "extracted_text", "") or ""
+    else:
+        plain_text = getattr(doc, "content", "") or ""
 
-        # Include title for better semantic representation.
-        full_text = f"{doc.title}. {plain_text}".strip()
+    plain_text = plain_text.strip()
 
-        if not full_text:
+    if not plain_text:
+        logger.warning("embed_document_chunks: no text for %s pk=%s — skipping.", source_type, doc.pk)
+        return []
+
+    chunks = chunk_legal_text(plain_text)
+
+    if not chunks:
+        logger.warning("embed_document_chunks: no chunks for %s pk=%s.", source_type, doc.pk)
+        return []
+
+    results: List[Dict] = []
+    for chunk in chunks:
+        chunk_input = f"{doc.title}. {chunk['chunk_text']}".strip()
+        try:
+            embedding = embed_text(chunk_input)
+        except Exception as exc:
             logger.warning(
-                "Document pk=%s has no extractable text — skipping.", doc.pk
+                "embed_document_chunks: embed failed for %s pk=%s chunk %d: %s",
+                source_type, doc.pk, chunk["chunk_index"], exc,
             )
-            return False
+            continue
 
-        doc.embedding = embed_text(full_text)
-        doc.save(update_fields=["embedding"])
-        logger.info("Embedded Document pk=%s ('%s').", doc.pk, doc.title)
-        return True
+        results.append({
+            "source_type":     source_type,
+            "document_pk":     doc.pk,
+            "document_title":  doc.title,
+            "chunk_index":     chunk["chunk_index"],
+            "chunk_type":      chunk["chunk_type"],
+            "chunk_text":      chunk["chunk_text"],
+            "embedding":       embedding,
+        })
 
-    except Exception as exc:
-        logger.error("Failed to embed Document pk=%s: %s", doc.pk, exc)
-        return False
-
-
-def embed_legacy_document(legacy_doc) -> bool:
-    """
-    Embed a LegacyDocument instance (PDF file) and persist the vector.
-
-    Args:
-        legacy_doc: A documents.models.LegacyDocument instance.
-                    Expected to have a `file` FileField and a `title` field.
-
-    Returns:
-        True if the embedding was saved, False on failure.
-    """
-    try:
-        pdf_path = legacy_doc.pdf_file # absolute filesystem path
-        plain_text = extract_pdf_text(pdf_path)
-
-        full_text = f"{legacy_doc.title}. {plain_text}".strip()
-
-        if not full_text:
-            logger.warning(
-                "LegacyDocument pk=%s has no extractable text — skipping.",
-                legacy_doc.pk,
-            )
-            return False
-
-
-        legacy_doc.extracted_text = plain_text
-        legacy_doc.ocr_processed = True
-        legacy_doc.embedding = embed_text(full_text)
-        legacy_doc.save(update_fields=["extracted_text", "ocr_processed", "embedding"])
-        logger.info(
-            "Embedded LegacyDocument pk=%s ('%s').", legacy_doc.pk, legacy_doc.title
-        )
-        return True
-
-    except Exception as exc:
-        logger.error(
-            "Failed to embed LegacyDocument pk=%s: %s", legacy_doc.pk, exc
-        )
-        return False
+    logger.info(
+        "embed_document_chunks: %d/%d chunks embedded for %s pk=%s.",
+        len(results), len(chunks), source_type, doc.pk,
+    )
+    return results

@@ -2,195 +2,298 @@
 {% load static %}
 
 {% block content %}
-<div class="w-full mx-auto space-y-10">
+<div class="w-full space-y-6">
 
-    <!-- PAGE HEADER -->
-    <div class="flex justify-between items-end pb-4 border-b border-slate-100">
+    <!-- ── HEADER ─────────────────────────────────────────────────────────── -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-5 border-b border-slate-100">
         <div>
-            <nav class="flex text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 gap-2 mb-3">
-                <a href="{% url 'dashboard' %}" class="hover:text-indigo-600 transition-colors">Legislative</a>
-                <span>/</span>
-                <span class="text-emerald-600">Approved Registry</span>
+            <nav class="flex text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 gap-2 mb-2">
+                <a href="{% url 'dashboard' %}" class="hover:text-slate-600 transition-colors">Legislative</a>
+                <span class="text-slate-200">/</span>
+                <span class="text-slate-600">Approved Registry</span>
             </nav>
-            <h1 class="text-4xl font-[900] text-slate-900 tracking-tight">Legislative Archive</h1>
-            <p class="text-slate-500 mt-1 font-medium italic">Official Record of Enacted Ordinances and Approved Resolutions.</p>
+            <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Legislative Archive</h1>
+            <p class="text-slate-400 mt-0.5 text-xs font-medium">Official record of enacted ordinances and approved resolutions.</p>
         </div>
 
-        <!-- Yearly Statistics -->
-        <div class="flex gap-4">
-            <div class="px-6 py-3 bg-white border border-slate-200 rounded-2xl shadow-sm">
-                <p class="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Enacted Ordinances</p>
-                <div class="flex items-center gap-3">
-                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    <p class="text-xl font-black text-slate-800">{{ ordinances_count }}</p>
+        <!-- Stats pills -->
+        <div class="flex gap-3 shrink-0">
+            <div class="flex items-center gap-2.5 px-4 py-2.5 bg-white border border-slate-100 rounded-2xl shadow-sm">
+                <span class="w-2 h-2 rounded-full bg-slate-500 shrink-0"></span>
+                <div>
+                    <p class="text-[8px] font-black uppercase tracking-widest text-slate-400">Ordinances</p>
+                    <p class="text-lg font-black text-slate-800 leading-none">{{ ordinances_count }}</p>
                 </div>
             </div>
-            <div class="px-6 py-3 bg-white border border-slate-200 rounded-2xl shadow-sm">
-                <p class="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Approved Resolutions</p>
-                <div class="flex items-center gap-3">
-                    <span class="w-2 h-2 rounded-full bg-blue-500"></span>
-                    <p class="text-xl font-black text-slate-800">{{ resolutions_count }}</p>
+            <div class="flex items-center gap-2.5 px-4 py-2.5 bg-white border border-slate-100 rounded-2xl shadow-sm">
+                <span class="w-2 h-2 rounded-full bg-slate-400 shrink-0"></span>
+                <div>
+                    <p class="text-[8px] font-black uppercase tracking-widest text-slate-400">Resolutions</p>
+                    <p class="text-lg font-black text-slate-800 leading-none">{{ resolutions_count }}</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2.5 px-4 py-2.5 bg-white border border-slate-100 rounded-2xl shadow-sm">
+                <span class="w-2 h-2 rounded-full bg-amber-400 shrink-0"></span>
+                <div>
+                    <p class="text-[8px] font-black uppercase tracking-widest text-slate-400">Legacy</p>
+                    <p class="text-lg font-black text-slate-800 leading-none">{{ legacy_docs|length }}</p>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- JS SEARCH BAR (REPLACED BACKEND FILTER) -->
-    <div class="flex justify-between items-center bg-slate-50 p-4 rounded-3xl border border-slate-100">
-        <div class="flex gap-4 w-full">
+    <!-- ── FILTER BAR ──────────────────────────────────────────────────────── -->
+    <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3">
 
-            <!-- Search -->
-            <div class="relative flex-1">
-                <i class="fas fa-search absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 text-xs"></i>
-                <input 
-                    type="text" 
-                    id="searchInput"
-                    placeholder="Search by title or councilor..."
-                    class="w-full pl-12 pr-6 py-3 bg-white border-none rounded-2xl text-sm font-medium shadow-sm focus:ring-2 focus:ring-emerald-500 transition-all">
-            </div>
-            <select id="yearInput" class="px-5 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none text-sm">
-                <option value="">All Years</option>
-                {% for date in available_years %}
-                    <option value="{{ date.year }}">{{ date.year }}</option>
-                {% endfor %}
-            </select>
-
-
-            <!-- Clear -->
-            <button onclick="resetSearch()"
-                class="bg-slate-200 text-slate-600 px-6 py-3 rounded-2xl text-xs font-bold hover:bg-slate-300 transition-all">
-                Clear
-            </button>
+        <!-- Type tabs -->
+        <div class="flex bg-slate-100 rounded-xl p-1 gap-0.5 shrink-0">
+            <button onclick="setTypeFilter('all')"    id="tab-all"        class="type-tab active px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all">All</button>
+            <button onclick="setTypeFilter('ORDINANCE')" id="tab-ordinance" class="type-tab px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all">Ordinances</button>
+            <button onclick="setTypeFilter('RESOLUTION')" id="tab-resolution" class="type-tab px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all">Resolutions</button>
+            <button onclick="setTypeFilter('legacy')"  id="tab-legacy"    class="type-tab px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all">Legacy</button>
         </div>
+
+        <!-- Search -->
+        <div class="relative flex-1 min-w-0">
+            <i data-lucide="search" class="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" style="width:13px;height:13px;color:#cbd5e1;"></i>
+            <input type="text" id="searchInput" placeholder="Search title, reference number, or author…"
+                class="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 placeholder:text-slate-300 outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-100 transition-all">
+        </div>
+
+        <!-- Year -->
+        <select id="yearInput" class="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 outline-none focus:border-slate-300 shrink-0">
+            <option value="">All Years</option>
+            {% for yr in available_years %}
+                <option value="{{ yr }}">{{ yr }}</option>
+            {% endfor %}
+        </select>
+
+        <!-- Result count -->
+        <span id="resultCount" class="text-[10px] font-black uppercase tracking-widest text-slate-400 shrink-0"></span>
     </div>
 
-    <!-- DATA TABLE -->
-    <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+    <!-- ── TABLE ───────────────────────────────────────────────────────────── -->
+    <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         <table class="w-full text-left">
-            <thead class="bg-slate-50 border-b border-slate-100">
-                <tr>
-                    <th class="px-10 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Date Enacted</th>
-                    <th class="px-10 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Official Number</th>
-                    <th class="px-10 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Title of Legislation</th>
-                    <th class="px-10 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Sponsor</th>
-                    <th class="px-10 py-5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400 text-right">Actions</th>
+            <thead>
+                <tr class="border-b border-slate-100">
+                    <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 w-32">Date</th>
+                    <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 w-48">Reference No.</th>
+                    <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Title</th>
+                    <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 w-44">Sponsor</th>
+                    <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right w-36">Actions</th>
                 </tr>
             </thead>
 
-            <!-- IMPORTANT: added id -->
             <tbody id="documentTable" class="divide-y divide-slate-50">
-                {% for doc in approved %}
-                <tr class="hover:bg-emerald-50/20 transition-colors group" data-doc-id="{{doc.id}}">
 
-                    <td class="px-10 py-6 text-sm text-slate-500 whitespace-nowrap">
+                {% for doc in approved %}
+                <tr class="hover:bg-slate-50 transition-colors cursor-pointer group"
+                    data-doc-id="{{ doc.id }}"
+                    data-source="active"
+                    data-type="{{ doc.doc_type }}"
+                    data-year="{{ doc.updated_at|date:'Y' }}"
+                    data-search="{{ doc.title|lower }} {{ doc.reference_no|lower }} {{ doc.author.get_councilor_name|lower }}">
+
+                    <td class="px-6 py-4 text-xs text-slate-500 whitespace-nowrap">
                         {{ doc.updated_at|date:"M d, Y" }}
                     </td>
 
-                    <td class="px-10 py-6">
-                        <span class="text-xs font-black {% if doc.doc_type == 'ORDINANCE' %}text-emerald-700 bg-emerald-50 border-emerald-100{% else %}text-blue-700 bg-blue-50 border-blue-100{% endif %} px-4 py-1.5 rounded-xl border uppercase tracking-widest">
-                            {{ doc.reference_no }}
+                    <td class="px-6 py-4">
+                        <div class="flex items-center gap-2">
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border
+                                {% if doc.doc_type == 'ORDINANCE' %}bg-slate-50 text-slate-700 border-slate-200
+                                {% else %}bg-blue-50 text-blue-700 border-blue-100{% endif %}">
+                                {{ doc.reference_no|default:"—" }}
+                            </span>
+                        </div>
+                    </td>
+
+                    <td class="px-6 py-4">
+                        <p class="text-sm font-semibold text-slate-800 leading-snug line-clamp-2 group-hover:text-slate-900 transition-colors">{{ doc.title }}</p>
+                        <span class="inline-block mt-1 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full
+                            {% if doc.doc_type == 'ORDINANCE' %}bg-slate-100 text-slate-500
+                            {% else %}bg-blue-50 text-blue-500{% endif %}">
+                            {{ doc.get_doc_type_display }}
                         </span>
                     </td>
 
-                    <td class="px-10 py-6">
-                        <div class="max-w-md">
-                            <p class="text-sm font-extrabold text-slate-800 leading-snug group-hover:text-emerald-700 transition-colors line-clamp-3">
-                                {{ doc.title }}
-                            </p>
+                    <td class="px-6 py-4 whitespace-nowrap" data-author="{{ doc.author.get_councilor_name|lower }}">
+                        <div class="flex items-center gap-2">
+                            <div class="w-6 h-6 rounded-lg bg-slate-100 flex items-center justify-center text-[9px] font-black text-slate-500 shrink-0">
+                                {{ doc.author.get_councilor_name|first|upper }}
+                            </div>
+                            <span class="text-xs font-medium text-slate-600">{{ doc.author.get_councilor_name }}</span>
                         </div>
                     </td>
 
-                    <td class="px-10 py-6 text-sm font-medium text-slate-700 whitespace-nowrap"data-author="{{doc.author.get_councilor_name|lower}}">
-                        Hon. {{ doc.author.get_councilor_name }}
-                    </td>
-
-                    <td class="px-10 py-6 text-right">
-                        <div class="flex items-center justify-end gap-3">
-                            <a href="{%url 'document-history' doc.id%}" 
-                               class="w-10 h-10 flex items-center justify-center text-slate-300 hover:text-indigo-600 hover:bg-white hover:shadow-md border border-transparent hover:border-slate-100 rounded-xl transition-all">
-                                <i class="fas fa-history text-xs"></i>
+                    <td class="px-6 py-4 text-right">
+                        <div class="flex items-center justify-end gap-2">
+                            <a href="{% url 'document-history' doc.id %}" onclick="event.stopPropagation();"
+                               title="View History"
+                               class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all">
+                                <i data-lucide="history" style="width:13px;height:13px;"></i>
                             </a>
-
-                            <a href="{% url 'download_official_pdf' doc.id %}" 
-                                class="px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-700 hover:-translate-y-0.5 transition-all">
-                                <i class="fas fa-file-pdf mr-1.5"></i> Download Official
+                            <a href="{% url 'download_official_pdf' doc.id %}" onclick="event.stopPropagation();"
+                               title="Download PDF"
+                               class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all">
+                                <i data-lucide="download" style="width:13px;height:13px;"></i>
                             </a>
                         </div>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="5" class="p-20 text-center">
-                        <div class="inline-flex items-center justify-center w-20 h-20 bg-slate-50 rounded-3xl mb-6 border border-slate-100">
-                            <i class="fas fa-folder-open text-3xl text-slate-200"></i>
-                        </div>
-                        <p class="text-slate-400 font-bold uppercase tracking-widest text-xs">No approved documents found</p>
                     </td>
                 </tr>
                 {% endfor %}
+
+                {% for doc in legacy_docs %}
+                <tr class="hover:bg-amber-50/40 transition-colors cursor-pointer group"
+                    data-doc-id="{{ doc.id }}"
+                    data-source="legacy"
+                    data-type="legacy"
+                    data-year="{{ doc.year|default:'' }}"
+                    data-search="{{ doc.title|lower }} {{ doc.reference_no|lower }}">
+
+                    <td class="px-6 py-4 text-xs text-slate-500 whitespace-nowrap">
+                        {{ doc.uploaded_at|date:"M d, Y" }}
+                    </td>
+
+                    <td class="px-6 py-4">
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border bg-amber-50 text-amber-700 border-amber-200">
+                            {{ doc.reference_no|default:"—" }}
+                        </span>
+                    </td>
+
+                    <td class="px-6 py-4">
+                        <p class="text-sm font-semibold text-slate-800 leading-snug line-clamp-2 group-hover:text-slate-900 transition-colors">{{ doc.title }}</p>
+                        <span class="inline-block mt-1 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">
+                            Legacy · {{ doc.get_doc_type_display }}
+                        </span>
+                    </td>
+
+                    <td class="px-6 py-4 text-xs text-slate-300" data-author="">—</td>
+
+                    <td class="px-6 py-4 text-right">
+                        {% if doc.pdf_file %}
+                        <a href="/legacy/{{ doc.pk }}/pdf/" target="_blank" onclick="event.stopPropagation();"
+                           title="Download PDF"
+                           class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all ml-auto">
+                            <i data-lucide="download" style="width:13px;height:13px;"></i>
+                        </a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+
+                <!-- Empty state -->
+                <tr id="emptyState" class="hidden">
+                    <td colspan="5" class="py-20 text-center">
+                        <div class="inline-flex items-center justify-center w-14 h-14 bg-slate-50 rounded-2xl mb-4 border border-slate-100">
+                            <i data-lucide="search-x" style="width:24px;height:24px;color:#cbd5e1;"></i>
+                        </div>
+                        <p class="text-xs font-black text-slate-400 uppercase tracking-widest">No documents match your search</p>
+                    </td>
+                </tr>
+
+                {% if not approved and not legacy_docs %}
+                <tr>
+                    <td colspan="5" class="py-20 text-center">
+                        <div class="inline-flex items-center justify-center w-14 h-14 bg-slate-50 rounded-2xl mb-4 border border-slate-100">
+                            <i data-lucide="folder-open" style="width:24px;height:24px;color:#cbd5e1;"></i>
+                        </div>
+                        <p class="text-xs font-black text-slate-400 uppercase tracking-widest">No documents found</p>
+                    </td>
+                </tr>
+                {% endif %}
+
             </tbody>
         </table>
     </div>
 </div>
 
-<div id="docModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden z-50 flex items-start justify-center overflow-auto p-4">
-    <div class="bg-white rounded-[2rem] shadow-2xl max-w-5xl w-full p-6 relative">
-        <button id="closeDocModal" class="absolute top-4 right-4 text-slate-500 hover:text-slate-900 text-2xl font-bold">&times;</button>
-        <div id="docContent" class="w-full"></div>
+<!-- ── MODAL ───────────────────────────────────────────────────────────────── -->
+<div id="docModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-6">
+    <div class="bg-white rounded-[2rem] shadow-2xl relative" style="width:82vw;height:90vh;overflow:hidden;">
+        <button id="closeDocModal" class="absolute top-4 right-4 z-10 w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition-all font-bold text-lg">&times;</button>
+        <div id="docContent" style="width:100%;height:100%;overflow-y:auto;"></div>
     </div>
 </div>
+
+<style>
+    .type-tab { color: #94a3b8; }
+    .type-tab.active { background: #fff; color: #1e293b; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+</style>
+
 <script>
+let activeType = 'all';
 
-document.querySelectorAll('tr[data-doc-id]').forEach(row =>{
-    row.addEventListener('click', ()=>{
-        const docId = row.getAttribute('data-doc-id');
-        const modal = document.getElementById('docModal');
-        const contentDiv = document.getElementById('docContent');
-        modal.classList.remove('hidden');
-        contentDiv.innerHTML = 'Loading...';
-
-        fetch(`/modal/document/${docId}`)
-            .then(response => response.text())
-            .then(html => contentDiv.innerHTML = html)
-            .catch(err => contentDiv.innerHTML = "<p class='text-red-500 text-center mt-10'>Failed to load document.</p>");
-    });
-});
-document.getElementById('closeDocModal').addEventListener("click", ()=>{
-    document.getElementById('docModal').classList.add('hidden');
-});
-
+function setTypeFilter(type) {
+    activeType = type;
+    document.querySelectorAll('.type-tab').forEach(b => b.classList.remove('active'));
+    const tabMap = { all: 'tab-all', ORDINANCE: 'tab-ordinance', RESOLUTION: 'tab-resolution', legacy: 'tab-legacy' };
+    document.getElementById(tabMap[type])?.classList.add('active');
+    filterTable();
+}
 
 function filterTable() {
-    const searchValue = document.getElementById("searchInput").value.toLowerCase();
-    const yearValue = document.getElementById("yearInput").value;
-
-    const rows = document.querySelectorAll("#documentTable tr");
+    const search = document.getElementById('searchInput').value.toLowerCase().trim();
+    const year   = document.getElementById('yearInput').value;
+    const rows   = document.querySelectorAll('#documentTable tr[data-doc-id]');
+    let visible  = 0;
 
     rows.forEach(row => {
-        const date = row.children[0]?.innerText || "";
-        const title = row.children[2]?.innerText.toLowerCase() || "";
-        const author = row.children[3]?.dataset.author || "";
-
-        const year = date.slice(-4);
-
-        const matchText = title.includes(searchValue) || author.includes(searchValue);
-        const matchYear = yearValue === "" || year === yearValue;
-
-        row.style.display = (matchText && matchYear) ? "" : "none";
+        const matchType   = activeType === 'all' || row.dataset.type === activeType;
+        const matchSearch = !search || (row.dataset.search || '').includes(search);
+        const matchYear   = !year   || row.dataset.year === year;
+        const show = matchType && matchSearch && matchYear;
+        row.style.display = show ? '' : 'none';
+        if (show) visible++;
     });
+
+    const total = rows.length;
+    document.getElementById('resultCount').textContent = visible < total ? `${visible} of ${total}` : `${total} document${total !== 1 ? 's' : ''}`;
+    document.getElementById('emptyState').classList.toggle('hidden', visible > 0);
 }
 
 function resetSearch() {
-    document.getElementById("searchInput").value = "";
-    document.getElementById("yearInput").value = "";
-
-    const rows = document.querySelectorAll("#documentTable tr");
-    rows.forEach(row => row.style.display = "");
+    document.getElementById('searchInput').value = '';
+    document.getElementById('yearInput').value   = '';
+    setTypeFilter('all');
 }
 
-// Live search
-document.getElementById("searchInput").addEventListener("keyup", filterTable);
-document.getElementById("yearInput").addEventListener("keyup", filterTable);
+document.getElementById('searchInput').addEventListener('input', filterTable);
+document.getElementById('yearInput').addEventListener('change', filterTable);
+
+// Init count
+filterTable();
+
+// ── Modal ────────────────────────────────────────────────────────────────────
+function openDocModal(docId, source) {
+    const modal      = document.getElementById('docModal');
+    const contentDiv = document.getElementById('docContent');
+    modal.classList.remove('hidden');
+    contentDiv.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:200px;color:#94a3b8;font-size:13px;font-weight:600;">Loading…</div>';
+
+    const url = source === 'legacy' ? `/modal/legacy/${docId}/` : `/modal/document/${docId}`;
+    fetch(url)
+        .then(r => r.text())
+        .then(html => { contentDiv.innerHTML = html; if (window.lucide) lucide.createIcons(); })
+        .catch(() => contentDiv.innerHTML = "<p style='text-align:center;padding:40px;color:#94a3b8;'>Failed to load document.</p>");
+}
+
+document.querySelectorAll('tr[data-doc-id]').forEach(row => {
+    row.addEventListener('click', () => openDocModal(row.dataset.docId, row.dataset.source));
+});
+
+document.getElementById('closeDocModal').addEventListener('click', () => {
+    document.getElementById('docModal').classList.add('hidden');
+});
+
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') document.getElementById('docModal').classList.add('hidden');
+});
+
+// Auto-open from URL param
+const params = new URLSearchParams(window.location.search);
+if (params.get('open')) openDocModal(params.get('open'), params.get('source') || 'active');
 </script>
 
 {% endblock %}

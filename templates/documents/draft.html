@@ -9,54 +9,73 @@
     <!-- HEADER -->
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 border-b border-slate-100 pb-6 gap-4">
         <div class="flex items-center gap-4">
-            <a href="{% url 'dashboard' %}" class="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-all shadow-sm">
-                <i class="fas fa-arrow-left text-xs"></i>
+            <a href="{% url 'dashboard' %}" class="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-all shadow-sm">
+                <i data-lucide="arrow-left" style="width:14px;height:14px;vertical-align:middle;"></i>
             </a>
             <div>
                 <nav class="flex text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 gap-2 mb-1">
-                    <a href="{% url 'dashboard' %}" class="hover:text-indigo-600 transition-colors">Legislative</a>
+                    <a href="{% url 'dashboard' %}" class="hover:text-slate-600 transition-colors">Legislative</a>
                     <span class="text-slate-200">/</span>
-                    <span class="text-indigo-600">New Draft</span>
+                    <span class="text-slate-600">New Draft</span>
                 </nav>
-                <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Create New Draft</h1>
+                <h1 id= "CreateNewDraft" class="text-2xl font-extrabold text-slate-900 tracking-tight">Create New Draft</h1>
             </div>
         </div>
 
         <div class="flex items-center gap-3">
-            <span id="autosaveStatus" class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest hidden">
-                <i class="fas fa-check-circle mr-1"></i> Synced
+            <span id="autosaveStatus" class="text-[10px] font-bold text-slate-500 uppercase tracking-widest hidden">
+                <i data-lucide="check-circle-2" style="width:11px;height:11px;margin-right:4px;vertical-align:middle;"></i> Synced
             </span>
             <span id="autosaveSaving" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden">
-                <i class="fas fa-circle-notch fa-spin mr-1"></i> Saving...
+                <i data-lucide="loader-circle" style="width:11px;height:11px;margin-right:4px;vertical-align:middle;" class="animate-spin"></i> Saving...
             </span>
             <button form="draftForm" type="submit" name="action" value="save"
-                class="px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-50 hover:text-indigo-600 transition-all shadow-sm">
-                <i class="fas fa-save mr-2"></i> Save Draft
+                class="px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-50 hover:text-slate-600 transition-all shadow-sm">
+                <i data-lucide="save" style="width:13px;height:13px;margin-right:8px;vertical-align:middle;"></i> Save Draft
             </button>
             <button form="draftForm" type="submit" name="action" value="submit"
-                class="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all">
-                <i class="fas fa-paper-plane mr-2"></i> File Draft
+                class="px-6 py-3 bg-slate-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-slate-100 hover:bg-slate-700 hover:-translate-y-0.5 transition-all">
+                <i data-lucide="send" style="width:13px;height:13px;margin-right:8px;vertical-align:middle;"></i> File Draft
             </button>
         </div>
     </div>
 
+    <!-- RETURN REASON BANNER -->
+    {% if return_reason %}
+    <div class="mb-6 px-6 py-5 bg-red-50 border border-red-200 rounded-2xl">
+        <div class="flex items-start gap-3">
+            <div class="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center shrink-0 mt-0.5">
+                <i data-lucide="undo-2" style="width:16px;height:16px;color:#dc2626;"></i>
+            </div>
+            <div class="flex-1">
+                <p class="text-xs font-black text-red-800 uppercase tracking-widest mb-1">Document Returned</p>
+                <p class="text-sm text-red-700 font-medium leading-relaxed">{{ return_reason.reason }}</p>
+                <p class="text-[10px] text-red-400 font-bold mt-2">
+                    Returned by {{ return_reason.returned_by.get_full_name|default:return_reason.returned_by.username }}
+                    · {{ return_reason.created_at|timesince }} ago
+                </p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- GHOST RECOVERY BANNER -->
     {% if ghost %}
-    <div id="recoveryBanner" class="mb-6 flex items-center justify-between gap-4 px-6 py-4 bg-amber-50 border border-amber-200 rounded-2xl">
+    <div id="recoveryBanner" class="mb-6 flex items-center justify-between gap-4 px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl">
         <div class="flex items-center gap-3">
-            <i class="fas fa-clock-rotate-left text-amber-400"></i>
+            <i data-lucide="clock-4" style="width:16px;height:16px;color:#fbbf24;"></i>
             <div>
-                <p class="text-xs font-black text-amber-800 uppercase tracking-widest">Unsaved work recovered</p>
-                <p class="text-[11px] text-amber-600 font-medium mt-0.5">"{{ ghost.title }}" — last saved {{ ghost.updated_at|timesince }} ago</p>
+                <p class="text-xs font-black text-slate-800 uppercase tracking-widest">Unsaved work recovered</p>
+                <p class="text-[11px] text-slate-600 font-medium mt-0.5">"{{ ghost.title }}" — last saved {{ ghost.updated_at|timesince }} ago</p>
             </div>
         </div>
         <div class="flex items-center gap-3 shrink-0">
             <button type="button" onclick="discardGhost()"
-                class="text-[10px] font-black uppercase tracking-widest text-amber-500 hover:text-amber-700 transition-colors">
+                class="text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-slate-700 transition-colors">
                 Discard
             </button>
-            <span class="text-[10px] font-black uppercase tracking-widest text-emerald-600">
-                <i class="fas fa-check-circle mr-1"></i> Restored
+            <span class="text-[10px] font-black uppercase tracking-widest text-slate-600">
+                <i data-lucide="check-circle-2" style="width:11px;height:11px;margin-right:4px;vertical-align:middle;"></i> Restored
             </span>
         </div>
     </div>
@@ -69,7 +88,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
             <!-- LEFT: MAIN EDITOR -->
-            <div class="lg:col-span-8 space-y-6">
+            <div id= "drafttable" class="lg:col-span-8 space-y-6">
 
                 <!-- Title -->
                 <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8">
@@ -81,40 +100,32 @@
                         id="titleInput"
                         required
                         rows="2"
-                        class="title-textarea w-full px-4 py-3 border border-slate-200 rounded-xl font-extrabold text-slate-800 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 transition-all placeholder:font-normal placeholder:text-slate-300 resize-none overflow-hidden leading-snug"
+                        class="title-textarea w-full px-4 py-3 border border-slate-200 rounded-xl font-extrabold text-slate-800 outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-100 transition-all placeholder:font-normal placeholder:text-slate-300 resize-none overflow-hidden leading-snug"
                         placeholder="An Ordinance/Resolution providing for...">{{ ghost.title|default:'' }}</textarea>
                     <p class="text-[10px] text-slate-300 font-medium mt-2 text-right">
                         <span id="charCount">0</span> characters
                     </p>
                 </div>
-
+                <div id="tour-center-anchor" style="position: absolute; left: 50%; top: 50%; visibility: hidden;"></div>
                 <!-- Content Editor -->
                 <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
                     <div class="px-8 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
                         <div class="flex items-center gap-2.5">
-                            <div class="w-2 h-2 rounded-full bg-indigo-400"></div>
+                            <div class="w-2 h-2 rounded-full bg-slate-400"></div>
                             <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">Draft Content</span>
                         </div>
                         <div class="flex items-center gap-3">
                             <span class="text-[9px] font-bold text-slate-300 uppercase tracking-widest" id="wordCount">0 words</span>
                             <span id="ragStatusPill" style="display:none;"
-                                class="items-center gap-1.5 px-2.5 py-1 bg-violet-50 border border-violet-200 rounded-full">
-                                <span class="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse inline-block"></span>
-                                <span class="text-[9px] font-black uppercase tracking-widest text-violet-500">Similarities detected</span>
+                                class="items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-full">
+                                <span class="w-1.5 h-1.5 rounded-full bg-slate-400 animate-pulse inline-block"></span>
+                                <span class="text-[9px] font-black uppercase tracking-widest text-slate-500">Similarities detected</span>
                             </span>
                         </div>
                     </div>
 
-                    <div id="editorWrap" style="position:relative;">
-<div id="ragOverlay" style="
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 2;
-"></div>
-                        <div id="quillEditor" style="min-height:480px; position:relative; z-index:1;"></div>
+                    <div id="editorWrap">
+                        <div id="quillEditor" style="min-height:480px;"></div>
                     </div>
 
                     <textarea name="content" id="contentField" class="hidden">{{ ghost.content|default:'' }}</textarea>
@@ -124,29 +135,36 @@
                 <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8">
                     <div class="flex items-center justify-between mb-5">
                         <div class="flex items-center gap-3">
-                            <div class="w-9 h-9 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-center">
-                                <i class="fas fa-robot text-violet-500 text-sm"></i>
+                            <div class="w-9 h-9 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center">
+                                <i data-lucide="scale" style="width:16px;height:16px;color:#8b5cf6;"></i>
                             </div>
                             <div>
-                                <p class="text-xs font-black uppercase tracking-widest text-slate-700">AI Legal Basis Assistant</p>
-                                <p class="text-[10px] text-slate-400 font-medium">Finds relevant laws and ordinances for your draft</p>
+                                <p class="text-xs font-black uppercase tracking-widest text-slate-700">Legal Basis Assistant</p>
+                                <p class="text-[10px] text-slate-400 font-medium">Local precedents + national law authority for your draft</p>
                             </div>
                         </div>
                         <button type="button" id="aiCheckBtn"
-                            class="px-4 py-2.5 bg-violet-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-violet-700 hover:-translate-y-0.5 transition-all shadow-lg shadow-violet-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0">
-                            <i class="fas fa-search mr-2"></i> Find Legal Basis
+                            class="px-4 py-2.5 bg-slate-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-800 hover:-translate-y-0.5 transition-all shadow-lg shadow-slate-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0 flex items-center gap-2">
+                            <i data-lucide="search" style="width:13px;height:13px;"></i> Find Legal Basis
                         </button>
                     </div>
+
+                    <!-- Loading -->
                     <div id="aiLoading" class="hidden">
                         <div class="bg-slate-50 border border-slate-100 rounded-2xl p-5 flex items-center gap-4">
-                            <i class="fas fa-circle-notch fa-spin text-violet-400"></i>
-                            <p class="text-xs text-slate-400 font-medium italic">Searching legal database...</p>
+                            <svg style="width:16px;height:16px;color:#a78bfa;animation:spin 1s linear infinite;flex-shrink:0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                            <p class="text-xs text-slate-400 font-medium italic">Searching local database and consulting legal references…</p>
                         </div>
                     </div>
+
+                    <!-- Results -->
                     <div id="aiResults" class="hidden">
-                        <div class="bg-violet-50 border border-violet-100 rounded-2xl p-6">
-                            <p class="text-[9px] font-black uppercase tracking-widest text-violet-400 mb-3">AI Suggestion</p>
-                            <div id="aiContent" class="text-sm text-slate-700 leading-relaxed font-medium prose prose-sm max-w-none"></div>
+                        <div class="bg-slate-50 border border-slate-100 rounded-2xl p-6">
+                            <div class="flex items-center gap-2 mb-4">
+                                <i data-lucide="book-open" style="width:13px;height:13px;color:#6366f1;"></i>
+                                <p class="text-[10px] font-black uppercase tracking-widest text-slate-700">National Law Authority</p>
+                            </div>
+                            <div id="nationalLaws" class="text-[12.5px] text-slate-600 leading-relaxed space-y-1"></div>
                         </div>
                     </div>
                 </div>
@@ -157,7 +175,7 @@
 
                 <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8">
                     <h3 class="text-sm font-black uppercase tracking-widest text-slate-800 mb-6 flex items-center gap-2">
-                        <i class="fas fa-file-lines text-indigo-600"></i> Measure Details
+                        <i data-lucide="file-text" style="width:15px;height:15px;color:#4f46e5;"></i> Measure Details
                     </h3>
                     <div class="space-y-5">
                         <div>
@@ -165,18 +183,18 @@
                             <div class="grid grid-cols-2 gap-2">
                                 <label class="doc-type-label">
                                     <input type="radio" name="type" value="ORDINANCE" checked class="hidden">
-                                    <span class="type-pill"><i class="fas fa-scroll mr-1.5 text-[9px]"></i>Ordinance</span>
+                                    <span class="type-pill"><i data-lucide="scroll" style="width:9px;height:9px;margin-right:6px;vertical-align:middle;"></i>Ordinance</span>
                                 </label>
                                 <label class="doc-type-label">
                                     <input type="radio" name="type" value="RESOLUTION" class="hidden">
-                                    <span class="type-pill"><i class="fas fa-file-circle-check mr-1.5 text-[9px]"></i>Resolution</span>
+                                    <span class="type-pill"><i data-lucide="file-check-2" style="width:9px;height:9px;margin-right:6px;vertical-align:middle;"></i>Resolution</span>
                                 </label>
                             </div>
                         </div>
                         <div class="border-t border-slate-50 pt-5">
                             <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Primary Author</label>
                             <div class="flex items-center gap-3 px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl">
-                                <div class="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center text-white text-[10px] font-black shrink-0">
+                                <div class="w-7 h-7 rounded-full bg-slate-600 flex items-center justify-center text-white text-[10px] font-black shrink-0">
                                     {{ user.last_name|first }}
                                 </div>
                                 <span class="text-xs font-bold text-slate-600">
@@ -193,10 +211,10 @@
 
                 <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8">
                     <h3 class="text-sm font-black uppercase tracking-widest text-slate-800 mb-5 flex items-center gap-2">
-                        <i class="fas fa-users-rectangle text-indigo-600"></i> Referred Committee
+                        <i data-lucide="users" style="width:15px;height:15px;color:#4f46e5;"></i> Referred Committee
                     </h3>
                     <select name="referred_committee"
-                        class="w-full px-4 py-3 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 transition-all">
+                        class="w-full px-4 py-3 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-100 transition-all">
                         <option value="">— No Committee Yet —</option>
                         {% for committee in committees %}
                             <option value="{{ committee.id }}">{{ committee.name }}</option>
@@ -209,18 +227,18 @@
                     <p class="text-[9px] font-black uppercase tracking-widest text-slate-400">What happens next?</p>
                     <div class="flex items-start gap-3">
                         <div class="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
-                            <i class="fas fa-save text-[8px] text-slate-400"></i>
+                            <i data-lucide="save" style="width:9px;height:9px;color:#94a3b8;"></i>
                         </div>
                         <p class="text-[11px] text-slate-500 font-medium leading-snug">
                             <span class="font-black text-slate-700">Save Draft</span> — stays private, editable anytime. Autosaved every few seconds.
                         </p>
                     </div>
                     <div class="flex items-start gap-3">
-                        <div class="w-6 h-6 rounded-lg bg-indigo-100 border border-indigo-200 flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
-                            <i class="fas fa-paper-plane text-[8px] text-indigo-500"></i>
+                        <div class="w-6 h-6 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                            <i data-lucide="send" style="width:9px;height:9px;color:#6366f1;"></i>
                         </div>
                         <p class="text-[11px] text-slate-500 font-medium leading-snug">
-                            <span class="font-black text-slate-700">File Draft</span> — officially submitted, gets a reference number, enters First Reading. <span class="text-rose-400 font-black">Cannot be undone.</span>
+                            <span class="font-black text-slate-700">File Draft</span> — officially submitted, gets a reference number, enters First Reading. <span class="text-slate-400 font-black">Cannot be undone.</span>
                         </p>
                     </div>
                 </div>
@@ -239,10 +257,10 @@
     pointer-events: none;
     opacity: 0;
     transition: opacity 0.15s ease;
-" class="bg-white border border-violet-200 rounded-2xl shadow-2xl overflow-hidden">
-    <div class="px-5 py-3 bg-violet-50 border-b border-violet-100 flex items-center gap-2">
-        <span class="w-2 h-2 rounded-full bg-violet-400 animate-pulse"></span>
-        <p class="text-[9px] font-black uppercase tracking-widest text-violet-500">Similar Document Found</p>
+" class="bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden">
+    <div class="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-slate-400 animate-pulse"></span>
+        <p class="text-[9px] font-black uppercase tracking-widest text-slate-500">Similar Document Found</p>
     </div>
     <div id="ragPopoverBody" class="px-5 py-4 space-y-3 max-h-64 overflow-y-auto"></div>
     <div class="px-5 py-2.5 bg-slate-50 border-t border-slate-100">
@@ -460,16 +478,30 @@ document.getElementById('aiCheckBtn').addEventListener('click', async function (
         document.getElementById('aiResults').classList.remove('hidden');
 
         if (!res.ok || data.error) {
-            document.getElementById('aiContent').innerHTML = `<span class="text-rose-500 font-bold">${data.error || 'Unknown error.'}</span>`;
+            document.getElementById('nationalLaws').innerHTML =
+                `<p class="text-xs text-red-500 font-bold">${data.error || 'Unknown error.'}</p>`;
             return;
         }
-        document.getElementById('aiContent').innerHTML = data.result
-            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+
+        const lawsEl   = document.getElementById('nationalLaws');
+        const lawsText = (data.national_laws || '').trim();
+        if (lawsText) {
+            lawsEl.innerHTML = lawsText
+                .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .split('\n').filter(l => l.trim())
+                .map(line => /^\d+\./.test(line.trim())
+                    ? `<p style="padding:10px 12px;background:white;border-left:3px solid #6366f1;border-radius:0 8px 8px 0;margin:0;">${line.trim()}</p>`
+                    : `<p style="padding:2px 12px;color:#64748b;">${line.trim()}</p>`
+                ).join('');
+        } else {
+            lawsEl.innerHTML = '<p class="text-xs text-slate-400 italic">No national law suggestions available.</p>';
+        }
 
     } catch (err) {
         document.getElementById('aiLoading').classList.add('hidden');
         document.getElementById('aiResults').classList.remove('hidden');
-        document.getElementById('aiContent').innerHTML = `<span class="text-rose-500 font-bold">Could not reach AI assistant. Try again.</span>`;
+        document.getElementById('nationalLaws').innerHTML = `<p class="text-xs text-red-500 font-bold">Could not reach AI assistant. Try again.</p>`;
         console.error("ai_legal_basis error:", err);
     } finally {
         btn.disabled = false;
@@ -504,17 +536,17 @@ document.getElementById('aiCheckBtn').addEventListener('click', async function (
 //     One embedding pass, one DB query, one response.
 // ════════════════════════════════════════════════════════════════════════════
 
-const ragOverlay     = document.getElementById('ragOverlay');
 const ragPopover     = document.getElementById('ragPopover');
 const ragPopoverBody = document.getElementById('ragPopoverBody');
 const ragStatusPill  = document.getElementById('ragStatusPill');
-const editorWrap     = document.getElementById('editorWrap');
 
 let inlineTimer      = null;
+let hotTimer         = null;
 let hidePopoverTimer = null;
+let batchInFlight    = false;
 
 // ── State stores ─────────────────────────────────────────────────────────────
-const tileMap   = new Map();   // uuid → overlay tile DOM node
+const matchMap  = new Map();   // uuid → matches array
 const hashCache = new Map();   // uuid → last text hash sent to server
 const focusLost = new Set();   // uuids of paragraphs the cursor just left
 
@@ -550,38 +582,55 @@ function buildPopoverContent(matches) {
         const badge = m.source === 'legacy'
             ? `<span style="background:#fef3c7;color:#92400e;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;padding:2px 7px;border-radius:999px;">Legacy</span>`
             : `<span style="background:#e0e7ff;color:#3730a3;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;padding:2px 7px;border-radius:999px;">Active</span>`;
-        const card = document.createElement('div');
-        card.style.cssText = i < matches.length - 1 ? 'padding-bottom:10px;border-bottom:1px solid #f1f5f9;margin-bottom:2px;' : '';
+        const chunkBadge = m.chunk_type
+            ? `<span style="background:#f3e8ff;color:#6b21a8;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;padding:2px 7px;border-radius:999px;">${m.chunk_type}</span>`
+            : '';
+
+        const url = `/view/approved/?open=${m.doc_id}&source=${m.source}`;
+
+        const card = document.createElement('a');
+        card.href   = url;
+        card.target = '_blank';
+        card.rel    = 'noopener noreferrer';
+        card.style.cssText = `
+            display:block;
+            text-decoration:none;
+            border-radius:10px;
+            padding:8px;
+            margin:0 -8px;
+            transition:background 0.15s;
+            ${i < matches.length - 1 ? 'padding-bottom:10px;border-bottom:1px solid #f1f5f9;margin-bottom:2px;border-radius:0;' : ''}
+        `;
+        card.onmouseenter = () => card.style.background = '#f8fafc';
+        card.onmouseleave = () => card.style.background = '';
         card.innerHTML = `
             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px;">
                 ${badge}
+                ${chunkBadge}
                 <span style="font-size:9px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;">${m.reference_no || '—'}</span>
                 <span style="margin-left:auto;font-size:9px;font-weight:900;color:#7c3aed;">${pct}% match</span>
             </div>
             <p style="font-size:11px;font-weight:700;color:#1e293b;line-height:1.4;margin-bottom:3px;">${m.title}</p>
             <p style="font-size:10px;color:#94a3b8;font-weight:500;line-height:1.5;">${m.snippet.slice(0,180)}…</p>
+            <p style="font-size:9px;color:#c7d2fe;font-weight:600;margin-top:4px;">Click to open document ↗</p>
         `;
         ragPopoverBody.appendChild(card);
     });
 }
 
-function showPopover(tileEl, matches) {
+function showPopover(pNode, matches) {
     buildPopoverContent(matches);
     ragPopover.style.display = 'block';
     ragPopover.style.pointerEvents = 'auto';
-    const rect   = tileEl.getBoundingClientRect();
+    const rect   = pNode.getBoundingClientRect();
     const scrollY = window.scrollY || document.documentElement.scrollTop;
-    const popW   = 320;
-    let left = rect.left + rect.width / 2 - popW / 2;
-    left = Math.max(8, Math.min(left, window.innerWidth - popW - 8));
-    ragPopover.style.left  = `${left}px`;
+    const popW   = 340;
+    let left = rect.right + 12;
+    if (left + popW > window.innerWidth - 16) left = rect.left - popW - 12;
+    ragPopover.style.left  = `${Math.max(8, left)}px`;
     ragPopover.style.width = `${popW}px`;
     ragPopover.style.top   = `${rect.top + scrollY}px`;
-    requestAnimationFrame(() => {
-        const popH = ragPopover.offsetHeight;
-        ragPopover.style.top = `${rect.top + scrollY - popH - 6}px`;
-        ragPopover.style.opacity = '1';
-    });
+    requestAnimationFrame(() => ragPopover.style.opacity = '1');
 }
 
 function hidePopover() {
@@ -593,59 +642,69 @@ function hidePopover() {
 ragPopover.addEventListener('mouseenter', () => clearTimeout(hidePopoverTimer));
 ragPopover.addEventListener('mouseleave', () => { hidePopoverTimer = setTimeout(hidePopover, 100); });
 
-// ── Tile management (UUID-keyed) ──────────────────────────────────────────────
-function positionTile(tile, pNode) {
-    const wRect = editorWrap.getBoundingClientRect();
-    const pRect = pNode.getBoundingClientRect();
-    tile.style.top    = `${pRect.top  - wRect.top}px`;
-    tile.style.left   = `${pRect.left - wRect.left}px`;
-    tile.style.width  = `${pRect.width}px`;
-    tile.style.height = `${pRect.height}px`;
-}
+// ── Highlight management (CSS class on paragraph, no overlay) ────────────────
 
-function upsertTile(uuid, pNode, matches) {
-    let tile = tileMap.get(uuid);
-    if (!tile) {
-        tile = document.createElement('div');
-        tile.style.cssText = `
-            position: absolute;
-            border-radius: 3px;
-            pointer-events: auto;
-            cursor: help;
-            background: rgba(139,92,246,0.07);
-            border-bottom: 2px solid rgba(139,92,246,0.30);
-            transition: background 0.2s ease, border-color 0.2s ease;
-            box-sizing: border-box;
-        `;
-        tile.addEventListener('mouseenter', () => {
+function markParagraph(uuid, pNode, matches) {
+    matchMap.set(uuid, matches);
+    pNode.classList.add('rag-match');
+
+    // Attach hover events directly on the paragraph (only once)
+    if (!pNode._ragBound) {
+        pNode.addEventListener('mouseenter', function () {
             clearTimeout(hidePopoverTimer);
-            showPopover(tile, tileMap.get(uuid)?._matches || []);
-            tile.style.background   = 'rgba(139,92,246,0.14)';
-            tile.style.borderBottom = '2px solid rgba(139,92,246,0.55)';
+            const m = matchMap.get(this.getAttribute('data-para-id'));
+            if (m && m.length) showPopover(this, m);
         });
-        tile.addEventListener('mouseleave', () => {
-            hidePopoverTimer = setTimeout(hidePopover, 100);
-            tile.style.background   = 'rgba(139,92,246,0.07)';
-            tile.style.borderBottom = '2px solid rgba(139,92,246,0.30)';
+        pNode.addEventListener('mouseleave', function () {
+            hidePopoverTimer = setTimeout(hidePopover, 150);
         });
-        ragOverlay.appendChild(tile);
-        tileMap.set(uuid, tile);
+        pNode._ragBound = true;
     }
-    tile._matches = matches;   // store matches directly on the tile node
-    positionTile(tile, pNode);
 }
 
-function removeTile(uuid) {
-    const tile = tileMap.get(uuid);
-    if (tile) { tile.remove(); tileMap.delete(uuid); }
+function unmarkParagraph(uuid) {
+    matchMap.delete(uuid);
+    const node = quill.root.querySelector(`[data-para-id="${uuid}"]`);
+    if (node) node.classList.remove('rag-match');
 }
 
-function repositionAllTiles() {
+function refreshAllHighlights() {
     const blocks = Array.from(quill.root.querySelectorAll('p, li, h1, h2, h3, blockquote'));
+    const liveUUIDs = new Set();
+
     blocks.forEach(pNode => {
         const uuid = pNode.getAttribute('data-para-id');
-        if (uuid && tileMap.has(uuid)) positionTile(tileMap.get(uuid), pNode);
+        if (!uuid || !matchMap.has(uuid)) return;
+        liveUUIDs.add(uuid);
+
+        const text = (pNode.textContent || '').trim();
+
+        // Empty/short paragraph — highlight doesn't belong here (Enter split)
+        if (text.length < 20) {
+            unmarkParagraph(uuid);
+            hashCache.delete(uuid);
+            return;
+        }
+
+        // Content changed — invalidate until next check
+        const currentHash = hashText(text);
+        const cachedHash  = hashCache.get(uuid);
+        if (cachedHash && cachedHash !== currentHash) {
+            unmarkParagraph(uuid);
+            hashCache.delete(uuid);
+            return;
+        }
+
+        // Ensure the class is still applied
+        pNode.classList.add('rag-match');
     });
+
+    // Remove highlights for UUIDs no longer in the DOM
+    matchMap.forEach((_, uuid) => {
+        if (!liveUUIDs.has(uuid)) unmarkParagraph(uuid);
+    });
+
+    ragStatusPill.style.display = matchMap.size > 0 ? 'flex' : 'none';
 }
 
 // ── STEP 4 — FOCUS-LOSS TRIGGER ──────────────────────────────────────────────
@@ -681,72 +740,57 @@ quill.root.addEventListener('focusout', () => {
 // The backend returns [{id, matches}] — one result per paragraph sent.
 
 async function runBatchCheck(candidates) {
-    // Build the batch: only paragraphs that pass gate + hash check
+    if (batchInFlight) return;
+
     const batch = [];
     candidates.forEach(({ uuid, node }) => {
         const text = (node.textContent || '').trim();
-
-        if (text.length < 20) {
-            removeTile(uuid);
-            hashCache.delete(uuid);
-            return;
-        }
-
-        if (!isComplete(text, uuid)) return;   // gate: not ready yet
-
+        if (text.length < 20) { unmarkParagraph(uuid); hashCache.delete(uuid); return; }
+        if (!isComplete(text, uuid)) return;
         const h = hashText(text);
-        if (hashCache.get(uuid) === h) return;  // hash: unchanged, skip
-
+        if (hashCache.get(uuid) === h) return;
         batch.push({ id: uuid, text });
     });
 
     if (!batch.length) return;
 
+    batchInFlight = true;
     try {
         const res = await fetch("{% url 'ai_inline_check' %}", {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-            body: JSON.stringify({ paragraphs: batch })   // ← array, not single paragraph
+            body: JSON.stringify({ paragraphs: batch })
         });
         if (!res.ok) return;
 
         const data    = await res.json();
-        const results = data.results || [];   // [{id, matches}]
+        const results = data.results || [];
 
-        // Build a lookup map from the current DOM for fast node access
         const nodeByUUID = new Map();
         quill.root.querySelectorAll('[data-para-id]').forEach(n => {
             nodeByUUID.set(n.getAttribute('data-para-id'), n);
         });
 
-        let anyMatch = false;
-
         results.forEach(({ id, matches }) => {
-            const filteredMatches = (matches || []).filter(m => m.score >= 0.6);
+            const filtered = (matches || []).filter(m => m.score >= 0.78);
             const node = nodeByUUID.get(id);
 
-            // Update hash cache now that we have a real result
-            if (node) {
-                hashCache.set(id, hashText((node.textContent || '').trim()));
-            }
-
-            // Clear focus-lost flag — this paragraph has now been checked
+            if (node) hashCache.set(id, hashText((node.textContent || '').trim()));
             focusLost.delete(id);
 
-            if (filteredMatches.length > 0 && node) {
-                upsertTile(id, node, filteredMatches);
-                anyMatch = true;
+            if (filtered.length > 0 && node) {
+                markParagraph(id, node, filtered);
             } else {
-                removeTile(id);
+                unmarkParagraph(id);
             }
         });
 
-        // Update status pill based on whether any tiles are active
-        const totalMatches = tileMap.size > 0;
-        ragStatusPill.style.display = totalMatches ? 'flex' : 'none';
+        ragStatusPill.style.display = matchMap.size > 0 ? 'flex' : 'none';
 
     } catch (err) {
         console.debug('[rag-inline] batch error:', err);
+    } finally {
+        batchInFlight = false;
     }
 }
 
@@ -755,9 +799,9 @@ function scanAllParagraphs() {
     assignMissingUUIDs();
     const blocks = Array.from(quill.root.querySelectorAll('p, li, h1, h2, h3, blockquote'));
 
-    // Remove tiles for UUIDs no longer in the document
+    // Remove highlights for UUIDs no longer in the document
     const liveUUIDs = new Set(blocks.map(n => n.getAttribute('data-para-id')).filter(Boolean));
-    tileMap.forEach((_, uuid) => { if (!liveUUIDs.has(uuid)) removeTile(uuid); });
+    matchMap.forEach((_, uuid) => { if (!liveUUIDs.has(uuid)) unmarkParagraph(uuid); });
 
     const candidates = blocks
         .map(node => ({ uuid: node.getAttribute('data-para-id'), node }))
@@ -766,25 +810,45 @@ function scanAllParagraphs() {
     runBatchCheck(candidates);
 }
 
+// ── Get the paragraph node currently under the cursor ────────────────────────
+function getActiveParagraphNode() {
+    const sel = quill.getSelection();
+    if (!sel) return null;
+    const [leaf] = quill.getLeaf(sel.index);
+    if (!leaf) return null;
+    let node = leaf.domNode;
+    while (node && node.parentNode !== quill.root) node = node.parentNode;
+    return (node && node.getAttribute('data-para-id')) ? node : null;
+}
+
 // ── Wire up ───────────────────────────────────────────────────────────────────
 quill.on('text-change', function () {
     quill.root.querySelectorAll('p, li, h1, h2, h3, blockquote').forEach(node => {
         if (!node.getAttribute('data-para-id')) node.setAttribute('data-para-id', uuid4());
-    });    
-    requestAnimationFrame(repositionAllTiles);
+    });
+
+    // Refresh highlights inline (no positioning needed — CSS handles it)
+    refreshAllHighlights();
+
+    // Hot check: fire quickly on just the paragraph being typed in
+    clearTimeout(hotTimer);
+    hotTimer = setTimeout(() => {
+        const node = getActiveParagraphNode();
+        if (node) {
+            const uuid = node.getAttribute('data-para-id');
+            runBatchCheck([{ uuid, node }]);
+        }
+    }, 400);
+
+    // Full scan: sweeps all paragraphs in case anything was missed
     clearTimeout(inlineTimer);
-    inlineTimer = setTimeout(scanAllParagraphs, 1500);
+    inlineTimer = setTimeout(scanAllParagraphs, 800);
 });
 
-window.addEventListener('scroll',  repositionAllTiles, { passive: true });
-window.addEventListener('resize',  repositionAllTiles, { passive: true });
-
-// Always start clean — clear any stale state before initial scan
-tileMap.forEach((tile) => tile.remove());
-tileMap.clear();
+// Start clean
+matchMap.clear();
 hashCache.clear();
 focusLost.clear();
-document.getElementById('ragOverlay').innerHTML = '';
 
 // Assign fresh UUIDs to all paragraphs on load
 quill.root.querySelectorAll('p, li, h1, h2, h3, blockquote').forEach(node => {
@@ -838,5 +902,19 @@ if (existingContent) setTimeout(scanAllParagraphs, 1200);
     }
     .type-pill:hover { border-color: #c7d2fe; color: #6366f1; }
     .type-pill.active { background: #eef2ff; border-color: #6366f1; color: #4f46e5; }
+
+    /* RAG inline match highlight — applied directly on paragraphs */
+    .ql-editor .rag-match {
+        border-left: 3px solid rgba(139,92,246,0.5) !important;
+        background: rgba(139,92,246,0.04) !important;
+        padding-left: 12px !important;
+        transition: background 0.2s, border-color 0.2s;
+        cursor: help;
+        border-radius: 0 4px 4px 0;
+    }
+    .ql-editor .rag-match:hover {
+        background: rgba(139,92,246,0.08) !important;
+        border-left-color: rgba(139,92,246,0.8) !important;
+    }
 </style>
 {% endblock %}

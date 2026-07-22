@@ -402,9 +402,12 @@
     <!-- Official Header -->
     <header class="gov-header">
         <div class="gov-header-left">
-            <!-- Swap this div with an <img> tag for the actual San Juan City seal -->
             <div class="seal-wrap">
-                <i class="fas fa-landmark"></i>
+                {% if settings.system_logo %}
+                    <img src="{{ settings.system_logo.url }}" alt="Seal" style="width:38px;height:38px;object-fit:contain;border-radius:50%;">
+                {% else %}
+                    <i data-lucide="landmark" style="width:28px;height:28px;"></i>
+                {% endif %}
             </div>
             <div class="gov-titles">
                 <div class="gov-lgu">Sangguniang Panlungsod ng San Juan City</div>
@@ -414,7 +417,7 @@
             <div class="sys-name">Legislative Process &amp; Management<br>Information &amp; Tracking System</div>
         </div>
         <div class="official-badge">
-            <i class="fas fa-shield-halved"></i>
+            <i data-lucide="shield-half" style="width:18px;height:18px;vertical-align:middle;"></i>
             Official Portal
         </div>
     </header>
@@ -437,7 +440,7 @@
         <div class="login-card">
 
             <div class="card-header-bar">
-                <i class="fas fa-lock"></i>
+                <i data-lucide="lock" style="width:15px;height:15px;vertical-align:middle;"></i>
                 <span class="card-header-title">Authorized Personnel Access</span>
             </div>
 
@@ -448,7 +451,7 @@
 
                 <!-- Unauthorized access warning -->
                 <div class="warning-notice">
-                    <i class="fas fa-triangle-exclamation"></i>
+                    <i data-lucide="triangle-alert" style="width:16px;height:16px;vertical-align:middle;"></i>
                     <span>This system is for <strong>authorized government personnel only.</strong> Unauthorized access attempts are monitored and subject to legal action.</span>
                 </div>
 
@@ -458,7 +461,7 @@
                     <div class="field">
                         <label for="id_username">Username</label>
                         <div class="input-wrap">
-                            <i class="fas fa-user input-icon"></i>
+                            <i data-lucide="user" style="width:14px;height:14px;" class="input-icon"></i>
                             <input
                                 type="text"
                                 name="username"
@@ -473,7 +476,7 @@
                     <div class="field">
                         <label for="id_password">Password</label>
                         <div class="input-wrap">
-                            <i class="fas fa-lock input-icon"></i>
+                            <i data-lucide="lock" style="width:14px;height:14px;" class="input-icon"></i>
                             <input
                                 type="password"
                                 name="password"
@@ -482,20 +485,20 @@
                                 autocomplete="current-password"
                             >
                             <button type="button" class="pw-toggle" onclick="togglePw()" aria-label="Show/hide password">
-                                <i class="fas fa-eye" id="pw-eye"></i>
+                                <i data-lucide="eye" id="pw-eye" style="width:16px;height:16px;vertical-align:middle;"></i>
                             </button>
                         </div>
                     </div>
 
-                    {% if form.non_field_errors %}
+                    {% if error %}
                     <div class="error-banner">
-                        <i class="fas fa-circle-exclamation"></i>
-                        <span>{{ form.non_field_errors|striptags }}</span>
+                        <i data-lucide="circle-alert" style="width:14px;height:14px;vertical-align:middle;"></i>
+                        <span>{{ error }}</span>
                     </div>
                     {% endif %}
 
                     <button type="submit" class="btn-submit">
-                        <i class="fas fa-right-to-bracket"></i>
+                        <i data-lucide="log-in" style="width:15px;height:15px;margin-right:8px;vertical-align:middle;"></i>
                         Sign In to System
                     </button>
                 </form>
@@ -503,7 +506,7 @@
 
             <div class="card-footer-bar">
                 <a href="mailto:secretariat@sanjuan.gov.ph">
-                    <i class="fas fa-envelope" style="font-size:10px; margin-right:4px;"></i>
+                    <i data-lucide="mail" style="width:10px;height:10px;margin-right:4px;vertical-align:middle;"></i>
                     Contact Secretariat
                 </a>
                 <span class="help-text">For access issues only</span>
@@ -538,11 +541,12 @@
             var eye = document.getElementById('pw-eye');
             if (inp.type === 'password') {
                 inp.type = 'text';
-                eye.classList.replace('fa-eye', 'fa-eye-slash');
+                eye.setAttribute('data-lucide', 'eye-off');
             } else {
                 inp.type = 'password';
-                eye.classList.replace('fa-eye-slash', 'fa-eye');
+                eye.setAttribute('data-lucide', 'eye');
             }
+            lucide.createIcons();
         }
     </script>
 

@@ -8,17 +8,17 @@
     <div class="flex justify-between items-end pb-4 border-b border-slate-100">
         <div>
             <nav class="flex text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 gap-2 mb-3">
-                <a href="{% url 'dashboard' %}" class="hover:text-indigo-600 transition-colors">Legislative</a>
+                <a href="{% url 'dashboard' %}" class="hover:text-slate-600 transition-colors">Legislative</a>
                 <span>/</span>
-                <span class="text-indigo-600">Committee Stage</span>
+                <span class="text-slate-600">Committee Stage</span>
             </nav>
             <h1 class="text-4xl font-extrabold text-slate-900 tracking-tight">Committee Referral Registry</h1>
             <p class="text-slate-500 mt-1 font-medium italic">Manage hearings and draft official committee reports for active legislation.</p>
         </div>
 
         <div class="flex gap-3">
-            <button class="px-6 py-3 bg-white border border-slate-200 text-slate-400 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:text-indigo-600 transition-all flex items-center gap-2 shadow-sm">
-                <i class="fas fa-calendar-day"></i> Calendar View
+            <button onclick="openCalendarModal()" class="px-6 py-3 bg-white border border-slate-200 text-slate-400 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:text-slate-600 transition-all flex items-center gap-2 shadow-sm">
+                <i data-lucide="calendar-days" style="width:14px;height:14px;vertical-align:middle;"></i> Calendar View
             </button>
         </div>
     </div>
@@ -48,21 +48,21 @@
                             <button type="submit" 
                                 class="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all
                                 {% if doc.public_participation %}
-                                    bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100
+                                    bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-100
                                 {% else %}
-                                    bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-100
+                                    bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-100
                                 {% endif %}">
                                 
                                 {% if doc.public_participation %}
-                                    <i class="fas fa-lock mr-1.5"></i> Close PP
+                                    <i data-lucide="lock" style="width:12px;height:12px;margin-right:6px;vertical-align:middle;"></i> Close PP
                                 {% else %}
-                                    <i class="fas fa-lock-open mr-1.5"></i> Open PP
+                                    <i data-lucide="lock-open" style="width:12px;height:12px;margin-right:6px;vertical-align:middle;"></i> Open PP
                                 {% endif %}
                             </button>
                         </form>
                         {% else %}
                         <span class="px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest
-                            {% if doc.people_participation_open %}bg-emerald-50 text-emerald-500{% else %}bg-slate-100 text-slate-400{% endif %}">
+                            {% if doc.people_participation_open %}bg-slate-50 text-slate-500{% else %}bg-slate-100 text-slate-400{% endif %}">
                             {% if doc.people_participation_open %}Open{% else %}Closed{% endif %}
                         </span>
                         {% endif %}
@@ -77,7 +77,7 @@
 
                     <td class="px-8 py-7">
                         <div class="max-w-xs">
-                            <p class="text-sm font-extrabold text-slate-900 group-hover:text-indigo-600 transition-colors leading-relaxed line-clamp-3" title="{{doc.title}}">
+                            <p class="text-sm font-extrabold text-slate-900 group-hover:text-slate-600 transition-colors leading-relaxed line-clamp-3" title="{{doc.title}}">
                                 {{ doc.title }}
                             </p>
                             <span class="inline-block mt-1 text-[9px] font-black text-slate-400 uppercase tracking-widest">
@@ -95,14 +95,14 @@
                     <td class="px-8 py-7">
                         {% if doc.hearing_date %}
                         <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                                <i class="fas fa-calendar-check text-[10px]"></i>
+                            <div class="w-8 h-8 rounded-lg bg-slate-50 text-slate-600 flex items-center justify-center shrink-0">
+                                <i data-lucide="calendar-check" style="width:11px;height:11px;vertical-align:middle;"></i>
                             </div>
                             <div>
-                                <p class="text-sm font-black text-indigo-600">{{ doc.hearing_date|date:"M d, Y" }}</p>
+                                <p class="text-sm font-black text-slate-600">{{ doc.hearing_date|date:"M d, Y" }}</p>
                                 {% if user.role == 'SECRETARIAT' or user.role == 'STAFF' %}
                                 <button onclick="openRescheduleModal('{{ doc.id }}', '{{ doc.hearing_date|date:'Y-m-d' }}')"
-                                    class="text-[9px] font-bold text-slate-300 uppercase hover:text-indigo-600 transition-colors tracking-widest">
+                                    class="text-[9px] font-bold text-slate-300 uppercase hover:text-slate-600 transition-colors tracking-widest">
                                     Change Date
                                 </button>
                                 {% endif %}
@@ -114,10 +114,10 @@
                                 {% csrf_token %}
                                 <input type="hidden" name="doc_id" value="{{ doc.id }}">
                                 <input type="date" name="hearing_date" required
-                                    class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all">
+                                    class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:ring-4 focus:ring-slate-500/10 focus:border-slate-500 outline-none transition-all">
                                 <button type="submit"
-                                    class="p-2 bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-100 rounded-xl shadow-sm transition-all">
-                                    <i class="fas fa-check text-[10px]"></i>
+                                    class="p-2 bg-white border border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-100 rounded-xl shadow-sm transition-all">
+                                    <i data-lucide="check" style="width:11px;height:11px;vertical-align:middle;"></i>
                                 </button>
                             </form>
                             {% else %}
@@ -130,7 +130,7 @@
                     <td class="px-8 py-7">
                         {% if doc.referred_committee %}
                         <div class="inline-flex items-center gap-2.5 px-4 py-2 bg-slate-50 text-slate-600 rounded-xl border border-slate-100 shadow-sm">
-                            <i class="fas fa-users-rectangle text-[10px] opacity-40"></i>
+                            <i data-lucide="users" style="width:11px;height:11px;opacity:0.4;vertical-align:middle;"></i>
                             <span class="text-[10px] font-black uppercase tracking-widest">{{ doc.referred_committee.name }}</span>
                         </div>
                         {% else %}
@@ -149,21 +149,21 @@
                                 {% else %}
                                 <!-- Committee Report -->
                                 <a href="{% url 'report_workbench' doc.id %}"
-                                    class="px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all flex items-center gap-1.5">
-                                    <i class="fas fa-file-signature"></i>
+                                    class="px-4 py-2.5 bg-slate-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-slate-100 hover:bg-slate-700 hover:-translate-y-0.5 transition-all flex items-center gap-1.5">
+                                    <i data-lucide="file-pen-line" style="width:14px;height:14px;vertical-align:middle;"></i>
                                     {% if doc.committee_report %}Edit Report{% else %}Start Report{% endif %}
                                 </a>
                                 {% endif %}
                             {% endif %}
                                 <a href="{%url 'committee-amendments' doc.id%}" 
-                                   class="px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 hover:text-indigo-600 transition-all">
-                                    <i class="fas fa-pen-nib mr-1.5"></i> Insert Amendments
+                                   class="px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 hover:text-slate-600 transition-all">
+                                    <i data-lucide="feather" style="width:12px;height:12px;margin-right:6px;vertical-align:middle;"></i> Insert Amendments
                                 </a>
                             <!-- View document -->
                             <a href="{% url 'view-document' doc.id%}"
-                                class="w-10 h-10 flex items-center justify-center text-slate-300 hover:text-indigo-600 hover:bg-white hover:shadow-md border border-transparent hover:border-slate-100 rounded-xl transition-all"
+                                class="w-10 h-10 flex items-center justify-center text-slate-300 hover:text-slate-600 hover:bg-white hover:shadow-md border border-transparent hover:border-slate-100 rounded-xl transition-all"
                                 title="View Document">
-                                <i class="fas fa-eye text-xs"></i>
+                                <i data-lucide="eye" style="width:13px;height:13px;"></i>
                             </a>
                         </div>
                     </td>
@@ -172,7 +172,7 @@
                 <tr>
                     <td colspan="6" class="py-32 text-center bg-slate-50/20">
                         <div class="inline-flex items-center justify-center w-20 h-20 bg-white rounded-3xl shadow-sm mb-6 border border-slate-100">
-                            <i class="fas fa-folder-open text-3xl text-slate-200"></i>
+                            <i data-lucide="folder-open" style="width:40px;height:40px;color:#e2e8f0;"></i>
                         </div>
                         <p class="text-slate-400 font-bold uppercase tracking-widest text-xs">No active committee referrals found</p>
                     </td>
@@ -183,12 +183,57 @@
     </div>
 </div>
 
+<!-- CALENDAR MODAL -->
+<div id="calendarModal" class="fixed inset-0 z-50 hidden items-center justify-center p-3">
+    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="closeCalendarModal()"></div>
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-[1100px] modal-card overflow-hidden flex flex-col" style="max-height:92vh;">
+
+        <!-- Dark header bar -->
+        <div class="bg-slate-800 px-8 py-4 flex items-center justify-between shrink-0">
+            <div class="flex items-center gap-3">
+                <button onclick="calChangeMonth(-1)" class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 transition-all">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <h2 id="calMonthYear" class="text-white font-black text-lg tracking-widest uppercase min-w-[260px] text-center"></h2>
+                <button onclick="calChangeMonth(1)" class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 transition-all">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                </button>
+            </div>
+            <div class="flex items-center gap-4">
+                <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Hearing Calendar</span>
+                <button onclick="closeCalendarModal()" class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 transition-all">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Day-of-week header row -->
+        <div class="grid grid-cols-7 bg-slate-700 shrink-0">
+            <div class="text-center text-[10px] font-black uppercase tracking-wider text-slate-300 py-2.5 border-r border-slate-600">Sunday</div>
+            <div class="text-center text-[10px] font-black uppercase tracking-wider text-slate-300 py-2.5 border-r border-slate-600">Monday</div>
+            <div class="text-center text-[10px] font-black uppercase tracking-wider text-slate-300 py-2.5 border-r border-slate-600">Tuesday</div>
+            <div class="text-center text-[10px] font-black uppercase tracking-wider text-slate-300 py-2.5 border-r border-slate-600">Wednesday</div>
+            <div class="text-center text-[10px] font-black uppercase tracking-wider text-slate-300 py-2.5 border-r border-slate-600">Thursday</div>
+            <div class="text-center text-[10px] font-black uppercase tracking-wider text-slate-300 py-2.5 border-r border-slate-600">Friday</div>
+            <div class="text-center text-[10px] font-black uppercase tracking-wider text-slate-300 py-2.5">Saturday</div>
+        </div>
+
+        <!-- Calendar week rows (rendered by JS) -->
+        <div id="calGrid" class="flex-1 overflow-y-auto divide-y divide-slate-100 border-t border-slate-100"></div>
+
+        <!-- Legend bar -->
+        <div id="calLegend" class="shrink-0 px-6 py-2.5 border-t border-slate-100 flex items-center gap-4 flex-wrap bg-slate-50 min-h-[42px]">
+            <span class="text-[9px] font-black uppercase tracking-widest text-slate-400">Legend:</span>
+        </div>
+    </div>
+</div>
+
 <!-- RESCHEDULE MODAL -->
 <div id="rescheduleModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
     <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="closeRescheduleModal()"></div>
     <div class="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-sm p-8 modal-card">
-        <div class="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mb-5">
-            <i class="fas fa-calendar-day text-indigo-500"></i>
+        <div class="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center mb-5">
+            <i data-lucide="calendar-days" style="width:18px;height:18px;color:#6366f1;"></i>
         </div>
         <h2 class="text-base font-black text-slate-900 tracking-tight mb-1">Reschedule Hearing</h2>
         <p class="text-xs text-slate-400 font-medium mb-6">Set a new hearing date for this document.</p>
@@ -199,7 +244,7 @@
             <div class="mb-5">
                 <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">New Hearing Date</label>
                 <input type="date" name="hearing_date" id="rescheduleDate" required
-                    class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 transition-all">
+                    class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-100 transition-all">
             </div>
             <div class="flex gap-3">
                 <button type="button" onclick="closeRescheduleModal()"
@@ -207,7 +252,7 @@
                     Cancel
                 </button>
                 <button type="submit"
-                    class="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">
+                    class="flex-1 px-4 py-3 bg-slate-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-slate-100 hover:bg-slate-700 transition-all">
                     Confirm
                 </button>
             </div>
@@ -216,6 +261,7 @@
 </div>
 
 <script>
+    // --- Reschedule Modal ---
     function openRescheduleModal(docId, currentDate) {
         document.getElementById('rescheduleDocId').value = docId;
         document.getElementById('rescheduleDate').value = currentDate;
@@ -232,8 +278,139 @@
         document.body.style.overflow = '';
     }
 
+    // --- Calendar Modal ---
+    const _hearingData = [
+        {% for doc in committee_docs %}{% if doc.hearing_date %}
+        { date: "{{ doc.hearing_date|date:'Y-m-d' }}", title: "{{ doc.title|escapejs }}", type: "{{ doc.doc_type|escapejs }}", committee: "{{ doc.referred_committee.name|default:''|escapejs }}" },
+        {% endif %}{% endfor %}
+    ];
+
+    const _hearingMap = {};
+    _hearingData.forEach(h => {
+        if (!_hearingMap[h.date]) _hearingMap[h.date] = [];
+        _hearingMap[h.date].push(h);
+    });
+
+    const _CAL_COLORS = ['#6366f1','#0ea5e9','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#64748b'];
+    const _calColorMap = {};
+    let _calColorIdx = 0;
+    let _calYear, _calMonth;
+
+    function _calGetColor(key) {
+        const k = key || 'General';
+        if (!_calColorMap[k]) {
+            _calColorMap[k] = _CAL_COLORS[_calColorIdx % _CAL_COLORS.length];
+            _calColorIdx++;
+        }
+        return _calColorMap[k];
+    }
+
+    function _calPad(n) { return String(n).padStart(2, '0'); }
+
+    function openCalendarModal() {
+        const today = new Date();
+        _calYear = today.getFullYear();
+        _calMonth = today.getMonth();
+        // pre-build color map so legend is stable
+        _calColorIdx = 0;
+        Object.keys(_calColorMap).forEach(k => delete _calColorMap[k]);
+        _hearingData.forEach(h => _calGetColor(h.committee || h.type || 'General'));
+        _renderCalendar();
+        _renderCalLegend();
+        const modal = document.getElementById('calendarModal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeCalendarModal() {
+        const modal = document.getElementById('calendarModal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        document.body.style.overflow = '';
+    }
+
+    function calChangeMonth(dir) {
+        _calMonth += dir;
+        if (_calMonth < 0) { _calMonth = 11; _calYear--; }
+        if (_calMonth > 11) { _calMonth = 0; _calYear++; }
+        _renderCalendar();
+    }
+
+    function _renderCalLegend() {
+        const keys = Object.keys(_calColorMap);
+        const legend = document.getElementById('calLegend');
+        if (!keys.length) {
+            legend.innerHTML = '<span class="text-[9px] font-black uppercase tracking-widest text-slate-400">No hearings scheduled yet</span>';
+            return;
+        }
+        legend.innerHTML = '<span class="text-[9px] font-black uppercase tracking-widest text-slate-400 mr-1">Legend:</span>' +
+            keys.map(k => `<span class="flex items-center gap-1.5 text-[9px] font-bold text-slate-600 whitespace-nowrap">
+                <span class="w-2.5 h-2.5 rounded-sm inline-block shrink-0" style="background:${_calColorMap[k]}"></span>${k}
+            </span>`).join('');
+    }
+
+    function _renderCalendar() {
+        const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+        document.getElementById('calMonthYear').textContent = MONTHS[_calMonth] + ' ' + _calYear;
+
+        const grid = document.getElementById('calGrid');
+        grid.innerHTML = '';
+
+        const firstDay  = new Date(_calYear, _calMonth, 1).getDay();
+        const daysInMonth = new Date(_calYear, _calMonth + 1, 0).getDate();
+        const today    = new Date();
+        const todayStr = today.getFullYear() + '-' + _calPad(today.getMonth()+1) + '-' + _calPad(today.getDate());
+        const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
+
+        for (let w = 0; w < totalCells / 7; w++) {
+            const rowDiv = document.createElement('div');
+            rowDiv.className = 'grid grid-cols-7';
+
+            for (let d = 0; d < 7; d++) {
+                const idx    = w * 7 + d;
+                const dayNum = idx - firstDay + 1;
+                const cellDiv = document.createElement('div');
+                const borderR = d < 6 ? 'border-r border-slate-100' : '';
+                cellDiv.className = `min-h-[88px] p-2 ${borderR}`;
+
+                if (dayNum < 1 || dayNum > daysInMonth) {
+                    cellDiv.classList.add('bg-slate-50/40');
+                    rowDiv.appendChild(cellDiv);
+                    continue;
+                }
+
+                const dateStr = _calYear + '-' + _calPad(_calMonth + 1) + '-' + _calPad(dayNum);
+                const hearings = _hearingMap[dateStr] || [];
+                const isToday  = dateStr === todayStr;
+
+                const dayLabel = isToday
+                    ? `<span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-600 text-white text-[9px] font-black leading-none">${dayNum}</span>`
+                    : `<span class="text-[11px] font-bold text-slate-400">${dayNum}</span>`;
+
+                const pills = hearings.slice(0, 3).map(h => {
+                    const colorKey = h.committee || h.type || 'General';
+                    const bg = _calGetColor(colorKey);
+                    return `<div class="w-full text-[8.5px] font-bold text-white px-1.5 py-[3px] rounded-[4px] mb-[3px] truncate leading-tight cursor-default"
+                        style="background:${bg};" title="${h.title} • ${colorKey}">${h.title}</div>`;
+                }).join('');
+
+                const more = hearings.length > 3
+                    ? `<span class="text-[8px] font-bold text-slate-400">+${hearings.length - 3} more</span>` : '';
+
+                cellDiv.innerHTML = `<div class="mb-1">${dayLabel}</div>${pills}${more}`;
+                rowDiv.appendChild(cellDiv);
+            }
+
+            grid.appendChild(rowDiv);
+        }
+    }
+
     document.addEventListener('keydown', e => {
-        if (e.key === 'Escape') closeRescheduleModal();
+        if (e.key === 'Escape') {
+            closeRescheduleModal();
+            closeCalendarModal();
+        }
     });
 </script>
 

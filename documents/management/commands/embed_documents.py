@@ -1,118 +1,97 @@
-# documents/management/commands/embed_documents.py
 """
-LePMITS — Step 3: Embedding Management Command
-
 Usage:
     python manage.py embed_documents
-    python manage.py embed_documents --force        # re-embed already-embedded docs
-    python manage.py embed_documents --legacy-only  # skip Document, only LegacyDocument
-    python manage.py embed_documents --docs-only    # skip LegacyDocument, only Document
+    python manage.py embed_documents --force
+    python manage.py embed_documents --legacy-only
+    python manage.py embed_documents --docs-only
 """
 
 from django.core.management.base import BaseCommand
 
-from documents.models import Document, LegacyDocument
-from documents.rag.embedder import embed_document, embed_legacy_document
+from documents.models import Document, DocumentChunk, LegacyDocument
+from documents.rag.embedder import embed_document_chunks
 
 
 class Command(BaseCommand):
-    help = "Embed all APPROVED Documents and all LegacyDocuments into pgvector."
+    help = "Chunk and embed APPROVED Documents and LegacyDocuments into DocumentChunk."
 
     def add_arguments(self, parser):
-        parser.add_argument(
-            "--force",
-            action="store_true",
-            help="Re-embed documents that already have an embedding.",
-        )
-        parser.add_argument(
-            "--legacy-only",
-            action="store_true",
-            help="Only process LegacyDocument records (skip Document).",
-        )
-        parser.add_argument(
-            "--docs-only",
-            action="store_true",
-            help="Only process Document records (skip LegacyDocument).",
-        )
+        parser.add_argument("--force",       action="store_true", help="Re-embed already-chunked docs.")
+        parser.add_argument("--legacy-only", action="store_true", help="Only LegacyDocument records.")
+        parser.add_argument("--docs-only",   action="store_true", help="Only Document records.")
 
     def handle(self, *args, **options):
-        force = options["force"]
+        force       = options["force"]
         legacy_only = options["legacy_only"]
-        docs_only = options["docs_only"]
+        docs_only   = options["docs_only"]
 
         if not legacy_only:
-            self._embed_documents(force)
-
+            self._process(
+                qs=Document.objects.filter(status="APPROVED"),
+                source_type="document",
+                force=force,
+                label="Document",
+            )
         if not docs_only:
-            self._embed_legacy_documents(force)
+            self._process(
+                qs=LegacyDocument.objects.all(),
+                source_type="legacy_document",
+                force=force,
+                label="LegacyDocument",
+            )
 
         self.stdout.write(self.style.SUCCESS("embed_documents complete."))
 
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
-
-    def _embed_documents(self, force: bool) -> None:
-        qs = Document.objects.filter(status="APPROVED")
-
+    def _process(self, qs, source_type, force, label):
         if not force:
-            qs = qs.filter(embedding__isnull=True)
+            # Skip docs that already have chunks
+            already_chunked_ids = DocumentChunk.objects.filter(
+                **{"legacy_document__isnull": source_type == "document",
+                   "document__isnull":        source_type == "legacy_document"}
+            ).values_list(
+                "document_id" if source_type == "document" else "legacy_document_id",
+                flat=True
+            ).distinct()
+            qs = qs.exclude(pk__in=already_chunked_ids)
 
         total = qs.count()
-        self.stdout.write(
-            f"Documents — {total} APPROVED record(s) to embed "
-            f"({'including already-embedded' if force else 'skipping already-embedded'})."
-        )
-
-        ok = skipped = failed = 0
-
-        for doc in qs.iterator():
-            success = embed_document(doc)
-            if success:
-                ok += 1
-            else:
-                failed += 1
-
-            # Progress tick every 25 records so the terminal isn't silent
-            # during a large initial index run.
-            processed = ok + failed
-            if processed % 25 == 0:
-                self.stdout.write(f"  … {processed}/{total} processed.")
-
-        self._print_summary("Document", total, ok, failed)
-
-    def _embed_legacy_documents(self, force: bool) -> None:
-        qs = LegacyDocument.objects.all()
-
-        if not force:
-            qs = qs.filter(embedding__isnull=True)
-
-        total = qs.count()
-        self.stdout.write(
-            f"LegacyDocuments — {total} record(s) to embed "
-            f"({'including already-embedded' if force else 'skipping already-embedded'})."
-        )
-
+        self.stdout.write(f"{label} — {total} record(s) to process.")
         ok = failed = 0
 
-        for legacy_doc in qs.iterator():
-            success = embed_legacy_document(legacy_doc)
-            if success:
+        for doc in qs.iterator():
+            try:
+                chunk_records = embed_document_chunks(doc, source_type=source_type)
+
+                if not chunk_records:
+                    self.stdout.write(self.style.WARNING(f"  #{doc.pk} — no chunks, skipping."))
+                    failed += 1
+                    continue
+
+                # Delete stale chunks then bulk insert fresh ones
+                if source_type == "legacy_document":
+                    DocumentChunk.objects.filter(legacy_document=doc).delete()
+                    chunks = [DocumentChunk(legacy_document=doc, **_chunk_fields(cr)) for cr in chunk_records]
+                else:
+                    DocumentChunk.objects.filter(document=doc).delete()
+                    chunks = [DocumentChunk(document=doc, **_chunk_fields(cr)) for cr in chunk_records]
+
+                DocumentChunk.objects.bulk_create(chunks)
+                self.stdout.write(f"  #{doc.pk} — {len(chunk_records)} chunks saved.")
                 ok += 1
-            else:
+
+            except Exception as e:
+                self.stdout.write(self.style.ERROR(f"  #{doc.pk} failed: {e}"))
                 failed += 1
 
-            processed = ok + failed
-            if processed % 25 == 0:
-                self.stdout.write(f"  … {processed}/{total} processed.")
-
-        self._print_summary("LegacyDocument", total, ok, failed)
-
-    def _print_summary(self, label: str, total: int, ok: int, failed: int) -> None:
-        self.stdout.write(
-            self.style.SUCCESS(f"  {label}: {ok}/{total} embedded successfully.")
-        )
+        self.stdout.write(self.style.SUCCESS(f"  {label}: {ok}/{total} OK."))
         if failed:
-            self.stdout.write(
-                self.style.WARNING(f"  {label}: {failed} failed — check logs above.")
-            )
+            self.stdout.write(self.style.WARNING(f"  {label}: {failed} failed."))
+
+
+def _chunk_fields(cr: dict) -> dict:
+    return {
+        "chunk_type":  cr["chunk_type"],
+        "chunk_text":  cr["chunk_text"],
+        "embedding":   cr["embedding"],
+        "chunk_index": cr["chunk_index"],
+    }

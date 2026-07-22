@@ -7,8 +7,8 @@
     <title>LePMITS | San Juan City Citizen Portal</title>
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
     
     <style>
         :root {
@@ -268,77 +268,135 @@
 
     <div class="utility-bar">
         <div>
-            <i class="fas fa-wheelchair"></i> Accessibility 
+            <i data-lucide="accessibility" style="width:12px;height:12px;vertical-align:middle;"></i> Accessibility
             <span style="margin: 0 15px; opacity: 0.3">|</span>
-            <i class="fas fa-globe"></i> English
+            <i data-lucide="globe" style="width:12px;height:12px;vertical-align:middle;"></i> English
         </div>
         <div class="utility-links">
-            <a href="#">Track Status</a>
-            <a href="#">Contact Us</a>
-            <a href="/login" style="color: var(--accent-orange);">LePMITS Login <i class="fas fa-lock"></i></a>
+            <a href="{% url 'gazette_list' %}">Browse Ordinances</a>
+            <a href="mailto:secretariat@sanjuan.gov.ph">Contact Us</a>
+            <a href="{% url 'login' %}" style="color: var(--accent-orange);">
+                Staff Login <i data-lucide="lock" style="width:11px;height:11px;vertical-align:middle;"></i>
+            </a>
         </div>
     </div>
 
     <nav>
         <div class="nav-left">
-            <img src="{% static 'images/makabagongsanjuan.png' %}" alt="San Juan Seal" class="nav-logo">
+            <img src="{% static 'images/sanjuanlogo.png' %}" alt="Sangguniang Panlungsod Seal" class="nav-logo">
+            <img src="{% static 'images/SanJuanCityCouncilLogo_HD.png' %}" alt="San Juan City Seal" class="nav-logo">
             <div class="brand-text">
                 SAN JUAN CITY
-                <span>Makabago at Progresibo</span>
-        
+                <span>Sangguniang Panlungsod Office</span>
             </div>
         </div>
         <div class="nav-menu">
-            <a href="#">Government</a>
-            <a href="#">Legislative</a>
-            <a href="#">E-Services</a>
-            <a href="#">Transparency</a> 
+            <a href="{% url 'gazette_list' %}">Legislative</a>
+            <a href="{% url 'gazette_list' %}">Ordinances</a>
+            <a href="#stats">At a Glance</a>
+            <a href="{% url 'login' %}">Staff Portal</a>
         </div>
     </nav>
 
+    <!-- HERO -->
     <section class="hero">
         <div class="hero-content">
-            <h1>San Juan Legislative <br>& Permits Portal</h1>
-            <p>Empowering citizens with real-time access to legislative records, document tracking, and digital city services.</p>
-            
-            <div class="search-box">
-                <input type="text" placeholder="Search Ordinances, Resolutions, or Permits...">
-                <button><i class="fas fa-search"></i> Search</button>
-            </div>
+            <h1>San Juan City<br>Legislative Archive</h1>
+            <p>Access enacted ordinances and approved resolutions from the Sangguniang Panlungsod ng San Juan City.</p>
+
+            <form class="search-box" method="GET" action="{% url 'gazette_list' %}">
+                <input type="text" name="q" placeholder="Search ordinances, resolutions…" autocomplete="off">
+                <button type="submit">
+                    <i data-lucide="search" style="width:14px;height:14px;vertical-align:middle;margin-right:6px;"></i> Search
+                </button>
+            </form>
 
             <div class="btn-group">
-                <a href="#" class="cta-primary">Register Account</a>
-                <a href="#" class="cta-secondary">Learn How it Works</a>
+                <a href="{% url 'gazette_list' %}" class="cta-primary">Browse All Legislation</a>
+                <a href="#services" class="cta-secondary">Learn More ↓</a>
             </div>
         </div>
     </section>
 
-    <div class="services-grid">
-        <div class="service-card">
-            <i class="fas fa-gavel"></i>
-            <h3>Ordinance Tracking</h3>
-            <p>Browse and search through the latest city ordinances and local resolutions.</p>
+    <!-- STATS -->
+    <div id="stats" style="background:#001f42;padding:40px 5%;display:flex;justify-content:center;gap:60px;flex-wrap:wrap;">
+        <div style="text-align:center;color:white;">
+            <p style="font-size:42px;font-weight:900;line-height:1;">{{ total_docs }}</p>
+            <p style="font-size:11px;text-transform:uppercase;letter-spacing:3px;opacity:.6;margin-top:6px;">Total Documents</p>
         </div>
-        <div class="service-card">
-            <i class="fas fa-file-invoice"></i>
-            <h3>E-Permits</h3>
-            <p>Apply for and monitor the status of your barangay and city business permits.</p>
+        <div style="text-align:center;color:white;">
+            <p style="font-size:42px;font-weight:900;line-height:1;">{{ ordinance_count }}</p>
+            <p style="font-size:11px;text-transform:uppercase;letter-spacing:3px;opacity:.6;margin-top:6px;">Ordinances</p>
         </div>
-        <div class="service-card">
-            <i class="fas fa-users-viewfinder"></i>
-            <h3>Public Engagement</h3>
-            <p>View the city council's session agenda and find your elected officials.</p>
+        <div style="text-align:center;color:white;">
+            <p style="font-size:42px;font-weight:900;line-height:1;">{{ resolution_count }}</p>
+            <p style="font-size:11px;text-transform:uppercase;letter-spacing:3px;opacity:.6;margin-top:6px;">Resolutions</p>
         </div>
     </div>
 
-    <footer style="background: #00152e; color: white; padding: 60px 5%; text-align: center;">
-        <img src="{% static '/images/gavel.png' %}" style="height: 50px; margin-bottom: 20px;">
-        <p style="font-size: 14px; opacity: 0.6;">&copy; 2023 City Government of San Juan - LePMITS System. All Rights Reserved.</p>
+    <!-- SERVICES -->
+    <div id="services" class="services-grid">
+        <a href="{% url 'gazette_list' %}" class="service-card" style="text-decoration:none;color:inherit;">
+            <i data-lucide="gavel" style="width:28px;height:28px;"></i>
+            <h3>Ordinance Tracking</h3>
+            <p>Browse and search through the city's enacted ordinances and approved resolutions.</p>
+        </a>
+        <a href="{% url 'gazette_list' %}" class="service-card" style="text-decoration:none;color:inherit;">
+            <i data-lucide="scroll-text" style="width:28px;height:28px;"></i>
+            <h3>Legislative Records</h3>
+            <p>Access the complete legislative archive including legacy documents from previous councils.</p>
+        </a>
+        <a href="{% url 'gazette_list' %}" class="service-card" style="text-decoration:none;color:inherit;">
+            <i data-lucide="message-square" style="width:28px;height:28px;"></i>
+            <h3>Public Participation</h3>
+            <p>Share your thoughts on proposed ordinances open for public consultation.</p>
+        </a>
+    </div>
+
+    <!-- RECENT LEGISLATION -->
+    {% if recent_docs %}
+    <div style="padding:60px 5%;background:white;">
+        <h2 style="font-size:28px;font-weight:900;color:#002b5c;margin-bottom:6px;">Recent Legislation</h2>
+        <p style="color:#64748b;font-size:14px;margin-bottom:30px;">Latest enacted ordinances and resolutions from the Sangguniang Panlungsod.</p>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+            {% for doc in recent_docs %}
+            <a href="{% url 'gazette_list' %}"
+               style="display:flex;align-items:center;gap:16px;padding:16px 20px;border:1px solid #f1f5f9;border-radius:14px;text-decoration:none;color:inherit;transition:.2s;"
+               onmouseenter="this.style.borderColor='#b31d1d';this.style.background='#fef9f9'"
+               onmouseleave="this.style.borderColor='#f1f5f9';this.style.background='white'">
+                <div style="width:42px;height:42px;border-radius:10px;background:#f8fafc;border:1px solid #e2e8f0;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i data-lucide="file-text" style="width:16px;height:16px;color:#64748b;"></i>
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <p style="font-size:13px;font-weight:700;color:#1e293b;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ doc.title }}</p>
+                    <p style="font-size:11px;color:#94a3b8;margin-top:2px;">
+                        {{ doc.reference_no|default:"Legacy" }} &nbsp;·&nbsp;
+                        {% if doc.updated_at %}{{ doc.updated_at|date:"M d, Y" }}{% else %}{{ doc.uploaded_at|date:"M d, Y" }}{% endif %}
+                    </p>
+                </div>
+                <i data-lucide="chevron-right" style="width:14px;height:14px;color:#cbd5e1;flex-shrink:0;"></i>
+            </a>
+            {% endfor %}
+        </div>
+        <div style="text-align:center;margin-top:30px;">
+            <a href="{% url 'gazette_list' %}"
+               style="display:inline-block;padding:12px 32px;background:#002b5c;color:white;border-radius:10px;font-weight:700;font-size:13px;text-decoration:none;text-transform:uppercase;letter-spacing:1px;">
+                View All Legislation →
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    <footer style="background:#00152e;color:white;padding:50px 5%;text-align:center;">
+        <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:20px;">
+            <img src="{% static 'images/sanjuanlogo.png' %}" style="height:48px;opacity:.9;">
+            <img src="{% static 'images/SanJuanCityCouncilLogo_HD.png' %}" style="height:48px;opacity:.9;">
+        </div>
+        <p style="font-weight:800;font-size:15px;margin-bottom:4px;">Sangguniang Panlungsod ng San Juan City</p>
+        <p style="font-size:12px;opacity:.5;margin-bottom:16px;">Metro Manila · National Capital Region</p>
+        <p style="font-size:11px;opacity:.4;">&copy; {% now "Y" %} City Government of San Juan. All Rights Reserved. · LePMITS</p>
     </footer>
 
-    <div class="chat-toggle">
-        <i class="fas fa-comment-dots"></i>
-    </div>
-
+    <script>lucide.createIcons();</script>
 </body>
 </html>

@@ -9,14 +9,14 @@
     <!-- HEADER -->
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 border-b border-slate-100 pb-6 gap-4">
         <div class="flex items-center gap-4">
-            <a href="javascript:history.back()" class="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-all shadow-sm">
-                <i class="fas fa-arrow-left text-xs"></i>
+            <a href="javascript:history.back()" class="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-all shadow-sm">
+                <i data-lucide="arrow-left" style="width:14px;height:14px;vertical-align:middle;"></i>
             </a>
             <div>
                 <nav class="flex text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 gap-2 mb-1">
-                    <a href="{% url 'dashboard' %}" class="hover:text-indigo-600 transition-colors">Legislative</a>
+                    <a href="{% url 'dashboard' %}" class="hover:text-slate-600 transition-colors">Legislative</a>
                     <span class="text-slate-200">/</span>
-                    <span class="text-indigo-600">
+                    <span class="text-slate-600">
                         {% if draft.status == 'DRAFT' %}Edit Draft{% else %}View Document{% endif %}
                     </span>
                 </nav>
@@ -27,11 +27,11 @@
                     <!-- Status badge -->
                     <span class="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest
                         {% if draft.status == 'DRAFT' %}bg-slate-100 text-slate-500
-                        {% elif draft.status == 'FILED' %}bg-blue-50 text-blue-600
-                        {% elif draft.status == 'FIRST_READING' %}bg-amber-50 text-amber-600
-                        {% elif draft.status == 'SECOND_READING' %}bg-orange-50 text-orange-600
-                        {% elif draft.status == 'THIRD_READING' %}bg-violet-50 text-violet-600
-                        {% elif draft.status == 'APPROVED' %}bg-emerald-50 text-emerald-600
+                        {% elif draft.status == 'FILED' %}bg-slate-50 text-slate-600
+                        {% elif draft.status == 'FIRST_READING' %}bg-slate-50 text-slate-600
+                        {% elif draft.status == 'SECOND_READING' %}bg-slate-50 text-slate-600
+                        {% elif draft.status == 'THIRD_READING' %}bg-slate-50 text-slate-600
+                        {% elif draft.status == 'APPROVED' %}bg-slate-50 text-slate-600
                         {% else %}bg-slate-100 text-slate-500{% endif %}">
                         {{ draft.get_status_display }}
                     </span>
@@ -42,29 +42,29 @@
         <div class="flex items-center gap-3">
             {% if draft.status == 'DRAFT' %}
                 <!-- DRAFT MODE — edit actions -->
-                <span id="autosaveStatus" class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest hidden">
-                    <i class="fas fa-check-circle mr-1"></i> Synced
+                <span id="autosaveStatus" class="text-[10px] font-bold text-slate-500 uppercase tracking-widest hidden">
+                    <i data-lucide="check-circle-2" style="width:11px;height:11px;margin-right:4px;vertical-align:middle;"></i> Synced
                 </span>
                 <span id="autosaveSaving" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden">
-                    <i class="fas fa-circle-notch fa-spin mr-1"></i> Saving...
+                    <i data-lucide="loader-circle" style="width:11px;height:11px;margin-right:4px;vertical-align:middle;" class="animate-spin"></i> Saving...
                 </span>
                 <button form="draftEditForm" type="submit" name="action" value="save"
                     class="px-5 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm">
-                    <i class="fas fa-save mr-2"></i> Save Draft
+                    <i data-lucide="save" style="width:13px;height:13px;margin-right:8px;vertical-align:middle;"></i> Save Draft
                 </button>
                 <button form="draftEditForm" type="submit" name="action" value="submit"
-                    class="px-5 py-3 bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all">
-                    <i class="fas fa-paper-plane mr-2"></i> File Draft
+                    class="px-5 py-3 bg-slate-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-slate-100 hover:bg-slate-700 hover:-translate-y-0.5 transition-all">
+                    <i data-lucide="send" style="width:13px;height:13px;margin-right:8px;vertical-align:middle;"></i> File Draft
                 </button>
             {% else %}
                 <!-- FILED / VIEW MODE — read actions only -->
                 <button onclick="window.print()"
                     class="px-5 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm">
-                    <i class="fas fa-print mr-2"></i> Print
+                    <i data-lucide="printer" style="width:13px;height:13px;margin-right:8px;vertical-align:middle;"></i> Print
                 </button>
                 <a href="{% url 'generate_pdf' draft.id %}"
                     class="px-5 py-3 bg-slate-900 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-700 transition-all">
-                    <i class="fas fa-file-pdf mr-2"></i> Export PDF
+                    <i data-lucide="file-down" style="width:13px;height:13px;margin-right:8px;vertical-align:middle;"></i> Export PDF
                 </a>
             {% endif %}
         </div>
@@ -72,9 +72,9 @@
 
     <!-- READ-ONLY NOTICE BANNER -->
     {% if draft.status != 'DRAFT' %}
-    <div class="mb-6 flex items-center gap-3 px-5 py-4 bg-amber-50 border border-amber-100 rounded-2xl">
-        <i class="fas fa-lock text-amber-400 text-sm"></i>
-        <p class="text-xs font-bold text-amber-700">
+    <div class="mb-6 flex items-center gap-3 px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl">
+        <i data-lucide="lock" style="width:15px;height:15px;color:#fbbf24;"></i>
+        <p class="text-xs font-bold text-slate-700">
             This document has been officially filed and is now <span class="uppercase">read-only</span>. 
             It can no longer be edited.
         </p>
@@ -98,14 +98,14 @@
                 <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8 mb-6">
                     <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">Legislative Title</label>
                     <textarea name="title" id="titleInput" required rows="3"
-                        class="w-full px-4 py-4 border border-slate-200 rounded-xl text-lg font-extrabold text-slate-800 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 transition-all resize-none placeholder:font-normal placeholder:text-slate-300 leading-snug"
+                        class="w-full px-4 py-4 border border-slate-200 rounded-xl text-lg font-extrabold text-slate-800 outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-100 transition-all resize-none placeholder:font-normal placeholder:text-slate-300 leading-snug"
                         placeholder="An Ordinance/Resolution providing for...">{{ draft.title }}</textarea>
                 </div>
 
                 <!-- Content editor -->
                 <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden mb-6">
                     <div class="px-8 py-5 border-b border-slate-100 flex items-center gap-2.5 bg-slate-50/60">
-                        <div class="w-2 h-2 rounded-full bg-indigo-400"></div>
+                        <div class="w-2 h-2 rounded-full bg-slate-400"></div>
                         <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">Draft Content</span>
                     </div>
                     <div id="quillEditor"></div>
@@ -195,7 +195,7 @@
             <!-- Measure details -->
             <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8">
                 <h3 class="text-sm font-black uppercase tracking-widest text-slate-800 mb-6 flex items-center gap-2">
-                    <i class="fas fa-file-lines text-indigo-600"></i> Measure Details
+                    <i data-lucide="file-text" style="width:15px;height:15px;color:#4f46e5;"></i> Measure Details
                 </h3>
                 <div class="space-y-4 text-[11px]">
                     <div class="flex justify-between items-center pb-3 border-b border-slate-50">
@@ -242,24 +242,24 @@
             <!-- Committee -->
             <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8">
                 <h3 class="text-sm font-black uppercase tracking-widest text-slate-800 mb-5 flex items-center gap-2">
-                    <i class="fas fa-users-rectangle text-indigo-600"></i> Committee
+                    <i data-lucide="users" style="width:15px;height:15px;color:#4f46e5;"></i> Committee
                 </h3>
                 {% if draft.status == 'DRAFT' %}
                 <select name="referred_committee" form="draftEditForm"
-                    class="w-full px-4 py-3 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 transition-all">
+                    class="w-full px-4 py-3 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-100 transition-all">
                     <option value="">— No Committee Yet —</option>
                     {% for committee in committees %}
                         <option value="{{ committee.id }}"
                             {% if draft.referred_committee_id == committee.id %}selected{% endif %}>
-                            Committee on {{ committee.name }}
+                            {{ committee.name }}
                         </option>
                     {% endfor %}
                 </select>
                 {% else %}
                 <div class="px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-600">
                     {% if draft.referred_committee %}
-                        <i class="fas fa-users-rectangle mr-2 text-slate-300"></i>
-                        Committee on {{ draft.referred_committee.name }}
+                        <i data-lucide="users" style="width:13px;height:13px;margin-right:8px;color:#cbd5e1;vertical-align:middle;"></i>
+                        {{ draft.referred_committee.name }}
                     {% else %}
                         <span class="text-slate-400 italic font-normal">Not yet referred</span>
                     {% endif %}
@@ -270,7 +270,7 @@
             <!-- Legislative path -->
             <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8">
                 <h3 class="text-sm font-black uppercase tracking-widest text-slate-800 mb-6 flex items-center gap-2">
-                    <i class="fas fa-route text-indigo-600"></i> Legislative Path
+                    <i data-lucide="route" style="width:15px;height:15px;color:#4f46e5;"></i> Legislative Path
                 </h3>
                 {% with statuses="DRAFT,FILED,FIRST_READING,REFERRED,COMMITTEE,SECOND_READING,THIRD_READING,APPROVED" %}
                 
@@ -279,18 +279,18 @@
                     {% if s.0 != 'GHOST' %}
                     <div class="flex items-center gap-4 relative">
                         <div class="w-5 h-5 rounded-full border-4 border-white shadow-sm shrink-0 z-10
-                            {% if draft.status == s.0 %}bg-indigo-500
-                            {% elif draft.status > s.0 %}bg-emerald-400
+                            {% if draft.status == s.0 %}bg-slate-500
+                            {% elif draft.status > s.0 %}bg-slate-400
                             {% else %}bg-slate-200{% endif %}">
                         </div>
                         <p class="text-[10px] font-black uppercase tracking-widest
-                            {% if draft.status == s.0 %}text-indigo-600
-                            {% elif draft.status > s.0 %}text-emerald-500
+                            {% if draft.status == s.0 %}text-slate-600
+                            {% elif draft.status > s.0 %}text-slate-500
                             {% else %}text-slate-300{% endif %}">
                             {{ s.1 }}
                         </p>
                         {% if draft.status == s.0 %}
-                        <span class="ml-auto text-[8px] font-black uppercase tracking-widest text-indigo-400 bg-indigo-50 px-2 py-0.5 rounded-full">Now</span>
+                        <span class="ml-auto text-[8px] font-black uppercase tracking-widest text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full">Now</span>
                         {% endif %}
                     </div>
                     {% endif %}
@@ -307,13 +307,13 @@
                 <div class="space-y-3">
                     <div class="flex items-start gap-3">
                         <div class="w-5 h-5 rounded-full bg-white border border-slate-200 flex items-center justify-center shrink-0 mt-0.5">
-                            <i class="fas fa-save text-[8px] text-slate-400"></i>
+                            <i data-lucide="save" style="width:9px;height:9px;color:#94a3b8;"></i>
                         </div>
                         <p class="text-[11px] text-slate-500 font-medium leading-snug"><span class="font-black text-slate-700">Save Draft</span> — stays private, editable anytime.</p>
                     </div>
                     <div class="flex items-start gap-3">
-                        <div class="w-5 h-5 rounded-full bg-indigo-100 border border-indigo-200 flex items-center justify-center shrink-0 mt-0.5">
-                            <i class="fas fa-paper-plane text-[8px] text-indigo-500"></i>
+                        <div class="w-5 h-5 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 mt-0.5">
+                            <i data-lucide="send" style="width:9px;height:9px;color:#6366f1;"></i>
                         </div>
                         <p class="text-[11px] text-slate-500 font-medium leading-snug"><span class="font-black text-slate-700">File Draft</span> — officially submitted, gets a reference number, locked for editing.</p>
                     </div>

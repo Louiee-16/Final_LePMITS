@@ -17,14 +17,14 @@ Including another URLconf
 from django.contrib import admin
 from django.conf import settings
 from django.urls import path, include
-from accounts.views import CustomLoginView, dashboard_redirect
+from accounts.views import login_view, dashboard_redirect
 from django.contrib.auth import views as auth_views
 from django.conf.urls.static import static
 from accounts import views
 urlpatterns = [
     path('', views.index, name='index'),
     path('admin/', admin.site.urls),
-    path('login/', CustomLoginView.as_view(), name='login'),
+    path('login/', login_view, name='login'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
     path('dashboard/', dashboard_redirect, name='dashboard'),
     path('',include('accounts.urls')),
