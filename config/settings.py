@@ -11,6 +11,13 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,12 +27,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-vi%(^q-15z)q5f76c)7r2(of%-nw08t(fnfrcavdi4w-vid74e'
+SECRET_KEY = os.getenv('SECRET_KEY')
+
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DEBUG', 'FALSE') == 'TRUE'
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS','localhost').split(',')
+
+
+
 
 
 # Application definition
@@ -119,11 +130,11 @@ WSGI_APPLICATION = 'config.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'Final_LePMITS',
-        'USER': 'postgres',
-        'PASSWORD': '09469729948',
-        'HOST': 'localhost',
-        'PORT': '5432',
+        'NAME': os.getenv('DB_NAME'),
+        'USER': os.getenv('DB_USER'),
+        'PASSWORD': os.getenv('DB_PASSWORD'),
+        'HOST': os.getenv('DB_HOST'),
+        'PORT': os.getenv('DB_PORT'),
             }
     }
 
@@ -172,9 +183,9 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'louielouiee16@gmail.com'
-EMAIL_HOST_PASSWORD = 'ytjo acqf mmay facv'
-DEFAULT_FROM_EMAIL = 'Secretariat System <louielouiee16@gmail.com>'
+EMAIL_HOST_USER =os.getenv('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
+DEFAULT_FROM_EMAIL = 'Secretariat System <{EMAIL_HOST_USER}>'
 
 CKEDITOR_CONFIGS = {
     'default': {
@@ -191,11 +202,11 @@ CKEDITOR_CONFIGS = {
 }
 
 # FOR OLLAMA
-OLLAMA_ENDPOINT = "http://100.118.208.125:11434/api/generate"
-OLLAMA_MODEL = "gemma4:e4b"
-OLLAMA_VISION_MODEL = "qwen3.5:9b"  
-OLLAMA_OCR_MODEL = "gemma4:e4b"
-OLLAMA_EMBED_MODEL = "qwen3-embedding"
+OLLAMA_ENDPOINT = os.getenv('OLLAMA_ENDPOINT')
+OLLAMA_MODEL = os.getenv('OLLAMA_MODEL')
+OLLAMA_VISION_MODEL = os.getenv('OLLAMA_VISION_MODEL')  
+OLLAMA_OCR_MODEL = os.getenv('OLLAMA_OCR_MODEL')
+OLLAMA_EMBED_MODEL = os.getenv('OLLAMA_EMBED_MODEL')
  # must support images; used for PDF page OCR
 OLLAMA_OPTIONS = {
     "temperature": 0.3,
@@ -206,19 +217,18 @@ OLLAMA_OPTIONS = {
 
 
 
-LLM_BACKEND = "ollama"          # used for general LLM calls
-LEGAL_BASIS_BACKEND = "ollama"  # used specifically for AI Legal Basis feature
-ANTHROPIC_API_KEY = "sk-ant-…"  # only needed for "claude"
-CLAUDE_MODEL = "claude-opus-4-5"        # optional override
+LLM_BACKEND = os.getenv('LLM_BACKEND')         # used for general LLM calls
+LEGAL_BASIS_BACKEND = os.getenv('LEGAL_BASIS_BACKEND')  # used specifically for AI Legal Basis feature
+ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')  # only needed for "claude"
+CLAUDE_MODEL = os.getenv('CLAUDE_MODEL')        # optional override
 
 
 
-OPENAI_API_KEY = "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"
-GPT_MODEL = "gpt-4.1-mini"
-OLLAMA_ENDPOINT = "http://100.118.208.125:11434/api/generate"  # optional override
-GEMINI_API_KEY = "AIzaSyAglFkfjSZ1XF-KS27p_T_4wYuwbLNHcoE"
-GEMINI_MODEL = "gemini-2.5-flash"
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+GPT_MODEL = os.getenv('GPT_MODEL')
+OLLAMA_ENDPOINT = os.getenv('OLLAMA_ENDPOINT')  # optional override
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+GEMINI_MODEL = os.getenv('GEMINI_MODEL')
 
 
-OCR_CLEANUP_BACKEND = "ollama"
-
+OCR_CLEANUP_BACKEND = os.getenv('OCR_CLEANUP_BACKEND')
