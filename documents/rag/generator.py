@@ -76,6 +76,156 @@ def _retrieve_national_law_chunks(title: str, top_k: int = 5) -> list[dict]:
         return []
 
 
+
+import requests
+
+def search_philippine_laws(query: str, limit: int = 5) -> list:
+    try:
+        # Extract keywords from title for better search
+        # Remove common words that don't help search
+        keywords = query.replace("An Ordinance", "").replace("A Resolution", "")
+        keywords = keywords.replace("in San Juan City", "").replace("the City of San Juan", "")
+        keywords = keywords.strip()
+        
+        response = requests.get(
+            "https://open-congress-api.bettergov.ph/api/documents",
+            params={
+                "search": keywords,  # use cleaned keywords
+                "limit": limit
+            },
+            timeout=10
+        )
+        data = response.json()
+        if data.get("success"):
+            return data.get("data", [])
+        return []
+    except Exception as e:
+        logger.warning("Open Congress API unavailable: %s", e)
+        return []
+
+def generate_legal_basis(title: str, doc_type: str | None = None) -> str:
+    """
+    Searches Open Congress API for related Philippine national legislation,
+    retrieves similar local ordinances via RAG,
+    then asks AI to suggest legal bases grounded in both sources.
+    Returns the AI-generated text.
+    """
+    if not title or not title.strip():
+        raise ValueError("generate_legal_basis() requires a non-empty document title.")
+
+    # 1. Search national laws from Open Congress API
+    national_laws = search_philippine_laws(title, limit=5)
+    logger.info(
+        "Retrieved %d national law(s) from Open Congress API for: %r",
+        len(national_laws), title
+    )
+
+    # 2. Get local ordinances via existing RAG retriever
+    from documents.rag.retriever import retrieve
+    local_docs = retrieve(query=title, top_k=5)
+    logger.info(
+        "Retrieved %d local document(s) from RAG for: %r",
+        len(local_docs), title
+    )
+
+    # 3. Build prompt with both sources
+    prompt = _build_prompt(
+        title=title,
+        doc_type=doc_type,
+        national_laws=national_laws,
+        local_docs=local_docs
+    )
+
+    # 4. Call LLM backend
+    backend = getattr(
+        settings, "LEGAL_BASIS_BACKEND",
+        getattr(settings, "LLM_BACKEND", _DEFAULT_BACKEND)
+    ).lower().strip()
+
+    if backend == "claude":
+        return _call_claude(prompt)
+    elif backend == "gemini":
+        return _call_gemini(prompt)
+    elif backend == "ollama":
+        return _call_ollama(prompt)
+    else:
+        raise RuntimeError(f"Unknown backend: {backend!r}")
+
+
+def _build_prompt(
+    title: str,
+    doc_type: str | None,
+    national_laws: list,
+    local_docs: list
+) -> str:
+    """
+    Build RAG prompt combining national laws from Open Congress API
+    and local ordinances from pgvector.
+    """
+    doc_label = doc_type or "ORDINANCE"
+
+    # Format national laws section
+    if national_laws:
+        national_section = "RELATED PHILIPPINE NATIONAL LEGISLATION (Open Congress API):\n"
+        for law in national_laws:
+            # Use congress_website_title as fallback since title is often None
+            title_text = (
+                law.get('title') or 
+                law.get('long_title') or 
+                law.get('congress_website_title') or 
+                'Unknown'
+            )
+            bill_no = law.get('name', '')           # e.g. "HBN-04131"
+            congress = law.get('congress', '')
+            date_filed = law.get('date_filed', '')
+            national_section += (
+                f"- {bill_no} (Congress {congress}, filed {date_filed}):\n"
+                f"  {title_text}\n"
+            )
+    else:
+        national_section = (
+            "NATIONAL LEGISLATION: No related bills found in Open Congress API. "
+            "Use your training knowledge of Philippine laws carefully.\n"
+        )
+
+    # Format local ordinances section
+    if local_docs:
+        local_section = "RETRIEVED LOCAL ORDINANCES FROM SAN JUAN CITY DATABASE:\n"
+        for doc in local_docs:
+            local_section += (
+                f"- [{doc.get('score', 0):.2f}] {doc.get('title', 'Unknown')}\n"
+                f"  Snippet: {doc.get('snippet', '')[:200]}\n"
+            )
+    else:
+        local_section = (
+            "LOCAL ORDINANCES: No similar ordinances found in San Juan City database yet.\n"
+        )
+
+    return f"""/no_think
+You are a legal basis assistant for the Sangguniang Panlungsod of San Juan City, Metro Manila.
+
+{local_section}
+
+{national_section}
+
+Based on the sources above, suggest legal bases for the following:
+{doc_label}: "{title}"
+
+For each legal basis:
+1. Cite the specific law or ordinance name and number
+2. Explain why it is relevant to this draft
+3. Mark each as [LOCAL PRECEDENT] or [NATIONAL LAW]
+
+STRICT RULES:
+- Only cite laws visible in the sources above OR well-known Philippine laws you are highly confident about
+- For national laws not in the sources, only cite if you are 100% certain of the RA number
+- Never invent section numbers — write [verify section] if unsure
+- If no relevant laws found, say so honestly
+- Return only the legal basis suggestions, nothing else
+"""
+
+
+
 def _build_national_law_prompt(title: str, doc_type: str | None, law_chunks: list[dict]) -> str:
     """Build a focused prompt grounded in uploaded national law chunks."""
     label = ""
@@ -249,32 +399,32 @@ def _strip_thinking(text: str) -> str:
 
 
 def _call_ollama(prompt: str) -> str:
-    print("I will run ollama on your friend's server")
-    """Call the local Ollama HTTP API and return the response text."""
     ollama_model = getattr(settings, "OLLAMA_MODEL", _OLLAMA_MODEL)
-    endpoint = getattr(settings, "OLLAMA_ENDPOINT", _OLLAMA_ENDPOINT)
+    # Change endpoint from /api/generate to /api/chat
+    base_url = getattr(settings, "OLLAMA_ENDPOINT", _OLLAMA_ENDPOINT)
+    chat_endpoint = base_url.replace("/api/generate", "/api/chat")
 
     payload = {
         "model": ollama_model,
-        "prompt": prompt,
+        "messages": [
+            {"role": "user", "content": prompt}
+        ],
         "stream": False,
         "options": {
             "temperature": 0.3,
             "num_predict": 4096,
-            "num_ctx": 16834,
-            'think':False,
-            'thinking':False,
+            "num_ctx": 8192,
         },
     }
 
-    logger.info("Calling Ollama (endpoint=%s, model=%s).", endpoint, ollama_model)
+    logger.info("Calling Ollama chat (endpoint=%s, model=%s).", chat_endpoint, ollama_model)
 
     try:
-        resp = requests.post(endpoint, json=payload, timeout=120)
+        resp = requests.post(chat_endpoint, json=payload, timeout=120)
         resp.raise_for_status()
     except requests.exceptions.ConnectionError as exc:
         raise RuntimeError(
-            f"Could not connect to Ollama at {endpoint}. "
+            f"Could not connect to Ollama at {chat_endpoint}. "
             "Make sure Ollama is running: `ollama serve`"
         ) from exc
     except requests.exceptions.Timeout:
@@ -283,14 +433,24 @@ def _call_ollama(prompt: str) -> str:
             "Try a smaller model or increase the timeout."
         )
     except requests.exceptions.HTTPError as exc:
-        raise RuntimeError(f"Ollama returned HTTP {resp.status_code}: {resp.text}") from exc
+        raise RuntimeError(
+            f"Ollama returned HTTP {resp.status_code}: {resp.text}"
+        ) from exc
 
     try:
         data = resp.json()
     except json.JSONDecodeError as exc:
-        raise RuntimeError(f"Ollama returned non-JSON response: {resp.text[:200]}") from exc
+        raise RuntimeError(
+            f"Ollama returned non-JSON response: {resp.text[:200]}"
+        ) from exc
 
-    response_text = data.get("response", "").strip()
+    # Chat endpoint returns different structure
+    response_text = (
+        data.get("message", {}).get("content") or
+        data.get("response") or
+        ""
+    ).strip()
+
     if not response_text:
         raise RuntimeError(
             "Ollama returned an empty response. "
@@ -301,36 +461,9 @@ def _call_ollama(prompt: str) -> str:
     logger.info("Ollama call complete — %d chars returned.", len(response_text))
     return response_text
 
-
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
-
-def generate_legal_basis(title: str, doc_type: str | None = None) -> str:
-    """
-    Retrieves matching sections from uploaded national law documents,
-    then asks AI to cite specific provisions grounded in those excerpts.
-    Returns the AI-generated text.
-    """
-    if not title or not title.strip():
-        raise ValueError("generate_legal_basis() requires a non-empty document title.")
-
-    law_chunks = _retrieve_national_law_chunks(title)
-    logger.info("Retrieved %d national law chunk(s) for: %r", len(law_chunks), title)
-
-    prompt  = _build_national_law_prompt(title=title, doc_type=doc_type, law_chunks=law_chunks)
-    backend = getattr(settings, "LEGAL_BASIS_BACKEND",
-                      getattr(settings, "LLM_BACKEND", _DEFAULT_BACKEND)).lower().strip()
-
-    if backend == "claude":
-        return _call_claude(prompt)
-    elif backend == "gemini":
-        return _call_gemini(prompt)
-    elif backend == "ollama":
-        return _call_ollama(prompt)
-    else:
-        raise RuntimeError(f"Unknown backend: {backend!r}")
-
 
 def call_llm(prompt: str) -> str:
     """
@@ -350,3 +483,5 @@ def call_llm(prompt: str) -> str:
             f"Unknown LLM_BACKEND value: {backend!r}. "
             "Set settings.LLM_BACKEND to 'claude', 'gemini', or 'ollama'."
         )
+
+

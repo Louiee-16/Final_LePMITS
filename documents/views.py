@@ -1258,8 +1258,9 @@ def validate_ocr_with_ai(request):
     import requests as req
 
     endpoint  = getattr(settings, 'OLLAMA_ENDPOINT',  'http://localhost:11434/api/generate')
-    ocr_model = getattr(settings, 'OLLAMA_OCR_MODEL', 'ministral-3')
+    ocr_model = getattr(settings, 'OLLAMA_OCR_MODEL', 'siegemt/legislama:latest')
     logger.info("validate_ocr_with_ai: %d chars → AI", len(raw_text))
+    logger.info("Using endpoint: %s, model: %s", endpoint, ocr_model)
 
     prompt = (
         "/set nothink \n"

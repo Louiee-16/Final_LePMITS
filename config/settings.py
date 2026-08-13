@@ -18,7 +18,6 @@ load_dotenv()
 
 
 
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -31,7 +30,8 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'FALSE') == 'TRUE'
+#DEBUG = os.getenv('DEBUG', 'FALSE') == 'TRUE'
+DEBUG=True
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS','localhost').split(',')
 
@@ -174,7 +174,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = '/static/'
-
+#STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
@@ -205,7 +205,7 @@ CKEDITOR_CONFIGS = {
 OLLAMA_ENDPOINT = os.getenv('OLLAMA_ENDPOINT')
 OLLAMA_MODEL = os.getenv('OLLAMA_MODEL')
 OLLAMA_VISION_MODEL = os.getenv('OLLAMA_VISION_MODEL')  
-OLLAMA_OCR_MODEL = os.getenv('OLLAMA_OCR_MODEL')
+OLLAMA_OCR_MODEL = os.getenv('OLLAMA_OCR_MODEL', 'ALIENTELLIGENCE/attorney2:latest')
 OLLAMA_EMBED_MODEL = os.getenv('OLLAMA_EMBED_MODEL')
  # must support images; used for PDF page OCR
 OLLAMA_OPTIONS = {
