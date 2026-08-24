@@ -483,17 +483,36 @@ document.getElementById('aiCheckBtn').addEventListener('click', async function (
             return;
         }
 
-        const lawsEl   = document.getElementById('nationalLaws');
-        const lawsText = (data.national_laws || '').trim();
-        if (lawsText) {
-            lawsEl.innerHTML = lawsText
-                .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .split('\n').filter(l => l.trim())
-                .map(line => /^\d+\./.test(line.trim())
-                    ? `<p style="padding:10px 12px;background:white;border-left:3px solid #6366f1;border-radius:0 8px 8px 0;margin:0;">${line.trim()}</p>`
-                    : `<p style="padding:2px 12px;color:#64748b;">${line.trim()}</p>`
-                ).join('');
+        const lawsEl    = document.getElementById('nationalLaws');
+        const citations = Array.isArray(data.national_laws) ? data.national_laws : [];
+
+        const esc      = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        const isHttpUrl = u => typeof u === 'string' && /^https?:\/\//i.test(u);
+
+        if (citations.length) {
+            const cardStyle = 'display:block;padding:10px 12px;background:white;border-left:3px solid #6366f1;border-radius:0 8px 8px 0;margin:0 0 6px;';
+            const badge = status => {
+                if (status === 'pending') return '<span style="display:inline-block;padding:1px 6px;font-size:9px;font-weight:700;letter-spacing:.03em;color:#92400e;background:#fef3c7;border-radius:3px;">PENDING BILL</span>';
+                if (status === 'enacted') return '<span style="display:inline-block;padding:1px 6px;font-size:9px;font-weight:700;letter-spacing:.03em;color:#166534;background:#dcfce7;border-radius:3px;">ENACTED LAW</span>';
+                return '';
+            };
+            lawsEl.innerHTML = citations.map(c => {
+                const body = `
+                    ${c.status ? `<div style="margin:0 0 3px;">${badge(c.status)}</div>` : ''}
+                    <p style="margin:0;font-weight:700;color:#1e293b;">${esc(c.law_title) || 'Unknown law'}</p>
+                    ${c.reason ? `<p style="margin:2px 0 0;color:#64748b;line-height:1.5;">${esc(c.reason)}</p>` : ''}
+                `;
+                if (isHttpUrl(c.url)) {
+                    // Real, verified source link — resolved server-side against the
+                    // actual retrieved bill, never taken from the AI's own output.
+                    return `<a href="${esc(c.url)}" target="_blank" rel="noopener noreferrer"
+                                style="${cardStyle}text-decoration:none;cursor:pointer;">
+                                ${body}
+                                <span style="display:inline-block;margin-top:4px;font-size:10px;font-weight:700;color:#6366f1;">OPEN SOURCE DOCUMENT &rarr;</span>
+                            </a>`;
+                }
+                return `<div style="${cardStyle}">${body}</div>`;
+            }).join('');
         } else {
             lawsEl.innerHTML = '<p class="text-xs text-slate-400 italic">No national law suggestions available.</p>';
         }

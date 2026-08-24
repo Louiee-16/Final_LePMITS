@@ -14,6 +14,7 @@ from documents.models import Document
 from datetime import datetime, timedelta
 from django.views.decorators.clickjacking import xframe_options_sameorigin, xframe_options_exempt
 from django.http import FileResponse, HttpResponse, Http404
+from django.utils.crypto import get_random_string
 
 ################## DRAFT CREATION
 def referral_drafting_page(request, doc_id):
@@ -87,17 +88,23 @@ def add_councilor(request):
     if request.method == "POST":
         form = CouncilorForm(request.POST, request.FILES)
         if form.is_valid():
-            user= User.objects.create_user(
+            temp_password = get_random_string(length=12)
+            user = User.objects.create_user(
                 role = 'COUNCILOR',
                 username=form.cleaned_data['email'],
                 email=form.cleaned_data['email'],
-                password='password123'
+                password=temp_password
             )
 
             councilor = form.save(commit=False)
             councilor.user = user
             councilor.save()
 
+            messages.warning(
+                request,
+                f"Account for {user.username} created. Temporary password: {temp_password} "
+                "— provide it to the councilor securely; they should change it after first login."
+            )
             return redirect("councilors_list")
     else:
         form = CouncilorForm()
@@ -157,8 +164,16 @@ def delete_draft(request, id):
         
 
 
+@login_required
 def view_draft(request, id):
     draft = get_object_or_404(Document, id=id)
+
+    is_owner = draft.author_id == request.user.id
+    can_view_any = request.user.role in ('SECRETARIAT', 'STAFF', 'ADMIN')
+    if not (is_owner or can_view_any):
+        messages.error(request, "You don't have permission to view this draft.")
+        return redirect('draft-measures')
+
     context ={
         'draft':draft
     }

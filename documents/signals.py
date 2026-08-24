@@ -65,9 +65,9 @@ def auto_embed_on_approval(sender, instance, created, **kwargs):
 
     try:
         # Lazy import keeps startup fast and avoids any import-cycle risk.
-        from rag.embedder import embed_document  # noqa: PLC0415
+        from documents.rag.embedder import embed_document  # noqa: PLC0415
 
-        success = embed_document(instance)
+        success = embed_document(instance, source_type="document")
         if success:
             logger.info("Auto-embed succeeded for Document pk=%s.", instance.pk)
         else:

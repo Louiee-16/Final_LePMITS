@@ -118,6 +118,7 @@ def create_user(request):
 
 
 @login_required
+@user_passes_test(is_admin)
 def user_management(request):
     users       = User.objects.all().order_by('-date_joined')
     councilors  = users.filter(role='COUNCILOR')

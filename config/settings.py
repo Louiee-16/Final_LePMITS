@@ -30,8 +30,7 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 
 
 # SECURITY WARNING: don't run with debug turned on in production!
-#DEBUG = os.getenv('DEBUG', 'FALSE') == 'TRUE'
-DEBUG=True
+DEBUG = os.getenv('DEBUG', 'FALSE').strip().upper() == 'TRUE'
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS','localhost').split(',')
 
@@ -232,3 +231,10 @@ GEMINI_MODEL = os.getenv('GEMINI_MODEL')
 
 
 OCR_CLEANUP_BACKEND = os.getenv('OCR_CLEANUP_BACKEND')
+
+# Legal-basis drafting assistant sends the draft title to the public Open
+# Congress API (bettergov.ph) to look up related national legislation before
+# the document is approved. Set to 'FALSE' to keep unpublished draft titles
+# from leaving the system entirely (national-law suggestions will then rely
+# only on the AI model's own training knowledge).
+RAG_EXTERNAL_LAW_SEARCH_ENABLED = os.getenv('RAG_EXTERNAL_LAW_SEARCH_ENABLED', 'TRUE').strip().upper() == 'TRUE'

@@ -184,3 +184,36 @@ def embed_document_chunks(doc, source_type: str = "document") -> List[Dict]:
         len(results), len(chunks), source_type, doc.pk,
     )
     return results
+
+
+def _chunk_fields(chunk_record: Dict) -> Dict:
+    return {
+        "chunk_type":  chunk_record["chunk_type"],
+        "chunk_text":  chunk_record["chunk_text"],
+        "embedding":   chunk_record["embedding"],
+        "chunk_index": chunk_record["chunk_index"],
+    }
+
+
+def embed_document(doc, source_type: str = "document") -> bool:
+    """
+    Chunk, embed, and persist DocumentChunk rows for a single Document or
+    LegacyDocument instance, replacing any chunks it already has.
+
+    Returns True if at least one chunk was saved, False if the document had
+    no extractable text (or embedding failed for every chunk).
+    """
+    from documents.models import DocumentChunk
+
+    chunk_records = embed_document_chunks(doc, source_type=source_type)
+    if not chunk_records:
+        return False
+
+    filter_kwargs = (
+        {"legacy_document": doc} if source_type == "legacy_document" else {"document": doc}
+    )
+    DocumentChunk.objects.filter(**filter_kwargs).delete()
+    DocumentChunk.objects.bulk_create([
+        DocumentChunk(**filter_kwargs, **_chunk_fields(cr)) for cr in chunk_records
+    ])
+    return True

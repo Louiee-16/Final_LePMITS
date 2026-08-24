@@ -115,7 +115,6 @@ def finalize_agenda(request):
         council_number = 8,
         session_time = '10:00am',
         session_date = session_date,
-        agenda_finalized_date = timezone.now(),
     )
 
 

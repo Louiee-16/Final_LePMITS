@@ -1,6 +1,15 @@
 import pgvector.django.vector
 from django.db import migrations
 
+# NOTE: this migration changes the embedding vector dimension (768 -> 4096),
+# same as 0012_vector_768_nomic before it. Postgres/pgvector cannot resize an
+# existing vector column in place, so the RunSQL below wipes every stored
+# embedding with no reverse path. If a change like this is ever needed again,
+# back up documents_document.embedding / documents_legacydocument.embedding /
+# documents_nationallawchunk / document_chunk first, then re-run
+# `python manage.py embed_documents --force` afterwards to rebuild them —
+# do not ship another silent wipe.
+
 
 class Migration(migrations.Migration):
 

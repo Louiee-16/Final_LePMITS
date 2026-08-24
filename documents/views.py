@@ -1,6 +1,6 @@
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
+from django.http import JsonResponse, Http404, HttpResponse
 from django.views.decorators.clickjacking import xframe_options_exempt
 import json
 from django.db.models import Q
@@ -248,22 +248,29 @@ def move_to_disapproved(request, doc_id):
     return redirect('third-reading')
 
 @login_required
-def move_to_first(request,pk):
+def move_to_first(request, pk):
     doc = get_object_or_404(Document, pk=pk)
-    user = request.user
-    if doc.status == 'FILED' and user.role == 'SECRETARIAT':
-        ref_no = request.POST.get('reference_no')
-        if ref_no: doc.reference_no = ref_no
-        doc.status = 'FIRST_READING'
+
+    if request.method != 'POST' or doc.status != 'FILED' or request.user.role != 'SECRETARIAT':
+        messages.error(request, "You don't have permission to perform this action.")
+        return redirect('incoming_docs')
+
+    ref_no = request.POST.get('reference_no')
+    if ref_no:
+        doc.reference_no = ref_no
+    doc.status = 'FIRST_READING'
     doc.save()
     return redirect('incoming_docs')
 
 @login_required
 def move_to_other_matters(request, doc_id):
-    doc = get_object_or_404(BarangayFiles, id= doc_id)
-    user = request.user
-    if doc.status == 'FILED' and user.role == 'SECRETARIAT':
-        doc.status = 'OTHER_MATTERS'
+    doc = get_object_or_404(BarangayFiles, id=doc_id)
+
+    if request.method != 'POST' or doc.status != 'FILED' or request.user.role != 'SECRETARIAT':
+        messages.error(request, "You don't have permission to perform this action.")
+        return redirect('incoming_docs')
+
+    doc.status = 'OTHER_MATTERS'
     doc.save()
     return redirect('incoming_docs')
 
@@ -394,7 +401,7 @@ def incoming_docs(request):
 
 @login_required
 def refer_to_committee(request, doc_id):
-    if request.method == "POST" and request.user.role == 'SECRETARIAT' or request.user.role == 'STAFF':
+    if request.method == "POST" and request.user.role in ('SECRETARIAT', 'STAFF'):
         doc = get_object_or_404(Document, id=doc_id)
         committee_id = request.POST.get('referred_committee')
         
@@ -516,10 +523,13 @@ def approve_measure(request, pk):
 
     if request.method == "POST" and request.user.role in ['SECRETARIAT', 'STAFF']:
         doc = get_object_or_404(Document, pk=pk)
-        
-        # Prevent double approval
+
         if doc.status == 'APPROVED':
             messages.warning(request, "This measure is already approved.")
+            return redirect('third-reading')
+
+        if doc.status != 'THIRD_READING':
+            messages.error(request, f'"{doc.title}" has not reached Third Reading yet and cannot be approved.')
             return redirect('third-reading')
 
         current_year = timezone.now().year
@@ -553,7 +563,12 @@ def fail_measure(request, pk):
     """If the body rejects the measure at Third Reading."""
     if request.method == "POST" and request.user.role in ['SECRETARIAT', 'STAFF']:
         doc = get_object_or_404(Document, pk=pk)
-        doc.status = 'FAILED' 
+
+        if doc.status != 'THIRD_READING':
+            messages.error(request, f'"{doc.title}" has not reached Third Reading yet.')
+            return redirect('third_reading')
+
+        doc.status = 'FAILED'
         doc.save()
         messages.error(request, f"{doc.title} was marked as Failed.")
     return redirect('third_reading')
@@ -657,9 +672,17 @@ def approved_registry(request):
     })
     
 ################# HISTORY SYSTEM #############
+def _can_view_document(user, doc):
+    if doc.status not in ('DRAFT', 'GHOST'):
+        return True
+    return doc.author_id == user.id or user.role in ('SECRETARIAT', 'STAFF', 'ADMIN')
+
+
 @login_required
 def modal_document_viewer(request, doc_id):
     doc = get_object_or_404(Document, id=doc_id)
+    if not _can_view_document(request.user, doc):
+        return HttpResponse('Not found.', status=404)
 
     try:
         parts = doc.reference_no.split("-")
@@ -701,6 +724,9 @@ def document_history(request, pk):
 def view_document(request, doc_id):
 
     doc = get_object_or_404(Document, id=doc_id)
+    if not _can_view_document(request.user, doc):
+        raise Http404
+
     try:
         parts = doc.reference_no.split("-")
         doc.ref_number = int(parts[1])
@@ -806,8 +832,9 @@ def ai_legal_basis(request):
     POST /documents/ai-legal-basis/
     Body (JSON): { "pk": <int> }
 
-    Reads title + doc_type from the DB record (never trusts user-supplied strings),
-    calls generate_legal_basis(), returns { "result": <str> } or { "error": <str> }.
+    Reads title + doc_type + content from the DB record (never trusts
+    user-supplied strings), calls generate_legal_basis(), returns
+    { "national_laws": [...] } or { "error": <str> }.
 
     On the create-draft page the ghost pk comes from the autosave response
     (docIdField.value). The JS layer ensures autosave has completed before
@@ -836,6 +863,7 @@ def ai_legal_basis(request):
         result = generate_legal_basis(
             title=document.title,
             doc_type=document.doc_type,
+            content=document.content,
         )
     except ValueError as exc:
         return JsonResponse({"error": str(exc)}, status=400)

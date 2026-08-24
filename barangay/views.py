@@ -9,6 +9,7 @@ from django.db.models import Q
 from committees.models import Committee
 from django.core.mail import send_mail
 from django.conf import settings
+from django.utils.crypto import get_random_string
 
 @login_required
 def barangay_dashboard(request):
@@ -52,16 +53,21 @@ def add_barangay(request):
     if request.method == "POST":
         form = BarangayForm(request.POST)
         if form.is_valid():
+            temp_password = get_random_string(length=12)
             user = User.objects.create_user(
                 role = 'BARANGAY',
                 username = form.cleaned_data['email'],
                 email = form.cleaned_data['email'],
-                password = 'password123'
-
+                password = temp_password
             )
             barangay = form.save(commit=False)
             barangay.user = user
             barangay.save()
+            messages.warning(
+                request,
+                f"Account for {user.username} created. Temporary password: {temp_password} "
+                "— provide it to the barangay contact securely; they should change it after first login."
+            )
             return redirect("barangay-list")
     else:
         form = BarangayForm()
@@ -85,7 +91,7 @@ def checker(request):
 
 @login_required
 def barangay_to_referral(request, doc_id):
-    if request.method == "POST" and request.user.role == 'SECRETARIAT' or request.user.role == 'STAFF':
+    if request.method == "POST" and request.user.role in ('SECRETARIAT', 'STAFF'):
         doc = get_object_or_404(BarangayFiles, id=doc_id, status='OTHER_MATTERS')
         committee_id = request.POST.get('referred_committee')
 

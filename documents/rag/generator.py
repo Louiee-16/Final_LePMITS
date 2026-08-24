@@ -1,34 +1,58 @@
 """
 rag/generator.py
-LePMITS — Step 5: RAG Prompt + LLM Call
+LePMITS — AI Legal Basis: national-law suggestions for a draft title.
+
+National law only, by design. Local-ordinance precedent is a separate
+concern already handled by the inline drafting check (see
+documents.views.ai_inline_check, which calls
+documents.rag.retriever.retrieve directly) — this module doesn't duplicate
+that lookup.
 
 Public entry point:
-    generate_legal_basis(title: str, doc_type: str | None = None) -> str
+    generate_legal_basis(title, doc_type=None, content=None) -> list[dict]
 
 Internally:
-    1. Calls retrieve(title) → top-5 relevant snippets
-    2. Builds a RAG prompt grounded in Philippine local legislation context
-    3. Dispatches to the configured LLM backend (claude | ollama)
-    4. Returns the LLM's plain-text response
+    1. Extracts a short search phrase from the title via the LLM (cached
+       per title — see _extract_search_keywords), since the Open Congress
+       API does exact-phrase matching and a full sentence rarely matches.
+    2. Searches the Open Congress API for related national bills, and
+       deduplicates near-identical ones (see _dedupe_bills).
+    3. Builds a prompt grounded in those results plus a plain-text excerpt
+       of the draft's own content, so the AI can reason about the measure's
+       actual mechanism instead of only its title.
+    4. Dispatches to the configured LLM backend, parses its JSON response,
+       and resolves each citation's source URL server-side (see
+       _parse_citations / _law_url) — the LLM never supplies a URL itself.
 
 Backend selection:
-    settings.LLM_BACKEND = "claude"  →  Anthropic Claude API
-    settings.LLM_BACKEND = "ollama"  →  local Ollama (http://localhost:11434)
-    (defaults to "ollama" if the setting is absent)
+    settings.LEGAL_BASIS_BACKEND, falling back to settings.LLM_BACKEND,
+    falling back to "gemini" if neither is set. One of: "claude" | "gemini"
+    | "ollama".
 
-Privacy guarantee:
-    Only ≤300-char snippets of APPROVED/legacy documents are sent to any
-    external API. The unpublished draft body is never transmitted.
+Privacy notes:
+    The draft title is sent to the configured LLM backend twice (keyword
+    extraction, then final generation), and a ≤3000-char plain-text excerpt
+    of the draft *content* is sent once, as part of the final generation
+    call — before the document is approved. The title, as extracted
+    keywords, is also sent to the public Open Congress API
+    (open-congress-api.bettergov.ph); the draft content is never sent
+    there. The Open Congress lookup can be disabled with
+    settings.RAG_EXTERNAL_LAW_SEARCH_ENABLED, in which case the AI falls
+    back to its own training knowledge of Philippine law instead — this
+    does not affect what's sent to the LLM backend itself.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
+import re
 from typing import Any
 
 import requests
 from django.conf import settings
+from django.core.cache import cache
 
 
 logger = logging.getLogger(__name__)
@@ -77,71 +101,14 @@ def _retrieve_national_law_chunks(title: str, top_k: int = 5) -> list[dict]:
 
 
 
-import requests
-
-def search_philippine_laws(query: str, limit: int = 5) -> list:
-    try:
-        # Extract keywords from title for better search
-        # Remove common words that don't help search
-        keywords = query.replace("An Ordinance", "").replace("A Resolution", "")
-        keywords = keywords.replace("in San Juan City", "").replace("the City of San Juan", "")
-        keywords = keywords.strip()
-        
-        response = requests.get(
-            "https://open-congress-api.bettergov.ph/api/documents",
-            params={
-                "search": keywords,  # use cleaned keywords
-                "limit": limit
-            },
-            timeout=10
-        )
-        data = response.json()
-        if data.get("success"):
-            return data.get("data", [])
-        return []
-    except Exception as e:
-        logger.warning("Open Congress API unavailable: %s", e)
-        return []
-
-def generate_legal_basis(title: str, doc_type: str | None = None) -> str:
-    """
-    Searches Open Congress API for related Philippine national legislation,
-    retrieves similar local ordinances via RAG,
-    then asks AI to suggest legal bases grounded in both sources.
-    Returns the AI-generated text.
-    """
-    if not title or not title.strip():
-        raise ValueError("generate_legal_basis() requires a non-empty document title.")
-
-    # 1. Search national laws from Open Congress API
-    national_laws = search_philippine_laws(title, limit=5)
-    logger.info(
-        "Retrieved %d national law(s) from Open Congress API for: %r",
-        len(national_laws), title
-    )
-
-    # 2. Get local ordinances via existing RAG retriever
-    from documents.rag.retriever import retrieve
-    local_docs = retrieve(query=title, top_k=5)
-    logger.info(
-        "Retrieved %d local document(s) from RAG for: %r",
-        len(local_docs), title
-    )
-
-    # 3. Build prompt with both sources
-    prompt = _build_prompt(
-        title=title,
-        doc_type=doc_type,
-        national_laws=national_laws,
-        local_docs=local_docs
-    )
-
-    # 4. Call LLM backend
-    backend = getattr(
+def _resolve_backend() -> str:
+    return getattr(
         settings, "LEGAL_BASIS_BACKEND",
         getattr(settings, "LLM_BACKEND", _DEFAULT_BACKEND)
     ).lower().strip()
 
+
+def _dispatch_to_backend(prompt: str, backend: str) -> str:
     if backend == "claude":
         return _call_claude(prompt)
     elif backend == "gemini":
@@ -152,76 +119,367 @@ def generate_legal_basis(title: str, doc_type: str | None = None) -> str:
         raise RuntimeError(f"Unknown backend: {backend!r}")
 
 
-def _build_prompt(
-    title: str,
-    doc_type: str | None,
-    national_laws: list,
-    local_docs: list
-) -> str:
+_BOILERPLATE_RE = re.compile(
+    r"\b(an ordinance|a resolution|providing for|establishing|regulating|"
+    r"in san juan city|the city of san juan|city of san juan|metro manila)\b",
+    re.IGNORECASE,
+)
+
+
+def _fallback_keywords(title: str) -> str:
+    """Rule-based backup for when the LLM keyword extractor is unavailable."""
+    cleaned = _BOILERPLATE_RE.sub("", title)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" ,.\n")
+    return " ".join(cleaned.split()[:6])
+
+
+_KEYWORD_CACHE_TIMEOUT = 3600  # seconds — covers a typical drafting session
+
+
+def _extract_search_keywords(title: str) -> str:
     """
-    Build RAG prompt combining national laws from Open Congress API
-    and local ordinances from pgvector.
+    Turn a full draft title into a short search phrase for the Open
+    Congress API.
+
+    The API does exact-phrase matching, not keyword/relevance search — word
+    order matters and match counts collapse past a handful of words
+    (confirmed live: "special education" → 283 hits, "education special"
+    → 2, any 3+ word natural-language phrase → 0). Sending a full 20-40
+    word draft title returns nothing almost by construction, regardless of
+    whether the topic has related national legislation.
+
+    Falls back to a simple rule-based cleanup if the LLM call fails, so a
+    flaky extraction never blocks the national-law search entirely.
+
+    Cached per exact title (1 hour): re-clicking "Suggest Legal Basis" on
+    the same unsaved draft is a common pattern, and the extracted phrase
+    for a given title is stable, so repeat requests skip this LLM call.
+    """
+    cache_key = "legal_basis_keywords:" + hashlib.sha256(title.encode()).hexdigest()
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    prompt = (
+        "Extract the single best 2-4 word search phrase from this "
+        "Philippine local ordinance/resolution title, to search a "
+        "national bill database for related legislation. Return ONLY "
+        "the phrase — no punctuation, no quotes, no explanation.\n\n"
+        f'Title: "{title}"'
+    )
+
+    try:
+        keywords = _dispatch_to_backend(prompt, _resolve_backend()).strip().strip('"\'')
+        keywords = keywords or _fallback_keywords(title)
+    except Exception as exc:
+        logger.warning("Keyword extraction failed, using rule-based fallback: %s", exc)
+        keywords = _fallback_keywords(title)
+
+    cache.set(cache_key, keywords, _KEYWORD_CACHE_TIMEOUT)
+    return keywords
+
+
+def search_philippine_laws(query: str, limit: int = 5) -> list:
+    """
+    Query the Open Congress API's dedicated search endpoint.
+
+    `query` should already be a short phrase (see _extract_search_keywords)
+    — this function sends it to the API as-is.
+    """
+    try:
+        response = requests.get(
+            "https://open-congress-api.bettergov.ph/api/search/documents",
+            params={"q": query, "limit": limit},
+            timeout=10,
+        )
+        response.raise_for_status()
+        data = response.json()
+        if data.get("success"):
+            return data.get("data", [])
+        return []
+    except Exception as e:
+        logger.warning("Open Congress API unavailable: %s", e)
+        return []
+
+
+def _dedupe_bills(laws: list, keep: int = 5) -> list:
+    """
+    Collapse near-identical bills into one entry.
+
+    It's routine in Philippine Congress for several legislators to file the
+    same bill text separately (each claiming their own bill number) before
+    it's consolidated in committee — a search can easily return 3+ copies
+    of one proposal. Left as-is, that floods the prompt with redundant
+    entries and crowds out genuinely different legal bases.
+
+    Each kept entry gets an `_also_filed_as` list of the sibling bill
+    numbers it absorbed, so that fact isn't silently lost — a councilor
+    knowing 3 legislators filed the same bill is useful context, worth
+    mentioning once rather than 3 separate near-identical citations.
+    """
+    groups: dict[str, list] = {}
+    for law in laws:
+        key = re.sub(
+            r"\s+", " ",
+            (law.get("title") or law.get("long_title") or law.get("congress_website_title") or "").strip().lower()
+        )
+        groups.setdefault(key or law.get("name", ""), []).append(law)
+
+    deduped = []
+    for group in groups.values():
+        primary = dict(group[0])
+        primary["_also_filed_as"] = [b["name"] for b in group[1:] if b.get("name")]
+        deduped.append(primary)
+    return deduped[:keep]
+
+
+def _law_url(law: dict) -> str | None:
+    """Real, verifiable source link for a retrieved bill — never fabricated."""
+    if law.get("senate_website_permalink"):
+        return law["senate_website_permalink"]
+    sources = law.get("download_url_sources") or []
+    if sources:
+        return sources[0]
+    return None  # e.g. House bills — the API doesn't expose a direct link for these
+
+
+_LAWPHIL_RA_URL = "https://lawphil.net/statutes/repacts/ra{year}/ra_{number}_{year}.html"
+
+
+def _verified_enacted_law_url(ra_number: int | None, year: int | None, timeout: int = 4) -> str | None:
+    """
+    LawPhil.net's Republic Act pages follow a predictable
+    /ra{year}/ra_{number}_{year}.html pattern — but the LLM supplying an RA
+    number and year is exactly the kind of thing it can get wrong, so the
+    URL is never shown unless a live HEAD request confirms it actually
+    resolves. A wrong guess 404s (verified: bad year/number combos return
+    404, they don't silently land on an unrelated law), so this can only
+    ever produce a real link or no link.
+    """
+    if not ra_number or not year:
+        return None
+    url = _LAWPHIL_RA_URL.format(year=year, number=ra_number)
+    try:
+        resp = requests.head(url, timeout=timeout, allow_redirects=True)
+        return url if resp.status_code == 200 else None
+    except requests.RequestException as exc:
+        logger.warning("LawPhil verification failed for RA %s (%s): %s", ra_number, year, exc)
+        return None
+
+
+def _parse_citations(raw: str, national_laws: list) -> list[dict]:
+    """
+    Parse the LLM's JSON citation list and attach a real source URL to each
+    item by matching its `bill_ref` back against the bills we actually
+    retrieved from Open Congress — the LLM never supplies URLs itself, so
+    there's no risk of a hallucinated link.
+
+    Falls back to a single non-clickable citation holding the raw text if
+    the response isn't valid JSON, so a formatting slip degrades the
+    feature instead of breaking it.
+    """
+    by_ref = {law.get("name", "").strip().lower(): law for law in national_laws if law.get("name")}
+
+    match = re.search(r"\[.*\]", raw, re.DOTALL)
+    json_text = match.group(0) if match else raw
+
+    try:
+        items = json.loads(json_text)
+        if not isinstance(items, list):
+            raise ValueError("expected a JSON array")
+    except (json.JSONDecodeError, ValueError) as exc:
+        logger.warning("Could not parse citation JSON, falling back to plain text: %s", exc)
+        return [{"law_title": "AI-generated legal basis", "reason": raw.strip(), "bill_ref": None, "status": None, "url": None}]
+
+    citations = []
+    for item in items:
+        if not isinstance(item, dict) or not item.get("law_title"):
+            continue
+        bill_ref = (item.get("bill_ref") or "").strip()
+        source_law = by_ref.get(bill_ref.lower())
+        status = item.get("status") if item.get("status") in ("enacted", "pending") else (
+            "pending" if source_law else "enacted"
+        )
+
+        if source_law:
+            url = _law_url(source_law)
+        elif status == "enacted":
+            # Not from a retrieved bill — try a verified LawPhil.net link
+            # using the RA number/year the model gave, if any.
+            url = _verified_enacted_law_url(item.get("ra_number"), item.get("year"))
+        else:
+            url = None
+
+        citations.append({
+            "law_title": item["law_title"],
+            "reason":    item.get("reason", ""),
+            "bill_ref":  bill_ref or None,
+            "status":    status,
+            "url":       url,
+        })
+    return citations
+
+
+_CONTENT_EXCERPT_LIMIT = 3000  # chars — enough for the operative clauses without ballooning the prompt
+
+
+def _clean_content_excerpt(content: str | None) -> str:
+    """Plain-text excerpt of the draft body for prompt context — strips the
+    Quill-generated HTML tags and caps length."""
+    if not content:
+        return ""
+    from django.utils.html import strip_tags
+    text = strip_tags(content).strip()
+    return text[:_CONTENT_EXCERPT_LIMIT]
+
+
+def generate_legal_basis(title: str, doc_type: str | None = None, content: str | None = None) -> list[dict]:
+    """
+    Searches Open Congress API for related Philippine national legislation,
+    then asks AI to suggest legal bases grounded in that source.
+
+    `content`, if given, is an excerpt of the draft's actual body (WHEREAS
+    clauses, operative provisions) — without it, the AI only has the title
+    to reason from, which produces generic, boilerplate-sounding citations
+    ("the Local Government Code grants LGUs the power to regulate...") that
+    don't engage with what the measure actually does.
+
+    Returns a list of citations, each shaped:
+        {"law_title": str, "reason": str, "bill_ref": str | None,
+         "status": "enacted" | "pending", "url": str | None}
+    `status` distinguishes real, in-force Republic Acts ("enacted") from
+    bills that have merely been filed in Congress and carry no legal
+    authority yet ("pending") — the Open Congress API is a bills tracker,
+    not a database of enacted law, so this distinction matters for what a
+    councilor can actually cite. `url` is only set when the underlying
+    bill has a real, verifiable source link — never a guessed or
+    LLM-supplied address.
+
+    National law only, by design — local-ordinance precedent is already
+    surfaced separately by the inline drafting check (ai_inline_check /
+    documents.rag.retriever.retrieve), so duplicating that lookup here
+    would just repeat the same result under a different feature.
+    """
+    if not title or not title.strip():
+        raise ValueError("generate_legal_basis() requires a non-empty document title.")
+
+    # Search national laws from Open Congress API — opt-out via settings,
+    # since this sends the draft title (via keyword extraction) externally.
+    if getattr(settings, "RAG_EXTERNAL_LAW_SEARCH_ENABLED", True):
+        keywords = _extract_search_keywords(title)
+        # Fetch a wider pool than we'll actually use — Congress often has
+        # several near-identical bills on one topic, so deduping down to 5
+        # from a 5-item fetch leaves too little to choose from.
+        raw_laws = search_philippine_laws(keywords, limit=15)
+        national_laws = _dedupe_bills(raw_laws, keep=5)
+        logger.info(
+            "Retrieved %d national law(s), %d after deduping, from Open Congress API "
+            "for keywords %r (title: %r)",
+            len(raw_laws), len(national_laws), keywords, title
+        )
+    else:
+        national_laws = []
+        logger.info("RAG_EXTERNAL_LAW_SEARCH_ENABLED is False — skipping Open Congress API lookup.")
+
+    content_excerpt = _clean_content_excerpt(content)
+    prompt = _build_prompt(title=title, doc_type=doc_type, national_laws=national_laws, content_excerpt=content_excerpt)
+    raw = _dispatch_to_backend(prompt, _resolve_backend())
+
+    return _parse_citations(raw, national_laws)
+
+
+def _build_prompt(title: str, doc_type: str | None, national_laws: list, content_excerpt: str = "") -> str:
+    """
+    Build the RAG prompt from national laws retrieved via the Open Congress
+    API. National law only — local-ordinance precedent is out of scope for
+    this feature (see generate_legal_basis()'s docstring).
     """
     doc_label = doc_type or "ORDINANCE"
 
-    # Format national laws section
     if national_laws:
-        national_section = "RELATED PHILIPPINE NATIONAL LEGISLATION (Open Congress API):\n"
+        national_section = (
+            "PENDING BILLS FROM OPEN CONGRESS API (filed in Congress, NOT yet enacted "
+            "law — these carry no legal authority on their own; treat them as context "
+            "on legislative activity, not as citable legal basis):\n"
+        )
         for law in national_laws:
             # Use congress_website_title as fallback since title is often None
             title_text = (
-                law.get('title') or 
-                law.get('long_title') or 
-                law.get('congress_website_title') or 
+                law.get('title') or
+                law.get('long_title') or
+                law.get('congress_website_title') or
                 'Unknown'
             )
-            bill_no = law.get('name', '')           # e.g. "HBN-04131"
+            bill_no = law.get('name', '')           # e.g. "HBN-04131" — the bill_ref the model must echo back
             congress = law.get('congress', '')
             date_filed = law.get('date_filed', '')
+            also_filed = law.get('_also_filed_as') or []
+            also_note = f" — also filed separately as {', '.join(also_filed)}" if also_filed else ""
             national_section += (
-                f"- {bill_no} (Congress {congress}, filed {date_filed}):\n"
+                f"- bill_ref: {bill_no} (Congress {congress}, filed {date_filed}){also_note}:\n"
                 f"  {title_text}\n"
             )
     else:
         national_section = (
-            "NATIONAL LEGISLATION: No related bills found in Open Congress API. "
-            "Use your training knowledge of Philippine laws carefully.\n"
+            "NATIONAL LEGISLATION: No related pending bills found in Open Congress API.\n"
         )
 
-    # Format local ordinances section
-    if local_docs:
-        local_section = "RETRIEVED LOCAL ORDINANCES FROM SAN JUAN CITY DATABASE:\n"
-        for doc in local_docs:
-            local_section += (
-                f"- [{doc.get('score', 0):.2f}] {doc.get('title', 'Unknown')}\n"
-                f"  Snippet: {doc.get('snippet', '')[:200]}\n"
-            )
-    else:
-        local_section = (
-            "LOCAL ORDINANCES: No similar ordinances found in San Juan City database yet.\n"
-        )
+    draft_section = (
+        f"DRAFT EXCERPT (the actual measure — use this to reason about the specific "
+        f"mechanism, not just the topic):\n{content_excerpt}\n"
+        if content_excerpt else
+        "DRAFT EXCERPT: not available — only the title is known, so reasoning must stay "
+        "general and should say so rather than inventing specifics.\n"
+    )
 
     return f"""/no_think
 You are a legal basis assistant for the Sangguniang Panlungsod of San Juan City, Metro Manila.
 
-{local_section}
-
 {national_section}
 
-Based on the sources above, suggest legal bases for the following:
+{draft_section}
+
+Based on the above, suggest national-law legal bases for the following:
 {doc_label}: "{title}"
 
-For each legal basis:
-1. Cite the specific law or ordinance name and number
-2. Explain why it is relevant to this draft
-3. Mark each as [LOCAL PRECEDENT] or [NATIONAL LAW]
+PRIORITIZE actual enacted Philippine national law (Republic Acts, Presidential Decrees,
+the Local Government Code, etc.) that you are highly confident actually exists and is in
+force — this is what belongs in an ordinance's legal-basis section. Only mention a pending
+bill from the source above if it adds genuinely useful context (e.g. Congress is actively
+legislating on this exact issue) — do not present a pending bill as if it were existing law.
+
+If several bills above cover the same underlying topic, treat that as one point (e.g. note
+that multiple legislators have filed on it), not as separate near-duplicate entries.
+
+BE SPECIFIC, NOT GENERIC:
+- When citing the Local Government Code (RA 7160), name the actual applicable clause —
+  e.g. "Section 16 (General Welfare Clause)", "Section 458 (specific powers of the
+  Sangguniang Panlungsod)", or the relevant taxing-power provision — not just "the Local
+  Government Code grants LGUs the power to regulate/tax." If you cannot tell which section
+  applies, say "[verify section]" rather than defaulting to a vague, generic description.
+- Match the cited law's MECHANISM to the draft's actual mechanism. If the draft excerpt is
+  a straight prohibition/ban with penalties, do not cite tax or revenue-raising provisions
+  (e.g. NIRC excise tax sections) just because a retrieved bill above happens to be about
+  taxing the same subject — that bill's approach is not necessarily this draft's approach.
+  Only cite tax law if the draft excerpt itself imposes a tax, fee, or similar charge.
+- "reason" must be a real explanation (2-4 sentences), not a one-liner: state what the cited
+  provision actually says or authorizes, then explain concretely how it supports what THIS
+  draft does — referencing its specific mechanism (ban, tax, permit, labeling, penalty,
+  etc.) and, where relevant, quoting or paraphrasing the operative language from the draft
+  excerpt. A sentence that would fit any ordinance on any topic is not acceptable.
+
+Respond with ONLY a JSON array — no markdown code fences, no other text. Each item:
+{{"bill_ref": "<exact bill_ref from the source above if citing a pending bill, else null>", "law_title": "<law name and number, e.g. Republic Act 7160>", "ra_number": <bare Republic Act number as an integer, e.g. 7160 — only if status is "enacted" and you are certain, else null>, "year": <year the law was enacted, as an integer — only if you are certain, else null>, "reason": "<2-4 sentences: what the provision says, then why it specifically applies to this draft>", "status": "enacted" or "pending"}}
 
 STRICT RULES:
-- Only cite laws visible in the sources above OR well-known Philippine laws you are highly confident about
-- For national laws not in the sources, only cite if you are 100% certain of the RA number
-- Never invent section numbers — write [verify section] if unsure
-- If no relevant laws found, say so honestly
-- Return only the legal basis suggestions, nothing else
+- "status": "enacted" for real, in-force national law; "pending" only for bills from the source above
+- When citing a source above, "bill_ref" MUST exactly match its bill_ref value — do not paraphrase it
+- When citing enacted law from general knowledge instead, set "bill_ref" to null
+- Only cite an enacted law if you are 100% certain of its RA/PD number — never invent one, and leave "ra_number"/"year" null rather than guess
+- Never invent section numbers — write "[verify section]" in the reason if unsure
+- Do not cite local San Juan City ordinances — this feature covers national law only
+- Prefer 2-4 distinct, genuinely relevant citations over a longer list of redundant ones
+- If nothing relevant applies, return an empty JSON array: []
 """
 
 

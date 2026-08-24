@@ -9,7 +9,7 @@ Usage:
 from django.core.management.base import BaseCommand
 
 from documents.models import Document, DocumentChunk, LegacyDocument
-from documents.rag.embedder import embed_document_chunks
+from documents.rag.embedder import embed_document
 
 
 class Command(BaseCommand):
@@ -60,24 +60,12 @@ class Command(BaseCommand):
 
         for doc in qs.iterator():
             try:
-                chunk_records = embed_document_chunks(doc, source_type=source_type)
-
-                if not chunk_records:
+                if embed_document(doc, source_type=source_type):
+                    self.stdout.write(f"  #{doc.pk} — chunks saved.")
+                    ok += 1
+                else:
                     self.stdout.write(self.style.WARNING(f"  #{doc.pk} — no chunks, skipping."))
                     failed += 1
-                    continue
-
-                # Delete stale chunks then bulk insert fresh ones
-                if source_type == "legacy_document":
-                    DocumentChunk.objects.filter(legacy_document=doc).delete()
-                    chunks = [DocumentChunk(legacy_document=doc, **_chunk_fields(cr)) for cr in chunk_records]
-                else:
-                    DocumentChunk.objects.filter(document=doc).delete()
-                    chunks = [DocumentChunk(document=doc, **_chunk_fields(cr)) for cr in chunk_records]
-
-                DocumentChunk.objects.bulk_create(chunks)
-                self.stdout.write(f"  #{doc.pk} — {len(chunk_records)} chunks saved.")
-                ok += 1
 
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f"  #{doc.pk} failed: {e}"))
@@ -86,12 +74,3 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f"  {label}: {ok}/{total} OK."))
         if failed:
             self.stdout.write(self.style.WARNING(f"  {label}: {failed} failed."))
-
-
-def _chunk_fields(cr: dict) -> dict:
-    return {
-        "chunk_type":  cr["chunk_type"],
-        "chunk_text":  cr["chunk_text"],
-        "embedding":   cr["embedding"],
-        "chunk_index": cr["chunk_index"],
-    }

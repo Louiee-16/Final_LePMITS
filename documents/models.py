@@ -5,6 +5,7 @@ from committees.models import Committee
 from archives.models import Archives
 from barangay.models import BarangayFiles
 from pgvector.django import VectorField
+from documents.sanitize import sanitize_document_html
 
 
 
@@ -57,9 +58,11 @@ class Document(models.Model):
         related_name='derived_drafts'
     )
     def save(self, *args, **kwargs):
+        self.content = sanitize_document_html(self.content)
+
         is_new = self.pk is None
         status_changed = False
-        
+
         if not is_new:
             old_instance = Document.objects.get(pk=self.pk)
             if old_instance.status != self.status:
