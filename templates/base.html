@@ -9,6 +9,12 @@
     <link rel="stylesheet" href="{% static 'css/tailwind.min.css' %}">
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- EB Garamond backs the drafting editor's "printed document" look
+         (draft.html, document_pdf.html, and other document-viewing
+         templates all reference it in CSS) but was never actually linked
+         here — it silently fell back to Georgia/Times New Roman everywhere
+         it was used. -->
+    <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/shepherd.js@11.2.0/dist/css/shepherd.css">
     <script src="https://cdn.jsdelivr.net/npm/shepherd.js@11.2.0/dist/js/shepherd.min.js"></script>
     <script>const USER_ROLE = "{{ user.role }}";</script>
@@ -610,7 +616,7 @@
         {% endwith %}
         {% endif %}
 
-        <section class="flex-1 overflow-y-auto custom-scrollbar p-8" style="background:#f8fafc;">
+        <section id="mainContentSection" class="flex-1 overflow-y-auto custom-scrollbar p-8" style="background:#f8fafc;">
             {% block content %}{% endblock %}
         </section>
     </main>

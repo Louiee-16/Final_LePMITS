@@ -238,3 +238,12 @@ OCR_CLEANUP_BACKEND = os.getenv('OCR_CLEANUP_BACKEND')
 # from leaving the system entirely (national-law suggestions will then rely
 # only on the AI model's own training knowledge).
 RAG_EXTERNAL_LAW_SEARCH_ENABLED = os.getenv('RAG_EXTERNAL_LAW_SEARCH_ENABLED', 'TRUE').strip().upper() == 'TRUE'
+
+# Trial OnlyOffice Document Server integration (see documents/views.py
+# onlyoffice_* views). Runs as a separate local Docker container, not part
+# of this Django app. JWT request-signing is left off for this local trial
+# to keep the first test simple — must be turned on (both here and on the
+# container) before this is used for real, since without it the source-
+# document and callback endpoints trust any caller that can reach them.
+ONLYOFFICE_SERVER_URL = os.getenv('ONLYOFFICE_SERVER_URL', 'http://localhost:8082')
+ONLYOFFICE_JWT_SECRET = os.getenv('ONLYOFFICE_JWT_SECRET', '')

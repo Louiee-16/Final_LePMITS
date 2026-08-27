@@ -1,3 +1,4 @@
+{% load document_extras %}
 <!DOCTYPE html>
 <html>
 <head>
@@ -36,10 +37,15 @@
 
         .meta { margin-bottom: 30px; font-size: 11px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
         
-        .content { 
-            text-align: justify; 
+        .content {
+            text-align: justify;
             font-size: 12px;
         }
+        .content p { margin-bottom: 6px; }
+        /* WHEREAS / "NOW, THEREFORE" clauses get a first-line indent in
+           real government documents; SECTION clauses stay flush-left —
+           see documents/templatetags/document_extras.py. */
+        .content p.clause-indent { text-indent: 2em; }
 
         /* Signatories Area */
         .signatories { margin-top: 50px; width: 100%; }
@@ -65,7 +71,7 @@
     </div>
 
     <div class="content">
-        {{ doc.content|linebreaks }}
+        {{ doc.content|merge_wrapped_paragraphs }}
     </div>
 
     <div class="signatories">

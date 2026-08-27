@@ -2,58 +2,46 @@
 {% load static %}
 
 {% block content %}
-<link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
 
-<div class="max-w-[1800px] mx-auto px-4 py-6">
+<div style="margin:-2rem; width:calc(100% + 4rem); height:calc(100% + 4rem); display:flex; flex-direction:column;">
 
-    <!-- HEADER -->
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-slate-100 pb-5 gap-4">
-        <div class="flex items-center gap-4">
-            <a href="javascript:history.back()" class="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-all shadow-sm">
-                <i data-lucide="arrow-left" style="width:14px;height:14px;vertical-align:middle;"></i>
-            </a>
-            <div>
-                <nav class="flex text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 gap-2 mb-1">
-                    <a href="{% url 'dashboard' %}" class="hover:text-slate-600 transition-colors">Legislative</a>
-                    <span class="text-slate-200">/</span>
-                    <span class="text-slate-600">Draft from Barangay Document</span>
-                </nav>
-                <h1 class="text-xl font-extrabold text-slate-900 tracking-tight leading-tight max-w-2xl">{{ doc.title }}</h1>
-                <p class="text-[10px] text-slate-400 font-medium mt-1">
-                    Submitted by <span class="font-black text-slate-600">{{ doc.origin_barangay.barangay_name }}</span>
-                    — {{ doc.created_at|date:"M d, Y" }}
-                </p>
-            </div>
+    <form id="draftForm" method="POST" action="{%url 'create-referred-draft' doc.id%}" class="hidden">
+        {% csrf_token %}
+        <input type="hidden" name="action" id="formAction" value="save">
+        <input type="hidden" name="doc_id" id="doc_id_field" value="{{ existing_draft.id }}">
+    </form>
+
+    <!-- HEADER BAR -->
+    <div style="flex:0 0 auto;" class="flex flex-wrap items-center gap-3 px-6 py-3 border-b border-slate-200 bg-white shadow-sm">
+        <a href="javascript:history.back()" class="w-9 h-9 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-all shrink-0">
+            <i data-lucide="arrow-left" style="width:14px;height:14px;"></i>
+        </a>
+
+        <div class="min-w-0 shrink">
+            <nav class="flex text-[9px] font-black uppercase tracking-[0.15em] text-slate-400 gap-1.5">
+                <span>Legislative</span><span class="text-slate-200">/</span><span class="text-slate-600">Draft from Barangay Document</span>
+            </nav>
+            <p class="text-[10px] text-slate-400 font-medium truncate">
+                Submitted by <span class="font-black text-slate-600">{{ doc.origin_barangay.barangay_name }}</span> — {{ doc.created_at|date:"M d, Y" }}
+            </p>
         </div>
 
-        <div class="flex items-center gap-3 shrink-0">
-            <span id="autosaveStatus" class="text-[10px] font-bold text-slate-500 uppercase tracking-widest hidden">
-                <i data-lucide="check-circle-2" style="width:11px;height:11px;margin-right:4px;vertical-align:middle;"></i> Synced
-            </span>
-            <span id="autosaveSaving" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden">
-                <i data-lucide="loader-circle" style="width:11px;height:11px;margin-right:4px;vertical-align:middle;" class="animate-spin"></i> Saving...
-            </span>
-            <button form="draftForm" type="submit" name="action" value="save"
-                class="px-5 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-50 hover:text-slate-600 transition-all shadow-sm">
-                <i data-lucide="save" style="width:13px;height:13px;margin-right:8px;vertical-align:middle;"></i> Save Draft
-            </button>
-            <button type="button" onclick="openSubmitModal()"
-                class="px-5 py-2.5 bg-slate-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-slate-100 hover:bg-slate-700 hover:-translate-y-0.5 transition-all">
-                <i data-lucide="send" style="width:13px;height:13px;margin-right:8px;vertical-align:middle;"></i> File Official Draft
-            </button>
-        </div>
+        <div class="flex-1"></div>
+
+        <button id="saveDraftBtn" form="draftForm" type="submit" name="action" value="save"
+            class="shrink-0 px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-lg font-bold text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all disabled:opacity-50">
+            <i data-lucide="save" style="width:12px;height:12px;margin-right:6px;vertical-align:middle;"></i><span class="btn-label">Save Draft</span>
+        </button>
+        <button type="button" onclick="openSubmitModal()"
+            class="shrink-0 px-4 py-2.5 bg-slate-600 text-white rounded-lg font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-slate-100 hover:bg-slate-700 transition-all">
+            <i data-lucide="send" style="width:12px;height:12px;margin-right:6px;vertical-align:middle;"></i>File Official Draft
+        </button>
     </div>
 
     <!-- MAIN SPLIT PANEL -->
-    <form id="draftForm" method="POST" action="{%url 'create-referred-draft' doc.id%}">
-        {% csrf_token %}
-        <input type="hidden" name="action" id="formAction" value="save">
-        <input type="hidden" name="doc_id" id="doc_id_field" value="{{ existing_draft.id|default:'' }}">
-
-        <!-- Panel wrapper — CSS grid driven by JS class -->
-        <div id="panelWrapper"
-             class="grid rounded-[2rem] overflow-hidden border border-slate-200 shadow-sm panel-normal"
-             style="height: calc(100vh - 210px); min-height: 580px;">
+    <div id="panelWrapper"
+         class="grid panel-normal"
+         style="flex:1 1 auto; min-height:0;">
 
             <!-- ── LEFT: PDF PANEL ───────────────────────────── -->
             <div id="pdfPanel" class="flex flex-col border-r border-slate-200 bg-white overflow-hidden transition-all duration-300">
@@ -127,13 +115,12 @@
                         <div class="w-2 h-2 rounded-full bg-slate-400"></div>
                         <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">Legislative Draft</span>
                     </div>
-                    <span id="wordCount" class="text-[9px] font-bold text-slate-300 uppercase tracking-widest">0 words</span>
                 </div>
 
                 <!-- Title -->
                 <div class="px-6 pt-5 pb-3 border-b border-slate-50 shrink-0">
                     <label class="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">Legislative Title</label>
-                    <textarea name="title" id="titleInput" rows="2"
+                    <textarea name="title" id="titleInput" form="draftForm" rows="2"
                         placeholder="An Ordinance/Resolution providing for..."
                         class="title-textarea w-full px-4 py-3 border border-slate-200 rounded-xl font-extrabold text-slate-800 outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-100 transition-all resize-none overflow-hidden leading-snug placeholder:font-normal placeholder:text-slate-300"
                         >{{ existing_draft.title|default:'' }}</textarea>
@@ -143,7 +130,7 @@
                 <div class="px-6 py-3 border-b border-slate-50 flex items-center gap-3 shrink-0">
 
                     <label class="doc-type-label">
-                        <input type="radio" name="type" value="RESOLUTION"
+                        <input type="radio" name="type" value="RESOLUTION" form="draftForm"
                             {% if existing_draft.doc_type == 'RESOLUTION' %}checked{% endif %} class="hidden">
                         <span class="type-pill {% if existing_draft.doc_type == 'RESOLUTION' %}active{% endif %}">
                             <i data-lucide="file-check-2" style="width:9px;height:9px;margin-right:4px;vertical-align:middle;"></i> Resolution
@@ -151,7 +138,7 @@
                     </label>
 
                     <!-- Committee selector -->
-                    <select name="referred_committee"
+                    <select name="referred_committee" form="draftForm"
                         class="ml-auto px-3 py-1.5 border border-slate-200 rounded-xl text-[10px] font-bold text-slate-600 bg-white outline-none focus:border-slate-300 transition-all">
                         <option value="">— No Committee —</option>
                         {% for committee in committees %}
@@ -163,15 +150,13 @@
                     </select>
                 </div>
 
-                <!-- Quill -->
+                <!-- Editor -->
                 <div class="flex-1 overflow-hidden flex flex-col">
-                    <div id="draftEditor" style="flex:1; min-height: 0;"></div>
-                    <textarea name="content" id="contentField" class="hidden">{{ existing_draft.content|default:'' }}</textarea>
+                    <div id="onlyofficeContainer" style="flex:1; min-height: 0;"></div>
                 </div>
             </div>
 
         </div>
-    </form>
 </div>
 
 
@@ -220,7 +205,6 @@
 </div>
 
 
-<script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
 <script>
     // ── Panel state ──────────────────────────────────────────────
     // States: 'normal' (50/50), 'collapsed' (pdf ~56px), 'expanded' (pdf 65%)
@@ -276,88 +260,19 @@
     applyState(panelState);
 
 
-    // ── Quill ────────────────────────────────────────────────────
-    const quill = new Quill('#draftEditor', {
-        theme: 'snow',
-        placeholder: 'WHEREAS, ...',
-        modules: {
-            toolbar: [
-                [{ 'header': [1, 2, 3, false] }],
-                ['bold', 'italic', 'underline', 'strike'],
-                [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-                [{ 'indent': '-1' }, { 'indent': '+1' }],
-                ['blockquote'], ['clean']
-            ]
-        }
-    });
-
-    const existingContent = document.getElementById('contentField').value;
-    if (existingContent) quill.root.innerHTML = existingContent;
-
-    document.getElementById('draftForm').addEventListener('submit', function () {
-        document.getElementById('contentField').value = quill.root.innerHTML;
-    });
-
-    // Word count
-    quill.on('text-change', () => {
-        const text  = quill.getText().trim();
-        const words = text ? text.split(/\s+/).filter(w => w).length : 0;
-        document.getElementById('wordCount').textContent = `${words} word${words !== 1 ? 's' : ''}`;
-        triggerAutosave();
-    });
-
     // ── Auto-grow title ──────────────────────────────────────────
     const titleInput = document.getElementById('titleInput');
     function autoGrow(el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
-    titleInput.addEventListener('input', () => { autoGrow(titleInput); triggerAutosave(); });
+    titleInput.addEventListener('input', () => autoGrow(titleInput));
     autoGrow(titleInput);
 
-    // ── Autosave ─────────────────────────────────────────────────
-    const docIdField   = document.getElementById('doc_id_field');
-    const statusSaved  = document.getElementById('autosaveStatus');
-    const statusSaving = document.getElementById('autosaveSaving');
-    let autosaveTimer  = null;
-
-    function triggerAutosave() {
-        clearTimeout(autosaveTimer);
-        autosaveTimer = setTimeout(serverSync, 3000);
-    }
-
-    function serverSync() {
-        const title   = titleInput.value.trim();
-        const content = quill.root.innerHTML.trim();
-        if (!title && content === '<p><br></p>') return;
-
-        statusSaving.classList.remove('hidden');
-        statusSaved.classList.add('hidden');
-
-        fetch("{% url 'autosave_draft' %}", {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-            body: JSON.stringify({
-                title: title || 'Untitled Draft',
-                content: content,
-                doc_id: docIdField.value || null
-            })
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.status === 'saved') {
-                docIdField.value = data.doc_id;
-                statusSaving.classList.add('hidden');
-                statusSaved.classList.remove('hidden');
-                setTimeout(() => statusSaved.classList.add('hidden'), 3000);
-            }
-        })
-        .catch(() => statusSaving.classList.add('hidden'));
-    }
+    const docIdField = document.getElementById('doc_id_field');
 
     // ── Doc type pills ───────────────────────────────────────────
     document.querySelectorAll('.doc-type-label input').forEach(radio => {
         radio.addEventListener('change', () => {
             document.querySelectorAll('.type-pill').forEach(p => p.classList.remove('active'));
             radio.nextElementSibling.classList.add('active');
-            triggerAutosave();
         });
     });
     document.querySelector('.doc-type-label input:checked')?.nextElementSibling.classList.add('active');
@@ -377,8 +292,26 @@
         const all = ['scheck1','scheck2','scheck3'].every(id => document.getElementById(id).checked);
         document.getElementById('submitConfirmBtn').disabled = !all;
     }
-    function confirmSubmit() {
-        document.getElementById('contentField').value = quill.root.innerHTML;
+    // Forces an immediate OnlyOffice save and waits for it to land before
+    // proceeding — see templates/documents/draft.html for the full
+    // explanation. Shared by both the plain Save Draft button and the
+    // File Official Draft confirmation modal below.
+    async function forceSaveEditor() {
+        if (!onlyofficeDocKey) return;
+        try {
+            await fetch(`/onlyoffice/${docIdField.value}/forcesave/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                body: JSON.stringify({ key: onlyofficeDocKey })
+            });
+        } catch (err) {
+            console.warn('forcesave before submit failed:', err);
+        }
+    }
+
+    async function confirmSubmit() {
+        document.getElementById('submitConfirmBtn').disabled = true;
+        await forceSaveEditor();
         document.getElementById('formAction').value = 'submit';
         document.getElementById('draftForm').submit();
     }
@@ -386,6 +319,97 @@
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') closeSubmitModal();
     });
+
+    document.getElementById('saveDraftBtn')?.addEventListener('click', async function (e) {
+        e.preventDefault();
+        if (this.disabled) return;
+        this.disabled = true;
+        const label = this.querySelector('.btn-label');
+        if (label) label.textContent = 'Saving…';
+        await forceSaveEditor();
+        document.getElementById('formAction').value = 'save';
+        document.getElementById('draftForm').submit();
+    });
+
+    // ── OnlyOffice editor — the only content editor on this page ──
+    let onlyofficeDocKey = null;
+    (function () {
+        const onlyofficeServerUrl = "{{ onlyoffice_server_url }}";
+        const docId = docIdField.value;
+
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = src;
+                s.onload = resolve;
+                s.onerror = () => reject(new Error('Failed to load ' + src));
+                document.head.appendChild(s);
+            });
+        }
+
+        // ── Similarity check — see templates/documents/draft.html for the
+        // full explanation. Runs after each save lands, writes native Word
+        // comments onto matching paragraphs in the saved .docx.
+        function showSimilarityToast(count) {
+            const existing = document.getElementById('similarityToast');
+            if (existing) existing.remove();
+            const toast = document.createElement('div');
+            toast.id = 'similarityToast';
+            // No auto-dismiss — see draft.html for why.
+            toast.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;background:#1e293b;color:#fff;padding:14px 16px;border-radius:12px;font-size:12px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,0.25);max-width:340px;';
+            toast.innerHTML = `
+                <div style="display:flex;align-items:flex-start;gap:10px;">
+                    <span style="flex:1;line-height:1.5;">
+                        ⚠ ${count} passage${count !== 1 ? 's' : ''} may resemble existing legislation.
+                        <span style="display:block;font-weight:400;color:#cbd5e1;margin-top:4px;">
+                            Reopen this document, then check the <b>Collaboration</b> tab → <b>Comments</b> panel to review.
+                        </span>
+                    </span>
+                    <button style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:14px;flex-shrink:0;" onclick="this.closest('#similarityToast').remove()">✕</button>
+                </div>`;
+            document.body.appendChild(toast);
+        }
+
+        async function checkSimilarity() {
+            try {
+                const resp = await fetch(`/onlyoffice/${docId}/similarity-check/`, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+                });
+                const data = await resp.json();
+                if (data.new_flags > 0) showSimilarityToast(data.new_flags);
+            } catch (err) {
+                console.debug('similarity check failed:', err);
+            }
+        }
+
+        async function mountOnlyOffice() {
+            try {
+                await loadScript(`${onlyofficeServerUrl}/web-apps/apps/api/documents/api.js`);
+                const resp = await fetch(`/onlyoffice/${docId}/config/`);
+                if (!resp.ok) throw new Error('Could not load OnlyOffice config (' + resp.status + ')');
+                const config = await resp.json();
+                onlyofficeDocKey = config.document.key;
+                config.width = '100%';
+                config.height = '100%';
+                config.type = 'desktop';
+                config.events = {
+                    onDocumentStateChange: function (event) {
+                        if (event.data === false) checkSimilarity();
+                    },
+                };
+                new DocsAPI.DocEditor('onlyofficeContainer', config);
+            } catch (err) {
+                document.getElementById('onlyofficeContainer').innerHTML =
+                    `<div style="padding:40px;text-align:center;color:#dc2626;font-size:13px;font-weight:600;">
+                        The document editor failed to load — is the Document Server running?<br>
+                        <span style="font-weight:400;color:#94a3b8;">${err.message}</span>
+                    </div>`;
+            }
+        }
+
+        mountOnlyOffice();
+    })();
 </script>
 
 <style>
@@ -415,38 +439,6 @@
         transition: all 0.15s ease;
         flex-shrink: 0;
     }
-
-    /* ── Quill ───────────────────────────────────────── */
-    .ql-toolbar.ql-snow {
-        border: none !important;
-        border-bottom: 1px solid #f1f5f9 !important;
-        background: #f8fafc;
-        padding: 8px 16px !important;
-        position: sticky;
-        top: 0;
-        z-index: 10;
-    }
-    .ql-container.ql-snow {
-        border: none !important;
-        font-size: 13px;
-        font-family: Georgia, serif;
-        overflow-y: auto;
-        flex: 1;
-    }
-    #draftEditor {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-        overflow: hidden;
-    }
-    #draftEditor .ql-editor {
-        padding: 24px 32px !important;
-        line-height: 1.9;
-        color: #1e293b;
-        min-height: 100%;
-    }
-    #draftEditor > .ql-container { flex: 1; overflow-y: auto; }
-    .ql-editor.ql-blank::before { color: #94a3b8; font-style: italic; }
 
     /* ── Title textarea ──────────────────────────────── */
     .title-textarea {

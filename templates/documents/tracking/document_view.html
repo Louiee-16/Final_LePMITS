@@ -34,7 +34,7 @@
             </button>
 
             <!-- Download PDF -->
-            <a href=""
+            <a href="{% url 'download_document_pdf' pdf_doc_id %}" target="_blank"
                 class="px-4 py-2.5 bg-slate-900 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-700 transition-all shadow-sm flex items-center gap-2">
                 <i data-lucide="file-down" style="width:14px;height:14px;"></i> Download PDF
             </a>
@@ -44,6 +44,63 @@
 
 <!-- PAPER WRAPPER -->
 <div class="max-w-4xl mx-auto px-4 py-6" id="documentPaper">
+{% if doc.has_snapshot_pdf %}
+    <!-- Primary path — a plain PDF snapshot taken at the last checkpoint
+         (filing, or an amendment finalize). Far lighter than mounting a
+         full editor just to look at something read-only, and for a trail
+         version this is the ONLY way to see it exactly as it looked at
+         that stage (the live docx always reflects current state). -->
+    <iframe src="{{ snapshot_pdf_url }}" style="width:100%; height:85vh; border:0; background:#fff;" class="rounded-2xl border border-slate-200 shadow-xl"></iframe>
+{% elif doc.has_onlyoffice_docx %}
+    <!-- ══════════════════════════════════════════════════════════════
+         Exact-fidelity view — renders the real .docx the councilor
+         authored (letterhead, sponsor line, signatures, fonts, colors —
+         all of it, since it's typed directly into the document now)
+         instead of a reconstruction from stripped HTML. Read-only.
+         ══════════════════════════════════════════════════════════════ -->
+    <div id="onlyofficeViewer{{ doc.id }}" style="width:100%; height:85vh; background:#fff;" class="rounded-2xl border border-slate-200 shadow-xl overflow-hidden"></div>
+
+    <script>
+    (function () {
+        const onlyofficeServerUrl = "{{ onlyoffice_server_url }}";
+
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = src;
+                s.onload = resolve;
+                s.onerror = () => reject(new Error('Failed to load ' + src));
+                document.head.appendChild(s);
+            });
+        }
+
+        async function mount() {
+            const container = document.getElementById('onlyofficeViewer{{ doc.id }}');
+            try {
+                await loadScript(`${onlyofficeServerUrl}/web-apps/apps/api/documents/api.js`);
+                const resp = await fetch(`/onlyoffice/{{ doc.id }}/view-config/`);
+                if (!resp.ok) throw new Error('Could not load document (' + resp.status + ')');
+                const config = await resp.json();
+                config.width = '100%';
+                config.height = '100%';
+                config.type = 'desktop';
+                new DocsAPI.DocEditor('onlyofficeViewer{{ doc.id }}', config);
+            } catch (err) {
+                container.innerHTML =
+                    `<div style="padding:40px;text-align:center;color:#dc2626;font-size:13px;font-weight:600;">
+                        Could not load the document viewer.<br>
+                        <span style="font-weight:400;color:#94a3b8;">${err.message}</span>
+                    </div>`;
+            }
+        }
+
+        mount();
+    })();
+    </script>
+{% else %}
+    <!-- Legacy fallback — this document predates the OnlyOffice migration
+         and has no saved .docx, so it's reconstructed from the stored
+         HTML the same way it always was. -->
     <div class="paper bg-white shadow-xl border border-slate-200 mx-auto relative" style="max-width: 816px; padding: 72px 88px;">
 
         {% if doc.doc_type == 'ORDINANCE' %}
@@ -63,7 +120,7 @@
         <!-- Doc number -->
         <div class="text-center mb-3">
             <p class="text-[13px] font-black uppercase tracking-wide text-slate-900">
-                {% if doc.status != 'APPROVED'  %}Draft {% endif %}Ordinance No. {{ doc.ref_number}}
+                {% if doc.status == 'DRAFT' or doc.status == 'GHOST' %}Draft {% endif %}Ordinance No. {{ doc.ref_number}}
             </p>
             <p class="text-[11px] text-slate-500 mt-0.5">Series of {{ doc.created_at|date:"Y" }}</p>
         </div>
@@ -136,7 +193,7 @@
         <div class="text-center mb-3">
             <p class="text-[13px] font-black uppercase tracking-wide text-slate-900">
 
-                {% if doc.status != 'APPROVED'  %}Draft {% endif %}Resolution No.{{doc.ref_number}}
+                {% if doc.status == 'DRAFT' or doc.status == 'GHOST' %}Draft {% endif %}Resolution No.{{doc.ref_number}}
             </p>
             <p class="text-[11px] text-slate-500 mt-0.5">Series of {{ doc.created_at|date:"Y" }}</p>
         </div>
@@ -235,6 +292,7 @@
 
     </div>
     <!-- end .paper -->
+{% endif %}
 </div>
 
 <style>

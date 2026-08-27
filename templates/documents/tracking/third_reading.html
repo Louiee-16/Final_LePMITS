@@ -68,8 +68,14 @@
                         <div class="flex items-center justify-end gap-3">
                             
                             {% if user.role == 'SECRETARIAT' or user.role == 'STAFF' %}
+                                <!-- Action: Print for signature -->
+                                <a href="{% url 'download_document_pdf' doc.id %}" target="_blank" onclick="event.stopPropagation()"
+                                    class="px-5 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all" title="Print a copy for the councilors to sign">
+                                    <i data-lucide="printer" style="width:13px;height:13px;margin-right:6px;vertical-align:middle;"></i> Print
+                                </a>
+
                                 <!-- Action: Final Approval (Green) -->
-                                <button type="button" 
+                                <button type="button"
                                     onclick="event.stopPropagation();openApprovalModal('{{ doc.id }}', '{{ doc.title|escapejs }}')"
                                     class="px-5 py-2.5 bg-slate-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-slate-100 hover:bg-slate-700 hover:-translate-y-0.5 transition-all">
                                     <i data-lucide="check-check" style="width:13px;height:13px;margin-right:6px;vertical-align:middle;"></i> Final Approval
@@ -107,15 +113,28 @@
 <div id="approvalModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-[2rem] shadow-2xl max-w-lg w-full p-10 transform transition-all">
         <h2 class="text-2xl font-[900] text-slate-800 mb-2">Confirm Enactment</h2>
-        <p class="text-slate-500 text-sm mb-8">
-            You are about to officially approve this measure. This will move the document to the **Approved** state and create the final paper trail archive.
+        <p class="text-slate-500 text-sm mb-6">
+            This will move the document to the <strong>Approved</strong> state and create the final paper trail archive.
+            Print the measure first, have the councilors sign it, then upload the scanned copy here — it's required to complete approval.
         </p>
-        
-        <p id="modalDocTitle" class="bg-slate-50 p-4 rounded-xl text-xs font-bold text-slate-700 border border-slate-100 mb-8 italic"></p>
 
-        <form id="approvalForm" method="POST" action="">
+        <p id="modalDocTitle" class="bg-slate-50 p-4 rounded-xl text-xs font-bold text-slate-700 border border-slate-100 mb-6 italic"></p>
+
+        <form id="approvalForm" method="POST" action="" enctype="multipart/form-data">
             {% csrf_token %}
-            
+
+            <label for="signedPdfInput" class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
+                Scanned Signed Copy (PDF) <span class="text-red-400">*</span>
+            </label>
+            <label id="signedPdfDropzone" for="signedPdfInput"
+                class="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-200 rounded-2xl py-8 mb-2 cursor-pointer hover:border-slate-300 hover:bg-slate-50/50 transition-all">
+                <i data-lucide="upload" style="width:20px;height:20px;color:#94a3b8;"></i>
+                <span id="signedPdfLabel" class="text-xs font-bold text-slate-500">Click to choose the signed PDF</span>
+            </label>
+            <input type="file" name="signed_pdf" id="signedPdfInput" accept="application/pdf" required class="hidden"
+                onchange="document.getElementById('signedPdfLabel').textContent = this.files[0] ? this.files[0].name : 'Click to choose the signed PDF'; document.getElementById('signedPdfDropzone').classList.toggle('border-slate-300', !!this.files[0]);">
+            <p class="text-[10px] text-slate-400 mb-8">PDF only — this becomes the official record shown in the Gazette.</p>
+
             <div class="flex gap-3">
                 <button type="button" onclick="closeApprovalModal()" class="flex-1 py-4 text-slate-400 font-bold hover:text-slate-600">Wait, Go Back</button>
                 <button type="submit" class="flex-[2] bg-slate-600 text-white py-4 rounded-2xl font-black hover:bg-slate-700 shadow-lg shadow-slate-100">
@@ -147,7 +166,16 @@ document.querySelectorAll("tr[data-doc-id]").forEach(row =>{
 
         fetch(`/modal/document/${docId}`)
             .then(response => response.text())
-            .then(html => contentDiv.innerHTML = html)
+            .then(html => {
+                contentDiv.innerHTML = html;
+                // innerHTML doesn't execute <script> tags — re-create each
+                // one so the OnlyOffice viewer mount script runs.
+                contentDiv.querySelectorAll('script').forEach(old => {
+                    const s = document.createElement('script');
+                    if (old.src) s.src = old.src; else s.textContent = old.textContent;
+                    old.parentNode.replaceChild(s, old);
+                });
+            })
             .catch(err => contentDiv.innerHTML = "<p class='text-slate-500 text-center mt-10'>Failed to load document.</p>");
 
 
@@ -166,6 +194,9 @@ document.getElementById('closeDocModal').addEventListener('click', ()=>{
     function openApprovalModal(docId, title) {
         document.getElementById('approvalForm').action = `/approve/${docId}/`;
         document.getElementById('modalDocTitle').innerText = title;
+        document.getElementById('approvalForm').reset();
+        document.getElementById('signedPdfLabel').textContent = 'Click to choose the signed PDF';
+        document.getElementById('signedPdfDropzone').classList.remove('border-slate-300');
         document.getElementById('approvalModal').classList.remove('hidden');
     }
     function closeApprovalModal() {

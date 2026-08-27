@@ -148,7 +148,16 @@ document.querySelectorAll('tr[data-doc-id]').forEach(row => {
         contentDiv.innerHTML = "<p class='text-center text-slate-500 mt-10'>Loading document...</p>";
         fetch(`/modal/document/${docId}`)
             .then(response => response.text())
-            .then(html => contentDiv.innerHTML=html)
+            .then(html => {
+                contentDiv.innerHTML = html;
+                // innerHTML doesn't execute <script> tags — re-create each
+                // one so the OnlyOffice viewer mount script runs.
+                contentDiv.querySelectorAll('script').forEach(old => {
+                    const s = document.createElement('script');
+                    if (old.src) s.src = old.src; else s.textContent = old.textContent;
+                    old.parentNode.replaceChild(s, old);
+                });
+            })
             .catch(err=> contentDiv.innerHTML = "<p class='text-slate-500 text-center mt-10'>Failed to load document.</p>");
 
 

@@ -275,7 +275,17 @@ function openDocModal(docId, source) {
     const url = source === 'legacy' ? `/modal/legacy/${docId}/` : `/modal/document/${docId}`;
     fetch(url)
         .then(r => r.text())
-        .then(html => { contentDiv.innerHTML = html; if (window.lucide) lucide.createIcons(); })
+        .then(html => {
+            contentDiv.innerHTML = html;
+            // innerHTML doesn't execute <script> tags — re-create each one
+            // so the modal partial's OnlyOffice viewer mount script runs.
+            contentDiv.querySelectorAll('script').forEach(old => {
+                const s = document.createElement('script');
+                if (old.src) s.src = old.src; else s.textContent = old.textContent;
+                old.parentNode.replaceChild(s, old);
+            });
+            if (window.lucide) lucide.createIcons();
+        })
         .catch(() => contentDiv.innerHTML = "<p style='text-align:center;padding:40px;color:#94a3b8;'>Failed to load document.</p>");
 }
 

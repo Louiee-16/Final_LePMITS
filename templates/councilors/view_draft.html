@@ -2,6 +2,220 @@
 {% load static %}
 
 {% block content %}
+
+{% if draft.status == 'DRAFT' %}
+<!-- ══════════════════════════════════════════════════════════════
+     EDIT MODE — maximized full-panel OnlyOffice editor, same
+     pattern as templates/documents/draft.html.
+     ══════════════════════════════════════════════════════════════ -->
+<div style="margin:-2rem; width:calc(100% + 4rem); height:calc(100% + 4rem); display:flex; flex-direction:column;">
+
+    <form id="draftEditForm" method="POST" action="{%url 'create_draft'%}" class="hidden">
+        {% csrf_token %}
+        <input type="hidden" name="doc_id" value="{{ draft.id }}">
+    </form>
+
+    <!-- HEADER BAR -->
+    <div style="flex:0 0 auto;" class="flex flex-wrap items-center gap-3 px-6 py-3 border-b border-slate-200 bg-white shadow-sm">
+        <a href="javascript:history.back()" class="w-9 h-9 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-all shrink-0">
+            <i data-lucide="arrow-left" style="width:14px;height:14px;"></i>
+        </a>
+
+        <div class="shrink-0">
+            <nav class="flex text-[9px] font-black uppercase tracking-[0.15em] text-slate-400 gap-1.5">
+                <span>Legislative</span><span class="text-slate-200">/</span><span class="text-slate-600">Edit Draft</span>
+            </nav>
+        </div>
+
+        <input type="text" name="title" id="titleInput" form="draftEditForm" required
+            placeholder="An Ordinance/Resolution providing for..."
+            value="{{ draft.title }}"
+            class="flex-1 min-w-[220px] px-3 py-2 border border-slate-200 rounded-lg font-bold text-sm text-slate-800 outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-100 transition-all">
+
+        <div class="flex items-center gap-1.5 shrink-0" id="typeToggle">
+            <label class="type-pill-label">
+                <input type="radio" name="type" value="ORDINANCE" form="draftEditForm"
+                    {% if draft.doc_type == 'ORDINANCE' %}checked{% endif %} class="hidden">
+                <span class="type-pill {% if draft.doc_type == 'ORDINANCE' %}active{% endif %}">Ordinance</span>
+            </label>
+            <label class="type-pill-label">
+                <input type="radio" name="type" value="RESOLUTION" form="draftEditForm"
+                    {% if draft.doc_type == 'RESOLUTION' %}checked{% endif %} class="hidden">
+                <span class="type-pill {% if draft.doc_type == 'RESOLUTION' %}active{% endif %}">Resolution</span>
+            </label>
+        </div>
+
+        <select name="referred_committee" form="draftEditForm"
+            class="shrink-0 px-3 py-2 border border-slate-200 rounded-lg text-[11px] font-bold text-slate-600 bg-white outline-none focus:border-slate-300 transition-all max-w-[170px]">
+            <option value="">— No Committee Yet —</option>
+            {% for committee in committees %}
+                <option value="{{ committee.id }}"
+                    {% if draft.referred_committee_id == committee.id %}selected{% endif %}>
+                    {{ committee.name }}
+                </option>
+            {% endfor %}
+        </select>
+
+        <button id="saveDraftBtn" form="draftEditForm" type="submit" name="action" value="save"
+            class="shrink-0 px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-lg font-bold text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all disabled:opacity-50">
+            <i data-lucide="save" style="width:12px;height:12px;margin-right:6px;vertical-align:middle;"></i><span class="btn-label">Save Draft</span>
+        </button>
+        <button id="fileDraftBtn" form="draftEditForm" type="submit" name="action" value="submit"
+            class="shrink-0 px-4 py-2.5 bg-slate-600 text-white rounded-lg font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-slate-100 hover:bg-slate-700 transition-all disabled:opacity-50">
+            <i data-lucide="send" style="width:12px;height:12px;margin-right:6px;vertical-align:middle;"></i><span class="btn-label">File Draft</span>
+        </button>
+    </div>
+
+    <!-- EDITOR — fills all remaining space -->
+    <div id="onlyofficeContainer" style="flex:1 1 auto; min-height:0; width:100%;"></div>
+</div>
+
+<script>
+    // ── Type pill toggle ─────────────────────────────────────────
+    document.querySelectorAll('#typeToggle input').forEach(radio => {
+        radio.addEventListener('change', () => {
+            document.querySelectorAll('.type-pill').forEach(p => p.classList.remove('active'));
+            radio.nextElementSibling.classList.add('active');
+        });
+    });
+
+    // ── OnlyOffice editor — the only content editor on this page ──
+    const onlyofficeDocId = "{{ draft.id }}";
+    let onlyofficeDocKey = null;
+
+    (function () {
+        const onlyofficeServerUrl = "{{ onlyoffice_server_url }}";
+
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = src;
+                s.onload = resolve;
+                s.onerror = () => reject(new Error('Failed to load ' + src));
+                document.head.appendChild(s);
+            });
+        }
+
+        // ── Similarity check — see templates/documents/draft.html for the
+        // full explanation. Runs after each save lands, writes native Word
+        // comments onto matching paragraphs in the saved .docx.
+        function showSimilarityToast(count) {
+            const existing = document.getElementById('similarityToast');
+            if (existing) existing.remove();
+            const toast = document.createElement('div');
+            toast.id = 'similarityToast';
+            // No auto-dismiss — see draft.html for why.
+            toast.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;background:#1e293b;color:#fff;padding:14px 16px;border-radius:12px;font-size:12px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,0.25);max-width:340px;';
+            toast.innerHTML = `
+                <div style="display:flex;align-items:flex-start;gap:10px;">
+                    <span style="flex:1;line-height:1.5;">
+                        ⚠ ${count} passage${count !== 1 ? 's' : ''} may resemble existing legislation.
+                        <span style="display:block;font-weight:400;color:#cbd5e1;margin-top:4px;">
+                            Reopen this document, then check the <b>Collaboration</b> tab → <b>Comments</b> panel to review.
+                        </span>
+                    </span>
+                    <button style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:14px;flex-shrink:0;" onclick="this.closest('#similarityToast').remove()">✕</button>
+                </div>`;
+            document.body.appendChild(toast);
+        }
+
+        async function checkSimilarity() {
+            try {
+                const resp = await fetch(`/onlyoffice/${onlyofficeDocId}/similarity-check/`, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+                });
+                const data = await resp.json();
+                if (data.new_flags > 0) showSimilarityToast(data.new_flags);
+            } catch (err) {
+                console.debug('similarity check failed:', err);
+            }
+        }
+
+        async function mountOnlyOffice() {
+            try {
+                await loadScript(`${onlyofficeServerUrl}/web-apps/apps/api/documents/api.js`);
+                const resp = await fetch(`/onlyoffice/${onlyofficeDocId}/config/`);
+                if (!resp.ok) throw new Error('Could not load OnlyOffice config (' + resp.status + ')');
+                const config = await resp.json();
+                onlyofficeDocKey = config.document.key;
+                config.width = '100%';
+                config.height = '100%';
+                config.type = 'desktop';
+                config.events = {
+                    onDocumentStateChange: function (event) {
+                        if (event.data === false) checkSimilarity();
+                    },
+                };
+                new DocsAPI.DocEditor('onlyofficeContainer', config);
+            } catch (err) {
+                document.getElementById('onlyofficeContainer').innerHTML =
+                    `<div style="padding:40px;text-align:center;color:#dc2626;font-size:13px;font-weight:600;">
+                        The document editor failed to load — is the Document Server running?<br>
+                        <span style="font-weight:400;color:#94a3b8;">${err.message}</span>
+                    </div>`;
+            }
+        }
+
+        mountOnlyOffice();
+    })();
+
+    // ── Force a save before Save Draft / File Draft navigate away ──────
+    // See templates/documents/draft.html for the full explanation — OnlyOffice's
+    // own autosave is idle-triggered, so an immediate click right after typing
+    // can navigate away before it fires, silently losing the edit.
+    ['saveDraftBtn', 'fileDraftBtn'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        btn.addEventListener('click', async function (e) {
+            e.preventDefault();
+            if (btn.disabled) return;
+
+            const allBtns = [document.getElementById('saveDraftBtn'), document.getElementById('fileDraftBtn')].filter(Boolean);
+            allBtns.forEach(b => b.disabled = true);
+            const label = btn.querySelector('.btn-label');
+            if (label) label.textContent = 'Saving…';
+
+            if (onlyofficeDocKey) {
+                try {
+                    await fetch(`/onlyoffice/${onlyofficeDocId}/forcesave/`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                        body: JSON.stringify({ key: onlyofficeDocKey })
+                    });
+                } catch (err) {
+                    console.warn('forcesave before submit failed:', err);
+                }
+            }
+
+            const form = document.getElementById('draftEditForm');
+            const actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'action';
+            actionInput.value = btn.value;
+            form.appendChild(actionInput);
+            form.submit();
+        });
+    });
+</script>
+
+<style>
+    .type-pill {
+        display: block; padding: 7px 10px; border-radius: 8px;
+        font-size: 9px; font-weight: 900; text-transform: uppercase;
+        letter-spacing: 0.06em; cursor: pointer;
+        border: 1.5px solid #e2e8f0; color: #94a3b8;
+        transition: all 0.15s ease; background: white; white-space: nowrap;
+    }
+    .type-pill:hover { border-color: #c7d2fe; color: #6366f1; }
+    .type-pill.active { background: #eef2ff; border-color: #6366f1; color: #4f46e5; }
+</style>
+
+{% else %}
+<!-- ══════════════════════════════════════════════════════════════
+     VIEW MODE — a filed/read-only document. Unchanged from before:
+     a static paper-style display, no editor, no reason to maximize.
+     ══════════════════════════════════════════════════════════════ -->
 <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
 
 <div class="max-w-[1200px] mx-auto px-4 py-8">
@@ -16,23 +230,12 @@
                 <nav class="flex text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 gap-2 mb-1">
                     <a href="{% url 'dashboard' %}" class="hover:text-slate-600 transition-colors">Legislative</a>
                     <span class="text-slate-200">/</span>
-                    <span class="text-slate-600">
-                        {% if draft.status == 'DRAFT' %}Edit Draft{% else %}View Document{% endif %}
-                    </span>
+                    <span class="text-slate-600">View Document</span>
                 </nav>
                 <div class="flex items-center gap-3">
-                    <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">
-                        {% if draft.status == 'DRAFT' %}Editing Draft{% else %}Record #{{ draft.id }}{% endif %}
-                    </h1>
+                    <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Record #{{ draft.id }}</h1>
                     <!-- Status badge -->
-                    <span class="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest
-                        {% if draft.status == 'DRAFT' %}bg-slate-100 text-slate-500
-                        {% elif draft.status == 'FILED' %}bg-slate-50 text-slate-600
-                        {% elif draft.status == 'FIRST_READING' %}bg-slate-50 text-slate-600
-                        {% elif draft.status == 'SECOND_READING' %}bg-slate-50 text-slate-600
-                        {% elif draft.status == 'THIRD_READING' %}bg-slate-50 text-slate-600
-                        {% elif draft.status == 'APPROVED' %}bg-slate-50 text-slate-600
-                        {% else %}bg-slate-100 text-slate-500{% endif %}">
+                    <span class="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-slate-50 text-slate-600">
                         {{ draft.get_status_display }}
                     </span>
                 </div>
@@ -40,83 +243,86 @@
         </div>
 
         <div class="flex items-center gap-3">
-            {% if draft.status == 'DRAFT' %}
-                <!-- DRAFT MODE — edit actions -->
-                <span id="autosaveStatus" class="text-[10px] font-bold text-slate-500 uppercase tracking-widest hidden">
-                    <i data-lucide="check-circle-2" style="width:11px;height:11px;margin-right:4px;vertical-align:middle;"></i> Synced
-                </span>
-                <span id="autosaveSaving" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden">
-                    <i data-lucide="loader-circle" style="width:11px;height:11px;margin-right:4px;vertical-align:middle;" class="animate-spin"></i> Saving...
-                </span>
-                <button form="draftEditForm" type="submit" name="action" value="save"
-                    class="px-5 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm">
-                    <i data-lucide="save" style="width:13px;height:13px;margin-right:8px;vertical-align:middle;"></i> Save Draft
-                </button>
-                <button form="draftEditForm" type="submit" name="action" value="submit"
-                    class="px-5 py-3 bg-slate-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-slate-100 hover:bg-slate-700 hover:-translate-y-0.5 transition-all">
-                    <i data-lucide="send" style="width:13px;height:13px;margin-right:8px;vertical-align:middle;"></i> File Draft
-                </button>
-            {% else %}
-                <!-- FILED / VIEW MODE — read actions only -->
-                <button onclick="window.print()"
-                    class="px-5 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm">
-                    <i data-lucide="printer" style="width:13px;height:13px;margin-right:8px;vertical-align:middle;"></i> Print
-                </button>
-                <a href="{% url 'generate_pdf' draft.id %}"
-                    class="px-5 py-3 bg-slate-900 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-700 transition-all">
-                    <i data-lucide="file-down" style="width:13px;height:13px;margin-right:8px;vertical-align:middle;"></i> Export PDF
-                </a>
-            {% endif %}
+            <button onclick="window.print()"
+                class="px-5 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm">
+                <i data-lucide="printer" style="width:13px;height:13px;margin-right:8px;vertical-align:middle;"></i> Print
+            </button>
+            <a href="{% url 'download_document_pdf' draft.id %}" target="_blank"
+                class="px-5 py-3 bg-slate-900 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-700 transition-all">
+                <i data-lucide="file-down" style="width:13px;height:13px;margin-right:8px;vertical-align:middle;"></i> Export PDF
+            </a>
         </div>
     </div>
 
     <!-- READ-ONLY NOTICE BANNER -->
-    {% if draft.status != 'DRAFT' %}
     <div class="mb-6 flex items-center gap-3 px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl">
         <i data-lucide="lock" style="width:15px;height:15px;color:#fbbf24;"></i>
         <p class="text-xs font-bold text-slate-700">
-            This document has been officially filed and is now <span class="uppercase">read-only</span>. 
+            This document has been officially filed and is now <span class="uppercase">read-only</span>.
             It can no longer be edited.
         </p>
     </div>
-    {% endif %}
 
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
         <!-- LEFT: MAIN CONTENT -->
         <div class="lg:col-span-8 space-y-6">
+            {% if draft.has_snapshot_pdf %}
+            <!-- Primary path — a plain PDF snapshot taken at the last
+                 checkpoint (filing, or an amendment finalize). Far lighter
+                 than mounting a full editor just to look at something
+                 read-only. -->
+            <iframe src="{{ snapshot_pdf_url }}" style="width:100%; height:85vh; border:0; background:#fff;" class="rounded-[2rem] border border-slate-200 shadow-sm"></iframe>
+            {% elif draft.has_onlyoffice_docx %}
+            <!-- ══════════════════════════════════════════════════════════
+                 Exact-fidelity view — renders the real .docx the councilor
+                 authored (letterhead, sponsor line, signatures, fonts,
+                 colors — all of it) instead of a reconstruction from
+                 stripped HTML. Read-only.
+                 ══════════════════════════════════════════════════════════ -->
+            <div id="onlyofficeViewer{{ draft.id }}" style="width:100%; height:85vh; background:#fff;" class="rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden"></div>
 
-            {% if draft.status == 'DRAFT' %}
-            <!-- ══════════════════════════════
-                 EDIT MODE
-            ══════════════════════════════ -->
-            <form id="draftEditForm" method="POST" action="{%url 'create_draft'%}">
-                {% csrf_token %}
-                <input type="hidden" name="doc_id" value="{{ draft.id }}">
+            <script>
+            (function () {
+                const onlyofficeServerUrl = "{{ onlyoffice_server_url }}";
 
-                <!-- Title — big textarea -->
-                <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8 mb-6">
-                    <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">Legislative Title</label>
-                    <textarea name="title" id="titleInput" required rows="3"
-                        class="w-full px-4 py-4 border border-slate-200 rounded-xl text-lg font-extrabold text-slate-800 outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-100 transition-all resize-none placeholder:font-normal placeholder:text-slate-300 leading-snug"
-                        placeholder="An Ordinance/Resolution providing for...">{{ draft.title }}</textarea>
-                </div>
+                function loadScript(src) {
+                    return new Promise((resolve, reject) => {
+                        const s = document.createElement('script');
+                        s.src = src;
+                        s.onload = resolve;
+                        s.onerror = () => reject(new Error('Failed to load ' + src));
+                        document.head.appendChild(s);
+                    });
+                }
 
-                <!-- Content editor -->
-                <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden mb-6">
-                    <div class="px-8 py-5 border-b border-slate-100 flex items-center gap-2.5 bg-slate-50/60">
-                        <div class="w-2 h-2 rounded-full bg-slate-400"></div>
-                        <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">Draft Content</span>
-                    </div>
-                    <div id="quillEditor"></div>
-                    <textarea name="content" id="contentField" class="hidden">{{ draft.content }}</textarea>
-                </div>
-            </form>
+                async function mount() {
+                    const container = document.getElementById('onlyofficeViewer{{ draft.id }}');
+                    try {
+                        await loadScript(`${onlyofficeServerUrl}/web-apps/apps/api/documents/api.js`);
+                        const resp = await fetch(`/onlyoffice/{{ draft.id }}/view-config/`);
+                        if (!resp.ok) throw new Error('Could not load document (' + resp.status + ')');
+                        const config = await resp.json();
+                        config.width = '100%';
+                        config.height = '100%';
+                        config.type = 'desktop';
+                        new DocsAPI.DocEditor('onlyofficeViewer{{ draft.id }}', config);
+                    } catch (err) {
+                        container.innerHTML =
+                            `<div style="padding:40px;text-align:center;color:#dc2626;font-size:13px;font-weight:600;">
+                                Could not load the document viewer.<br>
+                                <span style="font-weight:400;color:#94a3b8;">${err.message}</span>
+                            </div>`;
+                    }
+                }
 
+                mount();
+            })();
+            </script>
             {% else %}
-            <!-- ══════════════════════════════
-                 VIEW MODE — paper document
-            ══════════════════════════════ -->
+            <!-- Legacy fallback — this document predates the OnlyOffice
+                 migration and has no saved .docx, so it's reconstructed
+                 from the stored HTML the same way it always was. -->
             <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
 
                 <!-- Paper header -->
@@ -200,22 +406,7 @@
                 <div class="space-y-4 text-[11px]">
                     <div class="flex justify-between items-center pb-3 border-b border-slate-50">
                         <span class="text-slate-400 font-bold uppercase tracking-widest">Type</span>
-                        {% if draft.status == 'DRAFT' %}
-                        <div class="flex gap-1.5" id="typeToggle">
-                            <label class="type-pill-label">
-                                <input type="radio" name="type" value="ORDINANCE" form="draftEditForm"
-                                    {% if draft.doc_type == 'ORDINANCE' %}checked{% endif %} class="hidden">
-                                <span class="type-pill {% if draft.doc_type == 'ORDINANCE' %}active{% endif %}">Ordinance</span>
-                            </label>
-                            <label class="type-pill-label">
-                                <input type="radio" name="type" value="RESOLUTION" form="draftEditForm"
-                                    {% if draft.doc_type == 'RESOLUTION' %}checked{% endif %} class="hidden">
-                                <span class="type-pill {% if draft.doc_type == 'RESOLUTION' %}active{% endif %}">Resolution</span>
-                            </label>
-                        </div>
-                        {% else %}
                         <span class="font-black text-slate-700 uppercase">{{ draft.doc_type }}</span>
-                        {% endif %}
                     </div>
                     <div class="flex justify-between items-center pb-3 border-b border-slate-50">
                         <span class="text-slate-400 font-bold uppercase tracking-widest">Reference No.</span>
@@ -244,18 +435,6 @@
                 <h3 class="text-sm font-black uppercase tracking-widest text-slate-800 mb-5 flex items-center gap-2">
                     <i data-lucide="users" style="width:15px;height:15px;color:#4f46e5;"></i> Committee
                 </h3>
-                {% if draft.status == 'DRAFT' %}
-                <select name="referred_committee" form="draftEditForm"
-                    class="w-full px-4 py-3 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-100 transition-all">
-                    <option value="">— No Committee Yet —</option>
-                    {% for committee in committees %}
-                        <option value="{{ committee.id }}"
-                            {% if draft.referred_committee_id == committee.id %}selected{% endif %}>
-                            {{ committee.name }}
-                        </option>
-                    {% endfor %}
-                </select>
-                {% else %}
                 <div class="px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-600">
                     {% if draft.referred_committee %}
                         <i data-lucide="users" style="width:13px;height:13px;margin-right:8px;color:#cbd5e1;vertical-align:middle;"></i>
@@ -264,7 +443,6 @@
                         <span class="text-slate-400 italic font-normal">Not yet referred</span>
                     {% endif %}
                 </div>
-                {% endif %}
             </div>
 
             <!-- Legislative path -->
@@ -272,8 +450,6 @@
                 <h3 class="text-sm font-black uppercase tracking-widest text-slate-800 mb-6 flex items-center gap-2">
                     <i data-lucide="route" style="width:15px;height:15px;color:#4f46e5;"></i> Legislative Path
                 </h3>
-                {% with statuses="DRAFT,FILED,FIRST_READING,REFERRED,COMMITTEE,SECOND_READING,THIRD_READING,APPROVED" %}
-                
                 <div class="space-y-4 relative before:absolute before:left-[10px] before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-100">
                     {% for s in draft.STATUS_CHOICES %}
                     {% if s.0 != 'GHOST' %}
@@ -296,134 +472,18 @@
                     {% endif %}
                     {% endfor %}
                 </div>
-                {% endwith %}
-                
             </div>
-
-            <!-- Draft mode hint -->
-            {% if draft.status == 'DRAFT' %}
-            <div class="bg-slate-50 rounded-[2rem] border border-slate-100 p-6">
-                <p class="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-3">What happens next?</p>
-                <div class="space-y-3">
-                    <div class="flex items-start gap-3">
-                        <div class="w-5 h-5 rounded-full bg-white border border-slate-200 flex items-center justify-center shrink-0 mt-0.5">
-                            <i data-lucide="save" style="width:9px;height:9px;color:#94a3b8;"></i>
-                        </div>
-                        <p class="text-[11px] text-slate-500 font-medium leading-snug"><span class="font-black text-slate-700">Save Draft</span> — stays private, editable anytime.</p>
-                    </div>
-                    <div class="flex items-start gap-3">
-                        <div class="w-5 h-5 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 mt-0.5">
-                            <i data-lucide="send" style="width:9px;height:9px;color:#6366f1;"></i>
-                        </div>
-                        <p class="text-[11px] text-slate-500 font-medium leading-snug"><span class="font-black text-slate-700">File Draft</span> — officially submitted, gets a reference number, locked for editing.</p>
-                    </div>
-                </div>
-            </div>
-            {% endif %}
 
         </aside>
     </div>
 </div>
 
-
-{% if draft.status == 'DRAFT' %}
-<script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
-<script>
-    // ── Quill ────────────────────────────────────────────────────
-    const quill = new Quill('#quillEditor', {
-        theme: 'snow',
-        placeholder: 'WHEREAS, ...',
-        modules: {
-            toolbar: [
-                [{ 'header': [1, 2, 3, false] }],
-                ['bold', 'italic', 'underline', 'strike'],
-                [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-                [{ 'indent': '-1' }, { 'indent': '+1' }],
-                ['blockquote'], ['clean']
-            ]
-        }
-    });
-
-    const existing = document.getElementById('contentField').value;
-    if (existing) quill.root.innerHTML = existing;
-
-    document.getElementById('draftEditForm').addEventListener('submit', function () {
-        document.getElementById('contentField').value = quill.root.innerHTML;
-    });
-
-    // ── Autosave ─────────────────────────────────────────────────
-    const titleInput   = document.getElementById('titleInput');
-    const statusSaved  = document.getElementById('autosaveStatus');
-    const statusSaving = document.getElementById('autosaveSaving');
-    let autosaveTimer  = null;
-
-    function triggerAutosave() {
-        clearTimeout(autosaveTimer);
-        autosaveTimer = setTimeout(serverSync, 3000);
-    }
-
-    function serverSync() {
-        const title   = titleInput.value.trim();
-        const content = quill.root.innerHTML.trim();
-        if (!title && content === '<p><br></p>') return;
-
-        statusSaving.classList.remove('hidden');
-        statusSaved.classList.add('hidden');
-
-        fetch("{% url 'autosave_draft' %}", {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-            body: JSON.stringify({
-                title: title || 'Untitled Draft',
-                content: content,
-                doc_id: '{{ draft.id }}'
-            })
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.status === 'saved') {
-                statusSaving.classList.add('hidden');
-                statusSaved.classList.remove('hidden');
-                setTimeout(() => statusSaved.classList.add('hidden'), 3000);
-            }
-        })
-        .catch(() => statusSaving.classList.add('hidden'));
-    }
-
-    titleInput.addEventListener('input', triggerAutosave);
-    quill.on('text-change', triggerAutosave);
-
-    // ── Type pill toggle ─────────────────────────────────────────
-    document.querySelectorAll('#typeToggle input').forEach(radio => {
-        radio.addEventListener('change', () => {
-            document.querySelectorAll('.type-pill').forEach(p => p.classList.remove('active'));
-            radio.nextElementSibling.classList.add('active');
-        });
-    });
-</script>
-{% endif %}
-
 <style>
-    /* Quill editor */
-    .ql-toolbar.ql-snow { border: none !important; border-bottom: 1px solid #f1f5f9 !important; background: #f8fafc; padding: 10px 20px !important; }
-    .ql-container.ql-snow { border: none !important; font-size: 14px; font-family: Georgia, serif; }
-    #quillEditor .ql-editor { min-height: 480px; padding: 28px 36px !important; line-height: 1.9; color: #1e293b; }
-    .ql-editor.ql-blank::before { color: #94a3b8; font-style: italic; }
-
-    /* View mode Quill content */
+    /* View mode content — reuses Quill's .ql-editor CSS classes purely for
+       their typography rules (list styling etc.) when rendering a filed
+       document's stored content read-only. No Quill JS/editor involved. */
     .doc-body.ql-editor p, .doc-body.ql-editor li { font-size: 13px; margin-bottom: 5px; }
     .doc-body.ql-editor strong { font-weight: 700; }
-
-    /* Type pills */
-    .type-pill {
-        display: block; padding: 5px 12px; border-radius: 10px;
-        font-size: 10px; font-weight: 900; text-transform: uppercase;
-        letter-spacing: 0.06em; cursor: pointer;
-        border: 1.5px solid #e2e8f0; color: #94a3b8;
-        transition: all 0.15s ease; background: white;
-    }
-    .type-pill:hover { border-color: #c7d2fe; color: #6366f1; }
-    .type-pill.active { background: #eef2ff; border-color: #6366f1; color: #4f46e5; }
 
     /* Print */
     @media print {
@@ -432,4 +492,5 @@
         .bg-white { box-shadow: none !important; }
     }
 </style>
+{% endif %}
 {% endblock %}

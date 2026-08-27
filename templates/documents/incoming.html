@@ -1,10 +1,10 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="flex gap-6 items-start">
+<div>
 
-    <!-- LEFT COLUMN: Tables -->
-    <div class="flex-1 min-w-0 space-y-10">
+    <!-- Tables -->
+    <div class="space-y-10">
 
         <!-- Incoming Documents -->
         <div>
@@ -116,24 +116,26 @@
 
     </div>
 
-    <!-- RIGHT COLUMN: Document Preview Panel -->
-    <div id="docPanel" class="hidden flex-col bg-white rounded-[2rem] border border-slate-100 shadow-xl overflow-hidden" style="width: 480px; min-width: 480px; position: sticky; top: 0; max-height: calc(100vh - 2rem);">
+</div>
 
-        <!-- Panel Header -->
-        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50 shrink-0">
+<!-- DOCUMENT PREVIEW MODAL -->
+<div id="docModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden z-50 items-center justify-center p-4 md:p-8">
+    <div class="bg-white rounded-[2rem] shadow-2xl max-w-6xl w-full relative flex flex-col max-h-[90vh]">
+
+        <!-- Modal Header -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50 shrink-0 rounded-t-[2rem]">
             <div class="flex items-center gap-2">
                 <i data-lucide="file-text" style="width:15px;height:15px;color:#6366f1;"></i>
                 <span class="text-xs font-black text-slate-700 uppercase tracking-widest">Document Preview</span>
             </div>
-            <button id="closeDocPanel" class="w-7 h-7 flex items-center justify-center rounded-full bg-slate-200 hover:bg-slate-100 hover:text-slate-500 text-slate-500 font-bold transition-colors text-sm">
+            <button id="closeDocModal" class="w-7 h-7 flex items-center justify-center rounded-full bg-slate-200 hover:bg-slate-100 hover:text-slate-500 text-slate-500 font-bold transition-colors text-sm">
                 &times;
             </button>
         </div>
 
-        <!-- Panel Content -->
+        <!-- Modal Content -->
         <div id="docContent" class="flex-1 overflow-y-auto p-4"></div>
     </div>
-
 </div>
 
 <!-- RETURN MODAL -->
@@ -189,26 +191,35 @@
 </script>
 
 <script>
-    // Row click loads document into side panel
+    // Row click loads document into modal
     document.querySelectorAll('.doc-row').forEach(row => {
         row.addEventListener('click', () => {
             const docId = row.getAttribute('data-doc-id');
-            const panel = document.getElementById('docPanel');
+            const modal = document.getElementById('docModal');
             const contentDiv = document.getElementById('docContent');
 
             // Highlight active row
             document.querySelectorAll('.doc-row').forEach(r => r.classList.remove('bg-slate-50'));
             row.classList.add('bg-slate-50');
 
-            // Show panel
-            panel.classList.remove('hidden');
-            panel.classList.add('flex');
+            // Show modal
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            document.body.style.overflow = 'hidden';
             contentDiv.innerHTML = "<p class='text-center text-slate-400 text-sm mt-10'>Loading document...</p>";
 
             fetch(`/modal/document/${docId}/`)
                 .then(r => r.text())
                 .then(html => {
                     contentDiv.innerHTML = html;
+                    // innerHTML doesn't execute <script> tags, but the
+                    // fetched modal partial needs its OnlyOffice viewer
+                    // mount script to actually run — re-create each one.
+                    contentDiv.querySelectorAll('script').forEach(old => {
+                        const s = document.createElement('script');
+                        if (old.src) s.src = old.src; else s.textContent = old.textContent;
+                        old.parentNode.replaceChild(s, old);
+                    });
                     lucide.createIcons();
                 })
                 .catch(() => {
@@ -217,13 +228,23 @@
         });
     });
 
-    // Close panel
-    document.getElementById('closeDocPanel').addEventListener('click', () => {
-        const panel = document.getElementById('docPanel');
+    function closeDocModal() {
+        const modal = document.getElementById('docModal');
         document.getElementById('docContent').innerHTML = '';
         document.querySelectorAll('.doc-row').forEach(r => r.classList.remove('bg-slate-50'));
-        panel.classList.add('hidden');
-        panel.classList.remove('flex');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        document.body.style.overflow = 'auto';
+    }
+
+    // Close modal
+    document.getElementById('closeDocModal').addEventListener('click', closeDocModal);
+
+    // Close modal on background click
+    document.getElementById('docModal').addEventListener('click', (e) => {
+        if (e.target.id === 'docModal') closeDocModal();
     });
+
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDocModal(); });
 </script>
 {% endblock %}

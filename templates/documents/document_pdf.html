@@ -1,9 +1,72 @@
+{% load document_extras %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        /* Running page-number footer via xhtml2pdf's @frame +
+           -pdf-frame-content mechanism (the modern replacement for the
+           deprecated <pdf:frame>/<pdf:template> tags — xhtml2pdf/tags.py
+           calls deprecation() on those). An @page rule must always be
+           present below — even empty — for these @frame declarations to
+           take effect; without one, xhtml2pdf silently falls back to a
+           single full-page frame and the footer never renders (confirmed
+           directly against this xhtml2pdf version's source and by
+           rendering test PDFs — no warning is raised, it just silently
+           drops the footer).
+
+           content_frame_box/footer_frame_box (documents/views.py's
+           _pdf_page_layout) are absolute "left top width height" points,
+           not the relative left/top/right/bottom form — a relative frame
+           resolves against whatever c.pageSize is *at CSS-parse time*,
+           which for a @frame declared (as it must be) before the @page
+           rule that sets page_orientation to landscape would silently use
+           the stale pre-swap portrait dimensions instead (confirmed
+           against xhtml2pdf's source and by rendering test PDFs). Absolute
+           points computed once in Python sidestep that ordering trap
+           entirely. The #footerContent element below deliberately has no
+           display:none — xhtml2pdf's static-frame content capture
+           (parser.py's id-match against frameStatic) is skipped entirely
+           for any display:none element, so hiding it would silently drop
+           the footer instead of just relocating it into the frame. */
+        @frame content_frame { -pdf-frame-box: {{ content_frame_box }}; }
+        @frame footer_frame {
+            -pdf-frame-content: footerContent;
+            -pdf-frame-box: {{ footer_frame_box }};
+        }
+
+        @page {
+            size: {{ page_width_pt }}pt {{ page_height_pt }}pt;
+            {% if doc.status == 'DRAFT' or doc.status == 'GHOST' %}
+            /* xhtml2pdf doesn't support CSS transform: rotate() for an
+               in-line diagonal watermark (confirmed against its own
+               docs/known issues), so the diagonal "DRAFT" text is a
+               pre-rendered PNG (static/images/draft_watermark.png,
+               generated once via Pillow, with its faintness already
+               baked into the image's own alpha channel) applied as a
+               page background instead. Deliberately NOT using CSS
+               background-opacity here — xhtml2pdf's own opacity
+               post-processing writes to a Windows temp file it then
+               reopens without closing the first handle, which throws
+               PermissionError on Windows; baking the alpha in at
+               generation time sidesteps that codepath entirely. */
+            background-image: url('{{ watermark_path }}');
+            {% endif %}
+        }
+
+        .pdf-footer {
+            font-size: 9px;
+            color: #9ca3af;
+            text-align: center;
+            letter-spacing: 0.03em;
+        }
+
+        /* A ribbon "Page Break" insert (draft.html) becomes a real page
+           boundary here — xhtml2pdf supports page-break-before natively,
+           unlike most other CSS layout properties it silently ignores. */
+        .page-break { page-break-before: always; }
 
         body {
             font-family: "EB Garamond", "Times New Roman", Georgia, serif;
@@ -12,12 +75,22 @@
             line-height: 1.8;
         }
 
+        .seal { display: block; margin: 0 auto 6px; width: 64px; height: 64px; }
+
         .letterhead-line {
             font-size: 11px;
-            color: #4b5563;
+            color: #111;
             line-height: 1.6;
             text-align: center;
             display: block;
+        }
+        .letterhead-line.republic { font-weight: 700; letter-spacing: 0.03em; }
+
+        .office-line {
+            font-size: 14px;
+            font-weight: 700;
+            text-align: center;
+            margin-top: 4px;
         }
 
         .text-center { text-align: center; }
@@ -25,7 +98,7 @@
 
         .doc-number {
             font-size: 13px;
-            font-weight: 800;  /* ← was 700 */
+            font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             text-align: center;
@@ -55,14 +128,6 @@
             margin: 16px 0;
         }
 
-        .sponsor-box {
-            border: 1px solid #6b7280;
-            padding: 12px 24px;
-            margin-bottom: 20px;
-            text-align: center;
-            display: block;  /* ← add this */
-        }
-
         .sponsor-label {
             font-size: 11px;
             color: #6b7280;
@@ -79,11 +144,31 @@
         p {
             margin-bottom: 2px;
             margin-top: 0;
-            text-align: justify;  /* ← match the scanned copy */
+            text-align: justify;
         }
+        /* WHEREAS / "NOW, THEREFORE" clauses get a first-line indent in the
+           real documents; SECTION clauses stay flush-left — see
+           documents/templatetags/document_extras.py for how this class
+           gets applied. */
+        p.clause-indent { text-indent: 2em; }
+        p.preamble { font-style: italic; }
+        p.signatory-block { font-weight: 800; text-transform: uppercase; text-align: center; letter-spacing: 0.03em; }
         strong { font-weight: 700; }
         em { font-style: italic; }
+        /* xhtml2pdf has no built-in default stylesheet entry for sub/sup
+           (checked xhtml2pdf/default.py's DEFAULT_CSS directly) — without
+           this they'd render as plain same-size inline text. */
+        sub { vertical-align: sub; font-size: smaller; }
+        sup { vertical-align: super; font-size: smaller; }
         ol, ul { padding-left: 2em; margin-bottom: 8px; }
+        /* Multilevel legal-style numbering (1 → a → i), matching the same
+           rule in draft.html's editor CSS so nested lists print the way
+           they're previewed — confirmed xhtml2pdf honors nested
+           list-style-type overrides (not one of the CSS properties it
+           silently ignores). */
+        ol ol { list-style-type: lower-alpha; }
+        ol ol ol { list-style-type: lower-roman; }
+        ol ol ol ol { list-style-type: decimal; }
         li { margin-bottom: 3px; }
         h1, h2, h3 { font-weight: 700; margin: 12px 0 6px; }
         blockquote { border-left: 3px solid #ccc; padding-left: 12px; color: #555; }
@@ -94,41 +179,59 @@
         .ql-indent-2 { padding-left: 6em; }
         .ql-indent-3 { padding-left: 9em; }
 
-        .closing-line {
-            font-size: 12px;
-            font-weight: 700;
-            text-transform: uppercase;
-            margin-top: 48px;
-            margin-bottom: 40px;
-        }
-
         .signatures {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 64px;
-            margin-top: 8px;
+            margin-top: 40px;
         }
 
-        .sig-block { text-align: center; }
+        .sig-block { text-align: center; page-break-inside: avoid; }
 
-        .sig-line {
-            border-bottom: 1px solid #111;
-            margin-top: 48px;
-            margin-bottom: 8px;
+        .sponsor-table {
+            width: 100%;
+            border: 1px solid #6b7280;
+            border-collapse: collapse;
+            margin-bottom: 20px;
         }
+        .sponsor-table td { padding: 12px 24px; }
 
+        /* xhtml2pdf ignores width/max-width on <hr> and its ancestors —
+           it always renders at the full text-frame width regardless of
+           CSS. A fixed-width <table> is laid out with a real column
+           width instead, so it's used here to get an actual centered,
+           non-full-page-width signature line. */
+        .sig-line-table { margin-top: 48px; margin-bottom: 8px; border-collapse: collapse; }
+        .sig-line-table td { border-bottom: 1px solid #111; height: 1px; font-size: 1px; line-height: 1px; }
+
+        /* xhtml2pdf doesn't reliably inherit text-align from .sig-block
+           into these <p> children, so it's set explicitly here rather
+           than relied on from the ancestor. */
         .sig-name {
             font-size: 11px;
             font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 0.03em;
+            text-align: center;
         }
 
         .sig-role {
             font-size: 10px;
             color: #6b7280;
             margin-top: 2px;
+            text-align: center;
         }
+
+        /* Secretary certification / Vice-Mayor attestation / Mayor
+           approval — blank signature lines only. This system has no
+           Secretary/Vice-Mayor/Mayor data, and inventing a name for an
+           official government signature block would be worse than leaving
+           it blank: these get physically signed as part of the same
+           print → sign → scan → upload workflow this document is for. */
+        .certify-block { text-align: center; margin-top: 40px; }
+        .certify-text { font-size: 11px; line-height: 1.7; text-align: center; }
+        .certify-sig { margin: 24px auto 0; max-width: 300px; }
+        .approval-label { font-size: 11px; font-weight: 700; text-transform: uppercase; text-align: center; }
 
         .page-break { page-break-before: always; padding-top: 32px; }
 
@@ -167,127 +270,173 @@
 </head>
 <body>
 
+<div id="footerContent"><p class="pdf-footer">Page <pdf:pagenumber /> of <pdf:pagecount /></p></div>
+
+<div style="text-align:center;"><img class="seal" src="{{ seal_path }}"></div>
+<p class="letterhead-line republic">REPUBLIC OF THE PHILIPPINES</p>
+<p class="letterhead-line">City of San Juan,</p>
+<p class="letterhead-line">METRO MANILA</p>
+<p class="letterhead-line">-oOo-</p>
+<p class="office-line">OFFICE OF THE SANGGUNIANG PANLUNGSOD</p>
+
+<hr class="divider">
+
 {% if doc.doc_type == 'ORDINANCE' %}
 
-    <span class="letterhead-line">Republic of the Philippines</span>
-    <span class="letterhead-line" style="font-weight:600;">City of San Juan, Metro Manila</span>
-    <span class="letterhead-line">Office of the Sangguniang Panlungsod</span>
-
-    <hr class="divider">
-
     <p class="doc-number">
-        {% if doc.status != 'APPROVED'  %}Draft {% endif %}Ordinance No. {{ doc.ref_number}}
+        {% if doc.status == 'DRAFT' or doc.status == 'GHOST' %}Draft {% endif %}City Ordinance No. {{ doc.ref_number }}
     </p>
     <p class="doc-series">Series of {{ doc.created_at|date:"Y" }}</p>
 
     <p class="doc-title text-center">{{ doc.title }}</p>
 
-    <div class="sponsor-box">
-        <div class="sponsor-label">Sponsored by:</div>
-        <div class="sponsor-name">
-            {% if doc.author.councilor_profile %}{{ doc.author.councilor_profile.name }}
-            {% else %}Hon. {{ doc.author.last_name }}, {{ doc.author.first_name }}{% endif %}
-        </div>
-    </div>
-    {{ doc.content|safe }}
-
-    <p class="closing-line">Approved: ___________________________</p>
+    <table class="sponsor-table"><tr><td>
+        <p class="sponsor-label">Sponsored by:</p>
+        <p class="sponsor-name">
+            {% for c in doc.sponsor_councilors %}{{ c.name }}{% if forloop.revcounter0 == 1 %} and {% elif not forloop.last %}, {% endif %}
+            {% empty %}Hon. {{ doc.author.last_name }}, {{ doc.author.first_name }}{% endfor %}
+        </p>
+    </td></tr></table>
+    {{ doc.content|merge_wrapped_paragraphs }}
 
     <div class="signatures">
+        {% for c in doc.sponsor_councilors %}
         <div class="sig-block">
-            <div class="sig-line"></div>
-            <p class="sig-name">
-                {% if doc.author.councilor_profile %}{{ doc.author.councilor_profile.name }}
-                {% else %}Hon. {{ doc.author.last_name }}, {{ doc.author.first_name }}{% endif %}
-            </p>
+            <table align="center" class="sig-line-table"><tr><td width="220">&nbsp;</td></tr></table>
+            <p class="sig-name">{{ c.name }}</p>
             <p class="sig-role">City Councilor</p>
         </div>
+        {% empty %}
         <div class="sig-block">
-            <div class="sig-line"></div>
-            <p class="sig-name" style="color:#9ca3af; font-style:italic; text-transform:none; font-weight:400;">— Co-signatory —</p>
+            <table align="center" class="sig-line-table"><tr><td width="220">&nbsp;</td></tr></table>
+            <p class="sig-name">Hon. {{ doc.author.last_name }}, {{ doc.author.first_name }}</p>
             <p class="sig-role">City Councilor</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="certify-block">
+        <p class="certify-text">
+            I HEREBY CERTIFY THAT THIS ORDINANCE HAS BEEN DULY APPROVED<br>
+            BY THE SANGGUNIANG PANLUNGSOD ON _______________________.
+        </p>
+        <div class="sig-block certify-sig">
+            <table align="center" class="sig-line-table"><tr><td width="220">&nbsp;</td></tr></table>
+            <p class="sig-role">Secretary, Sangguniang Panlungsod</p>
+        </div>
+    </div>
+
+    <div class="certify-block">
+        <p class="approval-label">Attested:</p>
+        <div class="sig-block certify-sig">
+            <table align="center" class="sig-line-table"><tr><td width="220">&nbsp;</td></tr></table>
+            <p class="sig-role">Presiding Officer, City Vice-Mayor</p>
+        </div>
+    </div>
+
+    <div class="certify-block">
+        <p class="approval-label">Approved:</p>
+        <div class="sig-block certify-sig">
+            <table align="center" class="sig-line-table"><tr><td width="220">&nbsp;</td></tr></table>
+            <p class="sig-role">City Mayor</p>
         </div>
     </div>
 
 {% else %}
 
-    <span class="letterhead-line">Republic of the Philippines</span>
-    <span class="letterhead-line">City of San Juan</span>
-    <span class="letterhead-line">Metro Manila</span>
-
-    <p class="doc-number" style="font-size:14px; margin-top:8px;">Office of the Sangguniang Panlungsod</p>
-
-    <hr class="divider">
-
     <p class="doc-number">
-        {% if doc.status == 'DRAFT' or doc.status == 'GHOST' %}Draft {% endif %}Resolution No. {{ doc.reference_no|default:doc.id }}
+        {% if doc.status == 'DRAFT' or doc.status == 'GHOST' %}Draft {% endif %}City Resolution No. {{ doc.reference_no|default:doc.id }}
     </p>
     <p class="doc-series">Series of {{ doc.created_at|date:"Y" }}</p>
 
     <p class="doc-title text-justify">{{ doc.title }}</p>
 
-    <div class="sponsor-box" style="text-align:left;">
+    <table class="sponsor-table"><tr><td>
         <p class="sponsor-label">Sponsored by:</p>
         <p class="sponsor-name">
-            {% if doc.author.councilor_profile %}{{ doc.author.councilor_profile.name }}
-            {% else %}Hon. {{ doc.author.last_name }}, {{ doc.author.first_name }}{% endif %}
+            {% for c in doc.sponsor_councilors %}{{ c.name }}{% if forloop.revcounter0 == 1 %} and {% elif not forloop.last %}, {% endif %}
+            {% empty %}Hon. {{ doc.author.last_name }}, {{ doc.author.first_name }}{% endfor %}
         </p>
-    </div>
+    </td></tr></table>
 
-    {{ doc.content|safe }}
-
-    <p class="closing-line">Adopted: ___________________________</p>
+    {{ doc.content|merge_wrapped_paragraphs }}
 
     <!-- Page 2 -->
     <div class="page-break">
         <p class="page-2-header">
-            Page 2 of D.R. No. {{ doc.reference_no|default:doc.id }}-{{ doc.created_at|date:"Y" }}
+            Page 2 of City Res. No. {{ doc.reference_no|default:doc.id }}-{{ doc.created_at|date:"Y" }}
         </p>
 
-        <p class="submitted-by">Respectfully Submitted by:</p>
-
         {% if doc.referred_committee %}
+        <p class="submitted-by">Respectfully Submitted by:</p>
         <p class="committee-label">The Committee on {{ doc.referred_committee.name }}</p>
         <div class="committee-sigs">
             {% if doc.referred_committee.chairman %}
             <div class="sig-block">
-                <div class="sig-line"></div>
+                <table align="center" class="sig-line-table"><tr><td width="220">&nbsp;</td></tr></table>
                 <p class="sig-name">{{ doc.referred_committee.chairman.name }}</p>
                 <p class="sig-role">Chairperson</p>
             </div>
             {% endif %}
             {% if doc.referred_committee.vice_chairman %}
             <div class="sig-block">
-                <div class="sig-line"></div>
+                <table align="center" class="sig-line-table"><tr><td width="220">&nbsp;</td></tr></table>
                 <p class="sig-name">{{ doc.referred_committee.vice_chairman.name }}</p>
                 <p class="sig-role">Vice-Chairperson</p>
             </div>
             {% endif %}
             {% if doc.referred_committee.member %}
             <div class="sig-block">
-                <div class="sig-line"></div>
+                <table align="center" class="sig-line-table"><tr><td width="220">&nbsp;</td></tr></table>
                 <p class="sig-name">{{ doc.referred_committee.member.name }}</p>
                 <p class="sig-role">Member</p>
             </div>
             {% endif %}
         </div>
-        {% else %}
+        {% endif %}
+
         <div class="signatures">
+            {% for c in doc.sponsor_councilors %}
             <div class="sig-block">
-                <div class="sig-line"></div>
-                <p class="sig-name">
-                    {% if doc.author.councilor_profile %}{{ doc.author.councilor_profile.name }}
-                    {% else %}Hon. {{ doc.author.last_name }}, {{ doc.author.first_name }}{% endif %}
-                </p>
+                <table align="center" class="sig-line-table"><tr><td width="220">&nbsp;</td></tr></table>
+                <p class="sig-name">{{ c.name }}</p>
                 <p class="sig-role">City Councilor</p>
             </div>
+            {% empty %}
             <div class="sig-block">
-                <div class="sig-line"></div>
-                <p class="sig-name" style="color:#9ca3af; font-style:italic; text-transform:none; font-weight:400;">— Co-signatory —</p>
+                <table align="center" class="sig-line-table"><tr><td width="220">&nbsp;</td></tr></table>
+                <p class="sig-name">Hon. {{ doc.author.last_name }}, {{ doc.author.first_name }}</p>
                 <p class="sig-role">City Councilor</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="certify-block">
+            <p class="certify-text">
+                I HEREBY CERTIFY THAT THIS RESOLUTION HAS BEEN DULY APPROVED<br>
+                BY THE SANGGUNIANG PANLUNGSOD ON _______________________.
+            </p>
+            <div class="sig-block certify-sig">
+                <table align="center" class="sig-line-table"><tr><td width="220">&nbsp;</td></tr></table>
+                <p class="sig-role">Secretary, Sangguniang Panlungsod</p>
             </div>
         </div>
-        {% endif %}
+
+        <div class="certify-block">
+            <p class="approval-label">Attested:</p>
+            <div class="sig-block certify-sig">
+                <table align="center" class="sig-line-table"><tr><td width="220">&nbsp;</td></tr></table>
+                <p class="sig-role">Presiding Officer, City Vice-Mayor</p>
+            </div>
+        </div>
+
+        <div class="certify-block">
+            <p class="approval-label">Adopted:</p>
+            <div class="sig-block certify-sig">
+                <table align="center" class="sig-line-table"><tr><td width="220">&nbsp;</td></tr></table>
+                <p class="sig-role">City Mayor</p>
+            </div>
+        </div>
     </div>
 
 {% endif %}

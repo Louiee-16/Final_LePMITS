@@ -14,12 +14,14 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+import re
 from django.contrib import admin
 from django.conf import settings
-from django.urls import path, include
+from django.urls import path, re_path, include
 from accounts.views import login_view, dashboard_redirect
 from django.contrib.auth import views as auth_views
-from django.conf.urls.static import static
+from django.views.static import serve as static_serve
+from django.views.decorators.clickjacking import xframe_options_exempt
 from accounts import views
 urlpatterns = [
     path('', views.index, name='index'),
@@ -39,4 +41,13 @@ urlpatterns = [
     path('',include('audit.urls')),
 ]
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    # Media files (uploaded PDFs, etc.) are meant to be embedded in an <iframe>
+    # by the separate Gazette site, so this route is exempted from
+    # X-Frame-Options — everything else in the app keeps the default DENY.
+    urlpatterns += [
+        re_path(
+            r'^%s(?P<path>.*)$' % re.escape(settings.MEDIA_URL.lstrip('/')),
+            xframe_options_exempt(static_serve),
+            {'document_root': settings.MEDIA_ROOT},
+        ),
+    ]

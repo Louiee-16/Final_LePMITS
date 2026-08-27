@@ -9,6 +9,7 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
 from reportlab.lib import colors
 from django.contrib import messages
+from django.db.utils import ProgrammingError
 from .models import CommitteeReport, HearingLog
 from documents.models import Document
 from documents.urls import urlpatterns
@@ -41,10 +42,17 @@ def _sync_report_status_from_hearing(report, outcome):
 # ---------------------------------------------------------------------------
 def move_to_second_reading(request, doc_id):
     referred_doc = get_object_or_404(Document, id=doc_id)
-    if referred_doc.amended_content:
-        referred_doc.content = referred_doc.amended_content
+    # Amendments now save live to the docx via OnlyOffice (see
+    # amending_table.html) — referred_doc.content is already current,
+    # no amended_content to promote.
+    referred_doc.amended_content = None
+    referred_doc.amendment_status = None
     referred_doc.status = 'SECOND_READING'
     referred_doc.save()
+
+    from documents.views import _onlyoffice_snapshot_pdf
+    _onlyoffice_snapshot_pdf(request, referred_doc)
+
     return redirect('view-committee')
 
 def view_committee(request):
@@ -291,23 +299,28 @@ def set_hearing_date(request):
 def committee_amendments(request, doc_id):
     """Render the floor amendments workbench for a second-reading document."""
     from documents.models import PublicComment
+    from councilors.models import Councilor
     doc = get_object_or_404(Document, Q(id=doc_id) & (Q(status='REFERRED') | Q(status__icontains='COMMITTEE')))
     if request.user.role not in ['SECRETARIAT', 'STAFF', 'ADMIN']:
         messages.error(request, "You don't have permission to make amendments.")
         return redirect('second_reading')
 
     amendments = doc.amendment_notes.select_related('author').all()
-    comments = PublicComment.objects.filter(
-        document=doc,
-        replyTo__isnull=True,       # top-level only, no replies
-    ).order_by('created_at')
-    print("COMMENTS COUNT:", comments.count())
-    print("ALL COMMENTS:", PublicComment.objects.filter(document=doc).count())
-    print("APPROVED ONLY:", PublicComment.objects.filter(document=doc, is_approved=True).count())
+    try:
+        comments = list(PublicComment.objects.filter(
+            document=doc,
+            replyTo__isnull=True,       # top-level only, no replies
+        ).order_by('created_at'))
+    except ProgrammingError:
+        # The Gazette's public-comment table isn't provisioned in this environment.
+        comments = []
+    from django.conf import settings
     return render(request, 'documents/committee_level/amending_table.html', {
         'doc': doc,
         'amendments': amendments,
         'comments':comments,
+        'onlyoffice_server_url': settings.ONLYOFFICE_SERVER_URL,
+        'all_councilors': Councilor.objects.filter(is_active=True).order_by('name'),
     })
 
 
@@ -316,12 +329,17 @@ def move_to_unfinished(request, doc_id):
     doc = get_object_or_404(Document,id=doc_id, status__icontains='COMMITTEE' )
     if request.method != 'POST':
         return redirect('report_workbench',draft_id = doc_id)
-    if doc.amended_content:
-        doc.content = doc.amended_content
+    # Amendments now save live to the docx via OnlyOffice (see
+    # amending_table.html) — doc.content is already current, no
+    # amended_content to promote.
     doc.status = 'UNFINISHED_BUSINESS'
     doc.amended_content = None
     doc.amendment_status = None
     doc.save()
+
+    from documents.views import _onlyoffice_snapshot_pdf
+    _onlyoffice_snapshot_pdf(request, doc)
+
     return redirect('view-committee')
 
 
@@ -338,12 +356,10 @@ def save_committee_amendments(request, doc_id):
     if request.method != 'POST':
         return redirect('committee-amendments', doc_id=doc_id)
 
-    amended_content = request.POST.get('amended_content', '').strip()
-    amendment_status = request.POST.get('amendment_status', 'IN_PROGRESS')
-
-    if amended_content:
-        doc.amended_content = amended_content
-    doc.amendment_status = amendment_status
+    # Amendments themselves now save live to the docx via OnlyOffice (see
+    # amending_table.html) — this handler only tracks the informational
+    # "In Progress / Finalized / No Amendments" label for the session.
+    doc.amendment_status = request.POST.get('amendment_status', 'IN_PROGRESS')
     doc.save()
     return redirect('committee-amendments',doc_id=doc_id)
 

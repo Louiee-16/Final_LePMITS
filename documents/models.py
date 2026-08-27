@@ -4,6 +4,7 @@ from django.conf import settings
 from committees.models import Committee
 from archives.models import Archives
 from barangay.models import BarangayFiles
+from councilors.models import Councilor
 from pgvector.django import VectorField
 from documents.sanitize import sanitize_document_html
 
@@ -23,6 +24,8 @@ class Document(models.Model):
     ]
 
     DOC_CHOICES = [('ORDINANCE', 'Ordinance'), ('RESOLUTION', 'Resolution')]
+    PAGE_SIZE_CHOICES = [('A4', 'A4'), ('LETTER', 'Letter'), ('LEGAL', 'Legal')]
+    PAGE_ORIENTATION_CHOICES = [('PORTRAIT', 'Portrait'), ('LANDSCAPE', 'Landscape')]
     public_participation = models.BooleanField(default=False)
     title = models.TextField()
     reference_no = models.CharField(max_length=100, blank=True, null=True)
@@ -57,6 +60,46 @@ class Document(models.Model):
         blank=True,
         related_name='derived_drafts'
     )
+    # Councilors added as present/participating during committee hearing or
+    # second-reading floor deliberation — used for the "Sponsored by" byline
+    # and as the signature list on the printed sheet before Final Approval.
+    participating_councilors = models.ManyToManyField(
+        Councilor, blank=True, related_name='participated_documents'
+    )
+    # The physically-signed copy, scanned and uploaded at Final Approval —
+    # required before a measure can move to APPROVED (see approve_measure).
+    signed_pdf = models.FileField(upload_to='signed_documents/%Y/', null=True, blank=True)
+    # Content hashes of paragraphs already flagged with a similarity comment
+    # in the OnlyOffice-saved .docx (see onlyoffice_similarity_check). Lets
+    # repeated post-save checks add a comment only once per paragraph text —
+    # python-docx can't enumerate/delete existing comments, so this is what
+    # keeps the check from re-flagging the same unchanged paragraph forever.
+    flagged_similarity_hashes = models.JSONField(default=list, blank=True)
+    # Layout-tab page setup (draft.html) — live in the editor preview and
+    # carried through to the exported PDF's @page/@frame CSS (see
+    # documents/views.py's _pdf_page_layout and document_pdf.html). 2.54cm
+    # (1 inch) all around is the standard Word/Google-Docs default and also
+    # unifies what was previously two different implicit margins — the
+    # editor's own hardcoded ~2.5cm CSS padding vs. the PDF's xhtml2pdf
+    # built-in 1cm fallback — into one value that's now actually the same
+    # in both places by default, and user-adjustable in either.
+    page_size = models.CharField(max_length=10, choices=PAGE_SIZE_CHOICES, default='A4')
+    page_orientation = models.CharField(max_length=10, choices=PAGE_ORIENTATION_CHOICES, default='PORTRAIT')
+    margin_top_cm = models.FloatField(default=2.54)
+    margin_bottom_cm = models.FloatField(default=2.54)
+    margin_left_cm = models.FloatField(default=2.54)
+    margin_right_cm = models.FloatField(default=2.54)
+
+    def sponsor_councilors(self):
+        """Author first, then any councilors added during committee/second
+        reading, deduplicated — the full signatory list for printing."""
+        councilors = list(self.participating_councilors.all())
+        author_councilor = getattr(self.author, 'councilor_profile', None)
+        if author_councilor:
+            councilors = [c for c in councilors if c.pk != author_councilor.pk]
+            councilors.insert(0, author_councilor)
+        return councilors
+
     def save(self, *args, **kwargs):
         self.content = sanitize_document_html(self.content)
 

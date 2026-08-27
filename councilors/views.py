@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 from django.views.decorators.clickjacking import xframe_options_sameorigin, xframe_options_exempt
 from django.http import FileResponse, HttpResponse, Http404
 from django.utils.crypto import get_random_string
+from django.conf import settings
 
 ################## DRAFT CREATION
 def referral_drafting_page(request, doc_id):
@@ -24,12 +25,27 @@ def referral_drafting_page(request, doc_id):
             source_barangay_doc=doc,
             status__in=['DRAFT', 'GHOST']
         ).first()
-    
+
+    # OnlyOffice needs a real Document id to attach to from the very first
+    # keystroke, same reasoning as create_draft's auto-create — see
+    # documents/views.py.
+    if not existing_draft:
+        existing_draft = Document.objects.create(
+            author=request.user,
+            source_barangay_doc=doc,
+            title='Untitled Draft',
+            content='',
+            doc_type='RESOLUTION',
+            status='GHOST',
+        )
+
     context = {
         'doc':doc,
-        'existing_draft': existing_draft
+        'existing_draft': existing_draft,
+        'committees': Committee.objects.all(),
+        'onlyoffice_server_url': settings.ONLYOFFICE_SERVER_URL,
     }
-    return render(request,'documents/referral_drafting_page.html/',context)
+    return render(request,'documents/referral_drafting_page.html',context)
 
 
 ################### FOR VIEWING
@@ -174,8 +190,16 @@ def view_draft(request, id):
         messages.error(request, "You don't have permission to view this draft.")
         return redirect('draft-measures')
 
+    import os
+    from django.urls import reverse
+    from documents.views import _onlyoffice_saved_docx_path, _onlyoffice_saved_pdf_path
+    draft.has_onlyoffice_docx = os.path.exists(_onlyoffice_saved_docx_path(draft.id))
+    draft.has_snapshot_pdf = os.path.exists(_onlyoffice_saved_pdf_path(draft.id, draft.current_version))
+
     context ={
-        'draft':draft
+        'draft':draft,
+        'snapshot_pdf_url': reverse('document-snapshot-pdf', args=[draft.id]),
+        'onlyoffice_server_url': settings.ONLYOFFICE_SERVER_URL,
     }
     return render(request, 'councilors/view_draft.html', context)
 @login_required
