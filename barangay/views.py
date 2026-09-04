@@ -1,6 +1,10 @@
+import os
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.http import HttpResponse
+from django.views.decorators.clickjacking import xframe_options_exempt
 from .models import Barangay, BarangayFiles
 from accounts.models import User
 from .forms import BarangayForm, MeasureUploadForm
@@ -10,13 +14,18 @@ from committees.models import Committee
 from django.core.mail import send_mail
 from django.conf import settings
 from django.utils.crypto import get_random_string
+from audit.utils import log_action
+from documents.models import Document
+from documents.views import (
+    _onlyoffice_saved_docx_path,
+    _onlyoffice_checkpoint_sync,
+    _onlyoffice_snapshot_pdf,
+    _onlyoffice_archive_docx,
+)
 
 @login_required
 def barangay_dashboard(request):
     form = MeasureUploadForm()
-    user = request.user.role
-    print(user)
-    filed_measures = BarangayFiles.objects.all()
     context = {
         'form': form,
         'barangays': Barangay.objects.all(),
@@ -34,6 +43,8 @@ def upload_measure(request):
             barangay.reference_no = request.POST.get('title')
             barangay.status = 'FILED'
             barangay.save()
+            log_action(request, action='FILE', target=barangay.title or f'Barangay measure #{barangay.id}',
+                       detail=f'Filed by {request.user.username}.')
             return redirect('barangay-dashboard')
     else:
         form = MeasureUploadForm() 
@@ -50,6 +61,10 @@ def barangay_list(request):
 
 @login_required
 def add_barangay(request):
+    if request.user.role not in ['SECRETARIAT', 'STAFF', 'ADMIN']:
+        messages.error(request, "You don't have permission to add barangay accounts.")
+        return redirect('barangay-list')
+
     if request.method == "POST":
         form = BarangayForm(request.POST)
         if form.is_valid():
@@ -63,6 +78,7 @@ def add_barangay(request):
             barangay = form.save(commit=False)
             barangay.user = user
             barangay.save()
+            log_action(request, action='CREATE', target=f"Created barangay account for {user.username}")
             messages.warning(
                 request,
                 f"Account for {user.username} created. Temporary password: {temp_password} "
@@ -100,10 +116,52 @@ def barangay_to_referral(request, doc_id):
             return redirect('other-matters')
 
         committee = get_object_or_404(Committee, id=committee_id)
-        
-        doc.status = 'REFERRED'
+
+        if not doc.uploaded_docx:
+            messages.error(request, "This barangay measure has no uploaded file to refer.")
+            return redirect('other-matters')
+
+        # A barangay measure arrives as an already-complete draft, not a
+        # request for a councilor to write from scratch — so referring it
+        # to committee creates the real Document immediately, with the
+        # barangay's own .docx as its working file. Committee level is
+        # supervision (review, request changes) on the real thing, not a
+        # separate manual drafting stage first — that stage (previously
+        # "Pending Referrals") is gone; see docs/activity-log.md.
+        # No reference number here — barangay-originated documents skip
+        # First Reading, so they're numbered later, at committee
+        # approval (see committee_level/views.py's
+        # _sync_report_status_from_hearing).
+        chair_user = committee.chairman.user if committee.chairman_id else None
+        new_document = Document.objects.create(
+            author=chair_user or request.user,
+            source_barangay_doc=doc,
+            title=doc.title or 'Untitled',
+            content='',
+            doc_type='RESOLUTION',
+            status='GHOST',
+            referred_committee=committee,
+        )
+        working_docx_path = _onlyoffice_saved_docx_path(new_document.id)
+        os.makedirs(os.path.dirname(working_docx_path), exist_ok=True)
+        with open(doc.uploaded_docx.path, 'rb') as uploaded:
+            uploaded_bytes = uploaded.read()
+        with open(working_docx_path, 'wb') as f:
+            f.write(uploaded_bytes)
+        # Must run before status changes — see
+        # _onlyoffice_checkpoint_sync's docstring. Populates Document.content
+        # from the barangay's actual docx instead of leaving it blank.
+        _onlyoffice_checkpoint_sync(new_document)
+        new_document.status = 'REFERRED'
+        new_document.save()
+        _onlyoffice_snapshot_pdf(request, new_document)
+        _onlyoffice_archive_docx(new_document)
+
+        doc.status = 'DRAFT_CREATED'
         doc.referred_committee = committee
-        doc.save() 
+        doc.save()
+        log_action(request, action='MOVE', target=doc.title or f'Barangay measure #{doc.id}',
+                   detail=f'Referred to committee: {committee.name}.')
         recipients = []
 
         def add_email(councilor):
@@ -138,7 +196,64 @@ def barangay_to_referral(request, doc_id):
 
         messages.success(request, f"{doc.title} successfully referred to {committee.name}.")
         return redirect('other-matters')
-        
+
     return redirect('other-matters')
 
-    
+
+@login_required
+def barangay_file_preview(request, doc_id):
+    """Modal preview for a raw barangay upload, before it's been referred
+    to a committee (i.e. before barangay_to_referral has created a real
+    Document for it) — same viewing experience as a filed Document's own
+    modal_document_viewer (a PDF shown in an iframe). See
+    barangay_file_snapshot_pdf for how that PDF gets produced."""
+    doc = get_object_or_404(BarangayFiles, id=doc_id)
+    if request.user.role not in ('SECRETARIAT', 'STAFF', 'ADMIN'):
+        return HttpResponse('Not found.', status=404)
+    return render(request, 'barangay/modal_barangay_viewer.html', {'doc': doc})
+
+
+def _barangay_file_snapshot_pdf_path(doc_id):
+    """Cache path for a barangay file's converted preview PDF — keyed
+    only by doc_id, unlike a Document's own per-version snapshot
+    (_onlyoffice_saved_pdf_path), since a BarangayFiles row's
+    uploaded_docx never changes after upload (no re-upload/replace
+    feature exists), so there's nothing to key a version against."""
+    return os.path.join(settings.DOCUMENT_EDITOR_STORAGE_ROOT, f"barangay_{doc_id}.pdf")
+
+
+@login_required
+@xframe_options_exempt
+def barangay_file_snapshot_pdf(request, doc_id):
+    """Serves this barangay file's uploaded .docx converted to PDF —
+    converted once via the same local LibreOffice conversion every other
+    document-to-PDF path in this app already uses
+    (documents/libreoffice.py; see documents/views.py's
+    _onlyoffice_convert_docx_to_pdf for the Document equivalent), then
+    cached to disk so every preview after the first is an instant file
+    read instead of paying LibreOffice's startup cost again. Safe to
+    cache indefinitely since the source file itself can't change (see
+    _barangay_file_snapshot_pdf_path)."""
+    doc = get_object_or_404(BarangayFiles, id=doc_id)
+    if request.user.role not in ('SECRETARIAT', 'STAFF', 'ADMIN'):
+        return HttpResponse('Not found.', status=404)
+    if not doc.uploaded_docx:
+        return HttpResponse('No file uploaded.', status=404)
+
+    cache_path = _barangay_file_snapshot_pdf_path(doc.id)
+    if os.path.exists(cache_path):
+        with open(cache_path, 'rb') as f:
+            return HttpResponse(f.read(), content_type='application/pdf')
+
+    from documents import libreoffice
+    with open(doc.uploaded_docx.path, 'rb') as f:
+        docx_bytes = f.read()
+    try:
+        pdf_bytes = libreoffice.convert(docx_bytes, '.docx', 'pdf', label=f'barangay_{doc.id}')
+    except Exception as e:
+        return HttpResponse(f'PDF conversion failed: {e}', status=502)
+
+    os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+    with open(cache_path, 'wb') as f:
+        f.write(pdf_bytes)
+    return HttpResponse(pdf_bytes, content_type='application/pdf')

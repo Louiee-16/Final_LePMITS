@@ -12,7 +12,12 @@ class Barangay(models.Model):
 
 class BarangayFiles(models.Model):
     origin_barangay = models.ForeignKey(Barangay, on_delete=models.CASCADE)
-    scanned_pdf = models.FileField(upload_to='barangay_scans/%Y/', null=True, blank=True)
+    # The barangay's actual draft resolution, uploaded as a real .docx —
+    # not a scan. Once referred to a committee, this file becomes the
+    # Document's working docx directly (see barangay/views.py's
+    # barangay_to_referral), so committee-level review edits the real
+    # thing rather than a councilor re-typing it from a PDF.
+    uploaded_docx = models.FileField(upload_to='barangay_uploads/%Y/', null=True, blank=True)
     date_submitted = models.DateTimeField(auto_now_add=True)
     remarks = models.TextField(max_length=600, null=True, blank=True )
     title = models.CharField(max_length=100, blank=True, null=True)

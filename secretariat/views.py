@@ -10,6 +10,7 @@ from django.template.loader import render_to_string
 from django.core.mail import EmailMessage
 from django.contrib import messages
 from django.conf import settings
+from audit.utils import log_action
 
 
 @login_required
@@ -25,7 +26,10 @@ def public_participation(request, doc_id):
 
         doc.public_participation = not doc.public_participation
         doc.save()
-    return redirect(request.META.get('HTTP_REFERER') or reverse('view-committee'))      
+        label = "enabled" if doc.public_participation else "disabled"
+        log_action(request, action='UPDATE', target=f'{doc.doc_type} — {doc.reference_no or doc.id}',
+                   detail=f'Public participation {label}.')
+    return redirect(request.META.get('HTTP_REFERER') or reverse('view-committee'))
         
 
 
@@ -99,8 +103,13 @@ def download_order_of_business(request, session_id):
 
 from django.template.loader import get_template
 
+@login_required
 def finalize_agenda(request):
     """Generates the PDF and saves it to the session model."""
+    if request.user.role not in ['SECRETARIAT', 'STAFF', 'ADMIN']:
+        messages.error(request, "You don't have permission to finalize the agenda.")
+        return redirect('order-of-business')
+
     now = datetime.now()
 
     days_ahead = 0 - now.weekday() 
@@ -131,6 +140,8 @@ def finalize_agenda(request):
     session.order_of_business.save(filename, ContentFile(pdf_buffer.read()), save=True)
     session.agenda_finalized_date = timezone.now()
     session.save()
+    log_action(request, action='CREATE', target=f'Order of Business — Session #{session.session_number}',
+               detail='Agenda finalized and PDF generated.')
     
     return redirect('order-of-business')
 
@@ -218,6 +229,10 @@ def generate_agenda_pdf(request, session_id):
 @login_required
 def send_agenda_email(request, session_id):
     """Email the Order of Business PDF to all active councilors."""
+    if request.user.role not in ['SECRETARIAT', 'STAFF', 'ADMIN']:
+        messages.error(request, "You don't have permission to send the agenda email.")
+        return redirect('order-of-business')
+
     from councilors.models import Councilor
 
     session = get_object_or_404(Session, id=session_id)
@@ -273,6 +288,8 @@ def send_agenda_email(request, session_id):
 
     try:
         email.send()
+        log_action(request, action='UPDATE', target=f'Order of Business — Session #{session.session_number}',
+                   detail=f'Emailed to {len(councilor_emails)} councilor(s).')
         messages.success(request, f'Order of Business emailed to {len(councilor_emails)} councilor(s).')
     except Exception as e:
         messages.error(request, f'Failed to send email: {str(e)}')

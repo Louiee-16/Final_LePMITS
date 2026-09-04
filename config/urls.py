@@ -31,6 +31,7 @@ urlpatterns = [
     path('dashboard/', dashboard_redirect, name='dashboard'),
     path('',include('accounts.urls')),
     path('',include('documents.urls')),
+    path('wopi/',include('documents.wopi_urls')),
     path('',include('committees.urls')),
     path('',include('councilors.urls')),
     path('',include('committee_level.urls')),
@@ -38,7 +39,6 @@ urlpatterns = [
     path('',include('OfficialGazette.urls')),
     path('',include('secretariat.urls')),
     path('',include('systemadmin.urls')),
-    path('',include('audit.urls')),
 ]
 if settings.DEBUG:
     # Media files (uploaded PDFs, etc.) are meant to be embedded in an <iframe>

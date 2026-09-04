@@ -32,21 +32,6 @@
         </span>
         {% endif %}
 
-        <button type="button" onclick="openCouncilorsModal()"
-            class="relative shrink-0 px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-lg font-bold text-[10px] uppercase tracking-widest hover:border-slate-300 transition-all">
-            <i data-lucide="users" style="width:12px;height:12px;margin-right:6px;vertical-align:middle;"></i> Councilors Present
-            {% if doc.participating_councilors.count %}
-            <span class="absolute -top-1.5 -right-1.5 w-5 h-5 bg-slate-500 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow">
-                {{ doc.participating_councilors.count }}
-            </span>
-            {% endif %}
-        </button>
-
-        <button type="button" id="markStatusBtn" onclick="openSaveModal()"
-            class="shrink-0 px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-lg font-bold text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all">
-            <i data-lucide="tag" style="width:12px;height:12px;margin-right:6px;vertical-align:middle;"></i><span class="btn-label">Mark Status</span>
-        </button>
-
         <button type="button" id="returnCommitteeBtn" onclick="openCommitteeModal()"
             class="shrink-0 px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-lg font-bold text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all">
             <i data-lucide="rotate-ccw" style="width:12px;height:12px;margin-right:6px;vertical-align:middle;"></i><span class="btn-label">Return to Committee</span>
@@ -58,142 +43,69 @@
         </button>
     </div>
 
-    <!-- EDITOR — real .docx, live, exactly like the drafting page. No more
-         side-by-side diff view (dropped in favor of direct docx editing —
-         see LePMITS/06 - OnlyOffice Integration.md). -->
-    <div id="onlyofficeContainer" style="flex:1 1 auto; min-height:0; width:100%;"></div>
-</div>
+    <!-- MAIN SPLIT PANEL — original (read-only, as of Second Reading) on the
+         left, live editor on the right. Same pattern as amending_table.html:
+         see document_original_html (documents/views.py) for the left panel's
+         data-para-id source and getSelection()/scrollToParaId()
+         (frontend/casualdocs-entry.jsx) for how the two sides stay linked. -->
+    <div id="panelWrapper" class="grid panel-normal" style="flex:1 1 auto; min-height:0;">
 
+        <!-- ── LEFT: ORIGINAL (READ-ONLY) PANEL ─────────────── -->
+        <div id="originalPanel" class="flex flex-col border-r border-slate-200 bg-white overflow-hidden transition-all duration-300">
 
-<!-- ══════════════════════════════════════════════
-     COUNCILORS PRESENT MODAL
-══════════════════════════════════════════════ -->
-<div id="councilorsModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
-    <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="closeCouncilorsModal()"></div>
-    <div class="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-lg modal-card flex flex-col" style="max-height: 80vh;">
+            <div class="px-5 py-3.5 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between shrink-0">
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <div class="w-2 h-2 rounded-full bg-slate-300 shrink-0"></div>
+                    <span id="originalLabel" class="text-[10px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap overflow-hidden">
+                        Original (Read-Only)
+                    </span>
+                </div>
 
-        <form method="POST" action="{% url 'update-document-councilors' doc.id %}" class="flex flex-col min-h-0">
-            {% csrf_token %}
-
-            <div class="px-8 pt-8 pb-5 border-b border-slate-100 shrink-0">
-                <div class="flex items-start justify-between gap-4">
-                    <div class="flex items-center gap-3">
-                        <div class="w-11 h-11 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
-                            <i data-lucide="users" style="width:18px;height:18px;color:#6366f1;"></i>
-                        </div>
-                        <div>
-                            <h2 class="text-base font-black text-slate-900 tracking-tight">Councilors Present</h2>
-                            <p class="text-[10px] text-slate-400 font-medium mt-0.5">
-                                Marked present here appear on the "Sponsored by" line and the signature sheet.
-                            </p>
-                        </div>
-                    </div>
-                    <button type="button" onclick="closeCouncilorsModal()"
-                        class="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-all shrink-0 mt-0.5">
-                        <i data-lucide="x" style="width:13px;height:13px;vertical-align:middle;"></i>
+                <div id="originalControls" class="flex items-center gap-1.5 shrink-0 ml-2">
+                    <button type="button" onclick="collapsePanel()" title="Collapse original panel"
+                        class="panel-btn text-slate-400 hover:text-slate-700 hover:bg-slate-100" id="collapseBtn">
+                        <i data-lucide="chevron-left" style="width:12px;height:12px;vertical-align:middle;"></i>
+                    </button>
+                    <button type="button" onclick="expandPanel()" title="Expand original panel"
+                        class="panel-btn text-slate-400 hover:text-slate-700 hover:bg-slate-100" id="expandBtn">
+                        <i data-lucide="chevron-right" style="width:12px;height:12px;vertical-align:middle;"></i>
                     </button>
                 </div>
             </div>
 
-            <div class="flex-1 overflow-y-auto px-8 py-6">
-                {% if all_councilors %}
-                <div class="space-y-2">
-                    {% for c in all_councilors %}
-                    <label class="flex items-center gap-3 p-3 border border-slate-100 rounded-xl cursor-pointer hover:bg-slate-50 transition-all">
-                        <input type="checkbox" name="councilor_ids" value="{{ c.id }}" class="w-4 h-4 accent-slate-600"
-                            {% if c in doc.participating_councilors.all %}checked{% endif %}>
-                        <span class="text-xs font-bold text-slate-700">{{ c.name }}</span>
-                        <span class="text-[10px] text-slate-400 ml-auto">District {{ c.district }}</span>
-                    </label>
-                    {% endfor %}
+            <!-- Collapsed state — just a restore button -->
+            <div id="collapsedState" class="hidden flex-1 flex flex-col items-center justify-center gap-4 py-8 px-2">
+                <div class="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center">
+                    <i data-lucide="file-text" style="width:16px;height:16px;color:#94a3b8;"></i>
                 </div>
-                {% else %}
-                <p class="text-xs text-slate-400 italic text-center py-8">No active councilors found.</p>
-                {% endif %}
-            </div>
-
-            <div class="px-8 py-5 border-t border-slate-100 shrink-0 flex gap-3">
-                <button type="button" onclick="closeCouncilorsModal()"
-                    class="flex-1 px-4 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-all">
-                    Cancel
-                </button>
-                <button type="submit"
-                    class="flex-1 px-4 py-3 bg-slate-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-slate-100 hover:bg-slate-700 transition-all">
-                    Save
+                <p class="text-[9px] font-black uppercase tracking-widest text-slate-400 [writing-mode:vertical-lr] rotate-180">
+                    Original
+                </p>
+                <button type="button" onclick="restorePanel()"
+                    class="w-8 h-8 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-all"
+                    title="Restore original panel">
+                    <i data-lucide="chevron-right" style="width:12px;height:12px;vertical-align:middle;"></i>
                 </button>
             </div>
-        </form>
-    </div>
-</div>
 
-
-<!-- ══════════════════════════════════════════════
-     MARK AMENDMENT STATUS MODAL — purely informational now;
-     amendments themselves save live to the docx.
-══════════════════════════════════════════════ -->
-<div id="saveModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
-    <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="closeSaveModal()"></div>
-    <div class="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-sm p-8 modal-card">
-
-        <div class="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center mb-5">
-            <i data-lucide="tag" style="width:18px;height:18px;color:#6366f1;"></i>
+            <!-- Original content — fetched as HTML (not an iframe) so a click
+                 in the live editor can query its data-para-id elements directly. -->
+            <div id="originalContentWrap" class="flex-1 overflow-y-auto bg-slate-100 px-6 py-8">
+                <div id="originalContent" class="text-slate-800 bg-white mx-auto shadow-sm border border-slate-200 rounded-sm"></div>
+            </div>
         </div>
 
-        <h2 class="text-base font-black text-slate-900 tracking-tight mb-1">Mark Amendment Status</h2>
-        <p class="text-xs text-slate-400 font-medium mb-6 leading-relaxed">
-            A label for where this floor deliberation currently stands. Amendments themselves are already saved directly to the document as you edit.
-        </p>
-
-        <form id="statusForm" method="POST" action="{% url 'save_amendments' doc.id %}">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="save">
-
-            <div class="space-y-3 mb-6">
-                <label class="save-status-label flex items-start gap-4 p-4 border-2 border-slate-100 rounded-2xl cursor-pointer hover:bg-slate-50 transition-all">
-                    <input type="radio" name="amendment_status" value="IN_PROGRESS" class="hidden" {% if doc.amendment_status == 'IN_PROGRESS' or not doc.amendment_status %}checked{% endif %}>
-                    <div class="w-9 h-9 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 mt-0.5">
-                        <i data-lucide="gauge" style="width:16px;height:16px;color:#f59e0b;"></i>
-                    </div>
-                    <div>
-                        <p class="text-xs font-black uppercase tracking-widest text-slate-700">In Progress</p>
-                        <p class="text-[11px] text-slate-400 font-medium mt-0.5">Amendments are still being worked on.</p>
-                    </div>
-                </label>
-
-                <label class="save-status-label flex items-start gap-4 p-4 border-2 border-slate-100 rounded-2xl cursor-pointer hover:bg-slate-50 transition-all">
-                    <input type="radio" name="amendment_status" value="FINALIZED" class="hidden" {% if doc.amendment_status == 'FINALIZED' %}checked{% endif %}>
-                    <div class="w-9 h-9 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 mt-0.5">
-                        <i data-lucide="check-circle-2" style="width:16px;height:16px;color:#10b981;"></i>
-                    </div>
-                    <div>
-                        <p class="text-xs font-black uppercase tracking-widest text-slate-700">Finalized</p>
-                        <p class="text-[11px] text-slate-400 font-medium mt-0.5">All amendments are done and reviewed.</p>
-                    </div>
-                </label>
-
-                <label class="save-status-label flex items-start gap-4 p-4 border-2 border-slate-100 rounded-2xl cursor-pointer hover:bg-slate-50 transition-all">
-                    <input type="radio" name="amendment_status" value="NO_AMENDMENTS" class="hidden" {% if doc.amendment_status == 'NO_AMENDMENTS' %}checked{% endif %}>
-                    <div class="w-9 h-9 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0 mt-0.5">
-                        <i data-lucide="minus-circle" style="width:16px;height:16px;color:#94a3b8;"></i>
-                    </div>
-                    <div>
-                        <p class="text-xs font-black uppercase tracking-widest text-slate-700">No Amendments</p>
-                        <p class="text-[11px] text-slate-400 font-medium mt-0.5">No changes were made to this draft.</p>
-                    </div>
-                </label>
+        <!-- ── RIGHT: LIVE EDITOR PANEL ──────────────────────── -->
+        <div class="flex flex-col bg-white overflow-hidden">
+            <div class="px-6 py-3.5 border-b border-slate-100 flex items-center gap-2.5 shrink-0">
+                <div class="w-2 h-2 rounded-full bg-slate-400"></div>
+                <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">Amended (Editable)</span>
             </div>
+            <!-- real .docx, live, with Track Changes forced on so edits made
+                 here show up as redlined insertions/deletions. -->
+            <div id="documentEditorContainer" style="flex:1 1 auto; min-height:0; width:100%;"></div>
+        </div>
 
-            <div class="flex gap-3">
-                <button type="button" onclick="closeSaveModal()"
-                    class="flex-1 px-4 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-all">
-                    Cancel
-                </button>
-                <button type="submit"
-                    class="flex-1 px-4 py-3 bg-slate-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-slate-100 hover:bg-slate-700 transition-all">
-                    <i data-lucide="save" style="width:13px;height:13px;margin-right:8px;vertical-align:middle;"></i> Save
-                </button>
-            </div>
-        </form>
     </div>
 </div>
 
@@ -215,22 +127,6 @@
             <span class="text-slate-700 font-bold">This action cannot be undone.</span>
         </p>
 
-        <div class="bg-slate-50 rounded-2xl border border-slate-100 p-5 mb-6 space-y-3">
-            <p class="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-3">Before proceeding, confirm:</p>
-            <label class="flex items-start gap-3 cursor-pointer group">
-                <input type="checkbox" id="check1" class="mt-0.5 w-4 h-4 accent-slate-500 shrink-0" onchange="checkAllConfirmed()">
-                <span class="text-xs text-slate-600 font-medium group-hover:text-slate-800 transition-colors">All floor amendments have been applied and saved.</span>
-            </label>
-            <label class="flex items-start gap-3 cursor-pointer group">
-                <input type="checkbox" id="check2" class="mt-0.5 w-4 h-4 accent-slate-500 shrink-0" onchange="checkAllConfirmed()">
-                <span class="text-xs text-slate-600 font-medium group-hover:text-slate-800 transition-colors">The amended version has been reviewed by the committee chair.</span>
-            </label>
-            <label class="flex items-start gap-3 cursor-pointer group">
-                <input type="checkbox" id="check3" class="mt-0.5 w-4 h-4 accent-slate-500 shrink-0" onchange="checkAllConfirmed()">
-                <span class="text-xs text-slate-600 font-medium group-hover:text-slate-800 transition-colors">The document is ready for final deliberation.</span>
-            </label>
-        </div>
-
         <div class="flex gap-3">
             <button type="button" onclick="closeThirdReadingModal()"
                 class="flex-1 px-5 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-all">
@@ -238,8 +134,8 @@
             </button>
             <form id="thirdReadingForm" action="{% url 'move_to_third_reading' doc.id %}" method="POST" class="flex-1">
                 {% csrf_token %}
-                <button type="submit" id="confirmBtn" disabled
-                    class="w-full px-5 py-3 bg-slate-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-slate-100 hover:bg-slate-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:bg-slate-600">
+                <button type="submit"
+                    class="w-full px-5 py-3 bg-slate-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-slate-100 hover:bg-slate-700 transition-all">
                     <i data-lucide="send" style="width:13px;height:13px;margin-right:8px;vertical-align:middle;"></i> Confirm & Move
                 </button>
             </form>
@@ -282,64 +178,130 @@
 </div>
 
 
+<script src="{% static 'js/document_editors/casualdocs-mount.js' %}"></script>
 <script>
-    // ── OnlyOffice editor — the only content editor on this page ──
-    const onlyofficeDocId = "{{ doc.id }}";
-    let onlyofficeDocKey = null;
+    // ── Casual Docs editor, mode: 'suggesting' (its native track-changes
+    // mode) — see documents/wopi.py's casualdocs_document_bytes/
+    // casualdocs_save and static/js/document_editors/casualdocs-mount.js
+    // for the shared mount/similarity-check logic. ──
+    const documentEditorDocId = "{{ doc.id }}";
+    let activeEditor = null;
 
-    (function () {
-        const onlyofficeServerUrl = "{{ onlyoffice_server_url }}";
-
-        function loadScript(src) {
-            return new Promise((resolve, reject) => {
-                const s = document.createElement('script');
-                s.src = src;
-                s.onload = resolve;
-                s.onerror = () => reject(new Error('Failed to load ' + src));
-                document.head.appendChild(s);
-            });
-        }
-
-        async function mountOnlyOffice() {
-            try {
-                await loadScript(`${onlyofficeServerUrl}/web-apps/apps/api/documents/api.js`);
-                // Track-changes config, not the plain drafting one — see
-                // onlyoffice_amend_config.
-                const resp = await fetch(`/onlyoffice/${onlyofficeDocId}/amend-config/`);
-                if (!resp.ok) throw new Error('Could not load OnlyOffice config (' + resp.status + ')');
-                const config = await resp.json();
-                onlyofficeDocKey = config.document.key;
-                config.width = '100%';
-                config.height = '100%';
-                config.type = 'desktop';
-                new DocsAPI.DocEditor('onlyofficeContainer', config);
-            } catch (err) {
-                document.getElementById('onlyofficeContainer').innerHTML =
-                    `<div style="padding:40px;text-align:center;color:#dc2626;font-size:13px;font-weight:600;">
-                        The document editor failed to load — is the Document Server running?<br>
-                        <span style="font-weight:400;color:#94a3b8;">${err.message}</span>
-                    </div>`;
-            }
-        }
-
-        mountOnlyOffice();
+    (async function () {
+        const cacheBust = '{% now "U" %}';
+        activeEditor = await CasualDocsMount.mount(document.getElementById('documentEditorContainer'), {
+            docId: documentEditorDocId,
+            fileUrl: `/wopi/casualdocs/${documentEditorDocId}/file/`,
+            saveUrl: `/wopi/casualdocs/${documentEditorDocId}/save/`,
+            csrfToken: '{{ csrf_token }}',
+            authorName: '{{ request.user.get_full_name|default:request.user.username|escapejs }}',
+            mode: 'suggesting',
+            cssUrl: "{% static 'js/document_editors/casualdocs-bundle.css' %}?v=" + cacheBust,
+            jsUrl: "{% static 'js/document_editors/casualdocs-bundle.js' %}?v=" + cacheBust,
+            onError: function (err) { console.error('Casual Docs error:', err); },
+        });
+        wireParaIdHighlighting();
     })();
+
+    // ── Original (read-only) panel ──────────────────────────────────
+    // States: 'normal' (50/50), 'collapsed' (~56px), 'expanded' (65%).
+    const wrapper        = document.getElementById('panelWrapper');
+    const originalContentWrap = document.getElementById('originalContentWrap');
+    const originalContent = document.getElementById('originalContent');
+    const collapsedState = document.getElementById('collapsedState');
+    const originalLabel  = document.getElementById('originalLabel');
+    const collapseBtn    = document.getElementById('collapseBtn');
+    const expandBtn      = document.getElementById('expandBtn');
+
+    let panelState = localStorage.getItem('floor-amendments-panel-state') || 'normal';
+
+    function applyState(state) {
+        panelState = state;
+        localStorage.setItem('floor-amendments-panel-state', state);
+
+        wrapper.classList.remove('panel-normal', 'panel-collapsed', 'panel-expanded');
+        wrapper.classList.add(`panel-${state}`);
+
+        if (state === 'collapsed') {
+            originalContentWrap.classList.add('hidden');
+            collapsedState.classList.remove('hidden');
+            collapsedState.classList.add('flex');
+            originalLabel.classList.add('hidden');
+            collapseBtn.classList.add('opacity-30', 'pointer-events-none');
+            expandBtn.classList.remove('opacity-30', 'pointer-events-none');
+        } else {
+            originalContentWrap.classList.remove('hidden');
+            collapsedState.classList.add('hidden');
+            collapsedState.classList.remove('flex');
+            originalLabel.classList.remove('hidden');
+            collapseBtn.classList.remove('opacity-30', 'pointer-events-none');
+            expandBtn.classList.toggle('opacity-30', state === 'expanded');
+            expandBtn.classList.toggle('pointer-events-none', state === 'expanded');
+        }
+    }
+    function collapsePanel() { applyState(panelState === 'normal' ? 'collapsed' : 'normal'); }
+    function expandPanel()   { applyState(panelState === 'normal' ? 'expanded' : 'normal'); }
+    function restorePanel()  { applyState('normal'); }
+    applyState(panelState);
+
+    // Fetched once on load — the original is frozen for the whole editing
+    // session, so there's nothing to re-fetch as amendments are made.
+    (async function loadOriginal() {
+        try {
+            const resp = await fetch("{% url 'document-original-html' doc.id %}");
+            if (!resp.ok) throw new Error('not available');
+            originalContent.innerHTML = await resp.text();
+        } catch (err) {
+            originalContent.innerHTML =
+                '<p class="text-xs text-slate-400 italic">No snapshot available for this version.</p>';
+        }
+    })();
+
+    // Clicking a paragraph in the original panel scrolls the live editor to
+    // the matching paragraph (same w14:paraId) — the reverse direction of
+    // the highlight-on-select wiring below.
+    originalContent.addEventListener('click', function (e) {
+        const p = e.target.closest('[data-para-id]');
+        if (!p || !activeEditor || !activeEditor.scrollToParaId) return;
+        activeEditor.scrollToParaId(p.dataset.paraId);
+    });
+
+    // ── Link the editor's current selection to the matching paragraph in
+    // the original panel — highlights it and scrolls it into view. Reacts
+    // to mouseup/keyup on the editor container and reads the authoritative
+    // paraId via activeEditor.getSelection() (frontend/casualdocs-entry.jsx).
+    let highlightTimer = null;
+    function wireParaIdHighlighting() {
+        const editorEl = document.getElementById('documentEditorContainer');
+        if (!editorEl || !activeEditor || !activeEditor.getSelection) return;
+
+        editorEl.addEventListener('mouseup', scheduleHighlight);
+        editorEl.addEventListener('keyup', scheduleHighlight);
+    }
+    function scheduleHighlight() {
+        if (highlightTimer) clearTimeout(highlightTimer);
+        highlightTimer = setTimeout(highlightSelectedParagraph, 200);
+    }
+    function highlightSelectedParagraph() {
+        const selection = activeEditor.getSelection();
+        const previous = originalContent.querySelector('.para-highlight');
+        if (previous) previous.classList.remove('para-highlight');
+
+        if (!selection || !selection.paraId) return;
+        const match = originalContent.querySelector(`[data-para-id="${CSS.escape(selection.paraId)}"]`);
+        if (!match) return; // paragraph added since the original — nothing to highlight
+        match.classList.add('para-highlight');
+        match.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
 
     // ── Force a save before leaving the page, however that happens ─────
     // Amendments now save live to the docx (same pipeline as drafting),
-    // but OnlyOffice's own autosave is idle-triggered — navigating away
+    // but the editor's own autosave is idle-triggered — navigating away
     // right after typing can outrun it. Every exit from this page routes
     // through this first, same pattern as draft.html.
     async function forceSaveEditor() {
-        if (!onlyofficeDocKey) return;
-        try {
-            await fetch(`/onlyoffice/${onlyofficeDocId}/forcesave/`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-                body: JSON.stringify({ key: onlyofficeDocKey })
-            });
-        } catch (err) {
-            console.warn('forcesave before navigation failed:', err);
+        if (activeEditor && activeEditor.forceSave) {
+            await activeEditor.forceSave();
         }
     }
 
@@ -349,7 +311,7 @@
         window.location.href = this.href;
     });
 
-    ['statusForm', 'thirdReadingForm', 'committeeForm'].forEach(id => {
+    ['thirdReadingForm', 'committeeForm'].forEach(id => {
         const form = document.getElementById(id);
         if (!form) return;
         form.addEventListener('submit', async function (e) {
@@ -359,26 +321,9 @@
         });
     });
 
-    // ── Councilors present modal ─────────────────────────────────────
-    function openCouncilorsModal()  { openModalById('councilorsModal'); }
-    function closeCouncilorsModal() { closeModalById('councilorsModal'); }
-
-    // ── Mark status modal ────────────────────────────────────────────
-    function openSaveModal()  { openModalById('saveModal'); }
-    function closeSaveModal() { closeModalById('saveModal'); }
-
     // ── Third reading modal ──────────────────────────────────────────
-    function openThirdReadingModal() {
-        ['check1','check2','check3'].forEach(id => document.getElementById(id).checked = false);
-        document.getElementById('confirmBtn').disabled = true;
-        openModalById('thirdReadingModal');
-    }
+    function openThirdReadingModal() { openModalById('thirdReadingModal'); }
     function closeThirdReadingModal() { closeModalById('thirdReadingModal'); }
-
-    function checkAllConfirmed() {
-        const allChecked = ['check1','check2','check3'].every(id => document.getElementById(id).checked);
-        document.getElementById('confirmBtn').disabled = !allChecked;
-    }
 
     // ── Committee modal ──────────────────────────────────────────────
     function openCommitteeModal() { openModalById('committeeModal'); }
@@ -400,7 +345,7 @@
 
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') {
-            ['saveModal','thirdReadingModal','committeeModal','councilorsModal'].forEach(closeModalById);
+            ['thirdReadingModal','committeeModal'].forEach(closeModalById);
         }
     });
 </script>
@@ -412,5 +357,38 @@
         to   { opacity: 1; transform: scale(1) translateY(0); }
     }
     .save-status-label { user-select: none; }
+
+    /* ── Panel grid states — same pattern as amending_table.html ── */
+    #panelWrapper {
+        display: grid;
+        transition: grid-template-columns 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .panel-normal    { grid-template-columns: 1fr 1fr; }
+    .panel-collapsed { grid-template-columns: 56px 1fr; }
+    .panel-expanded  { grid-template-columns: 65fr 35fr; }
+
+    .panel-btn {
+        width: 26px;
+        height: 26px;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s ease;
+        flex-shrink: 0;
+    }
+
+    /* ── Original panel content — matches the actual document's own
+         Times New Roman look, not the app's default sans-serif UI font. ── */
+    #originalContent {
+        font-family: "Times New Roman", Times, serif;
+        font-size: 13px;
+        line-height: 1.7;
+        max-width: 794px;
+        padding: 96px;
+    }
+    #originalContent p[data-para-id] { cursor: pointer; border-radius: 6px; padding: 3px 8px; }
+    #originalContent p[data-para-id]:hover { background: #f8fafc; }
+    #originalContent .para-highlight { background: #fef9c3; }
 </style>
 {% endblock %}

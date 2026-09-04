@@ -17,7 +17,7 @@
     </div>
 
     <!-- ── SYSTEM STATS ── -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <!-- Users Card -->
         <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
             <div class="flex items-center justify-between mb-4">
@@ -71,12 +71,24 @@
     <p class="text-2xl font-black text-slate-900">{{ stats.uptime|default:"99.9%" }}</p>
     <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Current System Uptime</p>
 </div>
+
+        <!-- System Errors Card -->
+        <a href="{% url 'system-errors' %}" class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:border-slate-200 transition-all block">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center {% if stats.unresolved_errors %}bg-red-50 text-red-500{% else %}bg-slate-50 text-slate-600{% endif %}">
+                    <i data-lucide="bug" style="width:18px;height:18px;"></i>
+                </div>
+                <span class="text-[10px] font-black text-slate-500 bg-slate-50 px-2 py-1 rounded-lg uppercase">Unresolved</span>
+            </div>
+            <p class="text-3xl font-black text-slate-900">{{ stats.unresolved_errors|default:"0" }}</p>
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">System Errors</p>
+        </a>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
+
         <!-- ── RECENT AUDIT LOGS ── -->
-        <div class="lg:col-span-5 bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+        <div class="lg:col-span-2 bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
             <div class="p-6 border-b border-slate-50 flex justify-between items-center">
                 <h3 class="font-bold text-slate-800">Recent Security Activity</h3>
                 <a href="{% url 'audit-logs' %}" class="text-[10px] font-black text-slate-600 uppercase tracking-widest hover:underline">View All Logs</a>
@@ -113,54 +125,78 @@
         </div>
 
         <!-- ── QUICK ACTIONS & TOOLS ── -->
-        <!--
         <div class="space-y-6">
-            
-            
+
             <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
                 <h3 class="font-bold text-slate-800 mb-6">User Distribution</h3>
                 <div class="space-y-4">
-                    <div class="flex justify-between items-center">
-                        <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">Councilors</span>
-                        <span class="text-sm font-black text-slate-800">12</span>
+                    {% for role in role_breakdown %}
+                    <div>
+                        <div class="flex justify-between items-center mb-1.5">
+                            <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">{{ role.label }}</span>
+                            <span class="text-sm font-black text-slate-800">{{ role.count }}</span>
+                        </div>
+                        <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                            <div class="bg-slate-500 h-full" style="width: {{ role.percent }}%"></div>
+                        </div>
                     </div>
-                    <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                        <div class="bg-slate-500 h-full" style="width: 70%"></div>
-                    </div>
-
-                    <div class="flex justify-between items-center">
-                        <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">Secretariat</span>
-                        <span class="text-sm font-black text-slate-800">4</span>
-                    </div>
-                    <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                        <div class="bg-slate-500 h-full" style="width: 25%"></div>
-                    </div>
-
-                    <div class="flex justify-between items-center">
-                        <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">Barangay Admin</span>
-                        <span class="text-sm font-black text-slate-800">21</span>
-                    </div>
-                    <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                        <div class="bg-slate-500 h-full" style="width: 90%"></div>
-                    </div>
+                    {% empty %}
+                    <p class="text-xs text-slate-400 font-medium italic">No accounts registered yet.</p>
+                    {% endfor %}
                 </div>
             </div>
 
-            
             <div class="bg-slate-900 p-6 rounded-3xl shadow-xl shadow-slate-200">
                 <div class="flex items-center gap-3 mb-4 text-white">
                     <i data-lucide="info" style="width:16px;height:16px;color:#818cf8;vertical-align:middle;"></i>
                     <h3 class="font-bold text-sm">System Maintenance</h3>
                 </div>
                 <p class="text-slate-400 text-xs leading-relaxed mb-4">
-                    Automatic backups are scheduled daily at 2:00 AM. Next system maintenance window: Oct 24, 2023.
+                    {% if setting.maintenance_mode %}
+                        Maintenance Mode is <span class="text-white font-bold">ON</span> — non-admin users cannot access the system.
+                    {% else %}
+                        Maintenance Mode is off. Download a full database snapshot below at any time.
+                    {% endif %}
                 </p>
-                <button class="w-full py-2.5 bg-white/10 hover:bg-white/20 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-xl transition-all border border-white/10">
-                    Run Manual Backup
-                </button>
+                <div class="flex items-center gap-2">
+                    <a href="{% url 'general-settings' %}" class="flex-1 text-center py-2.5 bg-white/10 hover:bg-white/20 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-xl transition-all border border-white/10">
+                        Maintenance Settings
+                    </a>
+                </div>
+                <form method="POST" action="{% url 'trigger-backup' %}" class="mt-2">
+                    {% csrf_token %}
+                    <button type="submit" class="w-full py-2.5 bg-white/10 hover:bg-white/20 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-xl transition-all border border-white/10">
+                        Run Manual Backup
+                    </button>
+                </form>
             </div>
 
-        </div>-->
+        </div>
+    </div>
+
+    <!-- ── RECENT SYSTEM ERRORS ── -->
+    <div class="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+        <div class="p-6 border-b border-slate-50 flex justify-between items-center">
+            <h3 class="font-bold text-slate-800">Recent System Errors</h3>
+            <a href="{% url 'system-errors' %}" class="text-[10px] font-black text-slate-600 uppercase tracking-widest hover:underline">View All Errors</a>
+        </div>
+        {% if recent_errors %}
+        <div class="divide-y divide-slate-50">
+            {% for err in recent_errors %}
+            <a href="{% url 'system-errors' %}" class="px-6 py-4 flex items-center gap-4 hover:bg-slate-50/50 transition-colors">
+                <span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-red-50 text-red-600 shrink-0">
+                    {{ err.exception_type|default:"Error" }}
+                </span>
+                <span class="text-sm font-bold text-slate-700 truncate flex-1">{{ err.path }}</span>
+                <span class="text-[10px] text-slate-400 font-bold uppercase shrink-0">{{ err.timestamp|timesince }} ago</span>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="px-6 py-10 text-center">
+            <p class="text-slate-400 font-bold italic text-sm">No unresolved errors. System is running clean.</p>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

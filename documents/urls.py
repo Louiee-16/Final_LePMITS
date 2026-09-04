@@ -3,7 +3,6 @@ from . import views
 from .views import create_draft
 
 urlpatterns = [
-    path('create/referred_draft/<int:doc_id>/',views.create_referred_draft, name='create-referred-draft'),
     path('create/',views.create_draft, name = 'create_draft'),
     path('autosave/',views.autosave_draft, name = 'autosave_draft'),
     path('draft/upload-image/', views.upload_draft_image, name='upload-draft-image'),
@@ -50,6 +49,7 @@ urlpatterns = [
     ########################## for downloading###########################
     path('download-official/<int:pk>/', views.download_official_pdf, name='download_official_pdf'), #download button for approved files
     path('documents/<int:doc_id>/', views.download_document_pdf, name='download_document_pdf'), # download for any document version
+    path('documents/<int:doc_id>/docx/', views.download_document_docx, name='download_document_docx'),
     ##################################################################################
     path("ai-legal-basis/", views.ai_legal_basis, name="ai_legal_basis"),
 
@@ -63,16 +63,12 @@ urlpatterns = [
     path('documents/extract-legacy-metadata/',views.extract_legacy_metadata, name="EXTRACT-LEGACY-METADATA"),
     path('documents/validate-ocr/', views.validate_ocr_with_ai, name='validate-ocr-with-ai'),
 
-    ###################### ONLYOFFICE EDITOR TRIAL ######################
-    path('onlyoffice/<int:doc_id>/', views.onlyoffice_editor_test, name='onlyoffice-editor-test'),
-    path('onlyoffice/<int:doc_id>/config/', views.onlyoffice_editor_config, name='onlyoffice-editor-config'),
-    path('onlyoffice/<int:doc_id>/amend-config/', views.onlyoffice_amend_config, name='onlyoffice-amend-config'),
-    path('onlyoffice/<int:doc_id>/source/', views.onlyoffice_document_source, name='onlyoffice-document-source'),
-    path('onlyoffice/<int:doc_id>/pending-docx/', views.onlyoffice_pending_docx, name='onlyoffice-pending-docx'),
-    path('onlyoffice/<int:doc_id>/forcesave/', views.onlyoffice_forcesave, name='onlyoffice-forcesave'),
-    path('onlyoffice/<int:doc_id>/view-config/', views.onlyoffice_view_config, name='onlyoffice-view-config'),
-    path('onlyoffice/<int:doc_id>/snapshot.pdf', views.document_snapshot_pdf, name='document-snapshot-pdf'),
-    path('onlyoffice/archive/<int:archive_id>/snapshot.pdf', views.archive_snapshot_pdf, name='archive-snapshot-pdf'),
-    path('onlyoffice/<int:doc_id>/similarity-check/', views.onlyoffice_similarity_check, name='onlyoffice-similarity-check'),
-    path('onlyoffice/<int:doc_id>/callback/', views.onlyoffice_callback, name='onlyoffice-callback'),
+    ###################### DOCUMENT PDF SNAPSHOTS ######################
+    # Editor-agnostic — see documents/views.py's document_snapshot_pdf/
+    # archive_snapshot_pdf and _onlyoffice_snapshot_pdf's docstring. Live
+    # document editing itself is handled by documents/wopi.py (Casual Docs,
+    # mounted at /wopi/ — see config/urls.py).
+    path('documents/<int:doc_id>/snapshot.pdf', views.document_snapshot_pdf, name='document-snapshot-pdf'),
+    path('documents/archive/<int:archive_id>/snapshot.pdf', views.archive_snapshot_pdf, name='archive-snapshot-pdf'),
+    path('documents/<int:doc_id>/original.html', views.document_original_html, name='document-original-html'),
 ]

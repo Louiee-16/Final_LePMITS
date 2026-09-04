@@ -23,20 +23,26 @@ import os
 from django.conf import settings
 
 def get_media_storage_size():
-    """Calculates total size of the MEDIA_ROOT directory."""
-    total_size = 0
-    start_path = settings.MEDIA_ROOT
-    
-    # Check if the media directory exists to prevent errors
-    if not os.path.exists(start_path):
-        return "0 KB"
+    """Calculates total size of MEDIA_ROOT plus DOCUMENT_EDITOR_STORAGE_ROOT.
 
-    for dirpath, dirnames, filenames in os.walk(start_path):
-        for f in filenames:
-            fp = os.path.join(dirpath, f)
-            # skip if it is symbolic link
-            if not os.path.islink(fp):
-                total_size += os.path.getsize(fp)
+    The latter (documents/wopi.py's working + archived .docx/PDF files)
+    was moved out from under MEDIA_ROOT specifically so it's never
+    reachable via a raw MEDIA_URL path in production — see that setting's
+    comment in config/settings.py. It's still real disk usage this app is
+    responsible for, so it's still counted here; it just isn't under
+    MEDIA_ROOT itself anymore."""
+    total_size = 0
+    start_paths = [settings.MEDIA_ROOT, settings.DOCUMENT_EDITOR_STORAGE_ROOT]
+
+    for start_path in start_paths:
+        if not os.path.exists(start_path):
+            continue
+        for dirpath, dirnames, filenames in os.walk(start_path):
+            for f in filenames:
+                fp = os.path.join(dirpath, f)
+                # skip if it is symbolic link
+                if not os.path.islink(fp):
+                    total_size += os.path.getsize(fp)
 
     # Convert bytes to human-readable format
     for unit in ['B', 'KB', 'MB', 'GB', 'TB']:

@@ -60,7 +60,12 @@
             font-size: 9px;
             color: #9ca3af;
             text-align: center;
-            letter-spacing: 0.03em;
+            /* xhtml2pdf/ReportLab's CSS length parser doesn't resolve
+               em (confirmed live: "getSize: Not a float '0.03em'" on
+               every one of this file's em-based letter-spacing values,
+               all silently dropped) — px, in absolute terms matching
+               what 0.03em of this rule's own 9px font-size actually is. */
+            letter-spacing: 0.27px;
         }
 
         /* A ribbon "Page Break" insert (draft.html) becomes a real page
@@ -84,7 +89,9 @@
             text-align: center;
             display: block;
         }
-        .letterhead-line.republic { font-weight: 700; letter-spacing: 0.03em; }
+        /* 0.03em of this rule's own (inherited from .letterhead-line) 11px
+           font-size — see .pdf-footer above for why px, not em. */
+        .letterhead-line.republic { font-weight: 700; letter-spacing: 0.33px; }
 
         .office-line {
             font-size: 14px;
@@ -100,7 +107,9 @@
             font-size: 13px;
             font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            /* 0.05em of this rule's own 13px font-size — see .pdf-footer
+               above for why px, not em. */
+            letter-spacing: 0.65px;
             text-align: center;
             margin: 12px 0 4px;
         }
@@ -124,7 +133,9 @@
             text-transform: uppercase;
             color: #111;
             line-height: 1.7;
-            letter-spacing: 0.02em;
+            /* 0.02em of this rule's own 13px font-size — see .pdf-footer
+               above for why px, not em. */
+            letter-spacing: 0.26px;
             margin: 16px 0;
         }
 
@@ -152,7 +163,9 @@
            gets applied. */
         p.clause-indent { text-indent: 2em; }
         p.preamble { font-style: italic; }
-        p.signatory-block { font-weight: 800; text-transform: uppercase; text-align: center; letter-spacing: 0.03em; }
+        /* 0.03em of this rule's own (inherited from body) 12.5px font-size
+           — see .pdf-footer above for why px, not em. */
+        p.signatory-block { font-weight: 800; text-transform: uppercase; text-align: center; letter-spacing: 0.375px; }
         strong { font-weight: 700; }
         em { font-style: italic; }
         /* xhtml2pdf has no built-in default stylesheet entry for sub/sup
@@ -211,7 +224,9 @@
             font-size: 11px;
             font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: 0.03em;
+            /* 0.03em of this rule's own 11px font-size — see .pdf-footer
+               above for why px, not em. */
+            letter-spacing: 0.33px;
             text-align: center;
         }
 
@@ -239,7 +254,9 @@
             text-align: right;
             font-size: 10px;
             color: #9ca3af;
-            letter-spacing: 0.05em;
+            /* 0.05em of this rule's own 10px font-size — see .pdf-footer
+               above for why px, not em. */
+            letter-spacing: 0.5px;
             text-transform: uppercase;
             font-weight: 700;
             margin-bottom: 32px;
@@ -257,7 +274,9 @@
             font-weight: 700;
             text-transform: uppercase;
             text-align: center;
-            letter-spacing: 0.04em;
+            /* 0.04em of this rule's own 11px font-size — see .pdf-footer
+               above for why px, not em. */
+            letter-spacing: 0.44px;
             margin-bottom: 24px;
         }
 

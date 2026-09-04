@@ -1,0 +1,29 @@
+{% load static %}
+<!-- TOOLBAR -->
+<div class="max-w-[1400px] mx-auto px-4 pt-6 pb-2 no-print">
+    <div class="flex justify-between items-center">
+        <div class="flex items-center gap-3">
+            <span class="px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest bg-slate-100 text-slate-500">
+                {{ doc.status }}
+            </span>
+            {% if doc.uploaded_docx %}
+            <a href="{{ doc.uploaded_docx.url }}" download
+                class="px-4 py-2.5 bg-slate-900 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-700 transition-all shadow-sm flex items-center gap-2">
+                <i data-lucide="file-down" style="width:13px;height:13px;vertical-align:middle;"></i> Download .docx
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- PAPER WRAPPER -->
+<div class="max-w-[1400px] mx-auto px-4 py-6">
+{% if doc.uploaded_docx %}
+    <!-- Same viewing experience as a filed Document's snapshot PDF —
+         see documents/modal_document_viewer.html — just converted live
+         rather than from a cached snapshot. -->
+    <iframe src="{% url 'barangay-file-snapshot-pdf' doc.id %}" style="width:100%; height:85vh; border:0; background:#fff;" class="rounded-2xl border border-slate-200 shadow-xl"></iframe>
+{% else %}
+    <p class="p-10 text-center text-slate-400 font-medium">No file uploaded.</p>
+{% endif %}
+</div>

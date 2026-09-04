@@ -43,14 +43,11 @@
                                         class="bg-white border border-slate-200 text-slate-500 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all">
                                     <i data-lucide="undo-2" style="width:11px;height:11px;margin-right:3px;vertical-align:middle;"></i> Return
                                 </button>
-                                <form method="POST" action="{% url 'move_to_first' doc.id %}" style="margin:0;">
-                                    {% csrf_token %}
-                                    <button type="submit"
-                                            class="bg-slate-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-700 transition-colors"
-                                            onclick="event.stopPropagation(); return confirm('Move this document to First Reading?');">
-                                        Move to First Reading
-                                    </button>
-                                </form>
+                                <button type="button"
+                                        onclick="event.stopPropagation();openMoveToFirstModal('{{ doc.id }}', '{{ doc.title|escapejs }}')"
+                                        class="bg-slate-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-700 transition-colors">
+                                    Move to First Reading
+                                </button>
                             </div>
                             {% endif %}
                         </td>
@@ -79,7 +76,7 @@
                 </thead>
                 <tbody class="divide-y divide-slate-50">
                     {% for doc in barangay_docs %}
-                    <tr class="hover:bg-slate-50/30 transition-colors cursor-pointer doc-row" data-doc-id="{{ doc.id }}">
+                    <tr class="hover:bg-slate-50/30 transition-colors cursor-pointer doc-row" data-doc-id="{{ doc.id }}" data-doc-kind="barangay">
                         <td class="px-8 py-5">
                             <p class="text-sm font-extrabold text-slate-800 line-clamp-1" title="{{ doc.title }}">{{ doc.title }}</p>
                         </td>
@@ -119,8 +116,8 @@
 </div>
 
 <!-- DOCUMENT PREVIEW MODAL -->
-<div id="docModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden z-50 items-center justify-center p-4 md:p-8">
-    <div class="bg-white rounded-[2rem] shadow-2xl max-w-6xl w-full relative flex flex-col max-h-[90vh]">
+<div id="docModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden z-50 items-center justify-center p-4 md:p-6">
+    <div class="bg-white rounded-[2rem] shadow-2xl relative flex flex-col" style="width:95vw; max-width:1600px; max-height:95vh;">
 
         <!-- Modal Header -->
         <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50 shrink-0 rounded-t-[2rem]">
@@ -134,7 +131,7 @@
         </div>
 
         <!-- Modal Content -->
-        <div id="docContent" class="flex-1 overflow-y-auto p-4"></div>
+        <div id="docContent" class="flex-1 overflow-y-auto p-6"></div>
     </div>
 </div>
 
@@ -178,6 +175,36 @@
     </div>
 </div>
 
+<!-- MOVE TO FIRST READING MODAL -->
+<div id="moveToFirstModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-[2rem] shadow-2xl max-w-lg w-full p-10">
+        <div class="flex items-center gap-3 mb-2">
+            <div class="w-11 h-11 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
+                <i data-lucide="send" style="width:18px;height:18px;color:#4f46e5;"></i>
+            </div>
+            <div>
+                <h2 class="text-xl font-[900] text-slate-800">Move to First Reading</h2>
+                <p class="text-xs text-slate-400 mt-0.5">This advances the document into the legislative reading process.</p>
+            </div>
+        </div>
+
+        <p class="text-slate-500 text-sm mt-4 mb-1">Moving:</p>
+        <p id="moveToFirstDocTitle" class="font-bold text-slate-800 text-sm mb-6 leading-snug"></p>
+
+        <form id="moveToFirstForm" method="POST" action="">
+            {% csrf_token %}
+            <div class="flex gap-3">
+                <button type="button" onclick="closeMoveToFirstModal()"
+                    class="flex-1 py-3.5 text-slate-400 font-bold hover:text-slate-600 transition-colors">Cancel</button>
+                <button type="submit"
+                    class="flex-[2] bg-slate-800 text-white py-3.5 rounded-2xl font-black hover:bg-slate-900 shadow-lg shadow-slate-200 transition-all flex items-center justify-center gap-2">
+                    <i data-lucide="send" style="width:14px;height:14px;"></i> Confirm Move
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
     function openReturnModal(docId, title) {
         document.getElementById('returnForm').action = `/return/${docId}/filed/`;
@@ -187,7 +214,19 @@
     function closeReturnModal() {
         document.getElementById('returnModal').classList.add('hidden');
     }
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeReturnModal(); });
+    function openMoveToFirstModal(docId, title) {
+        document.getElementById('moveToFirstForm').action = `/move/${docId}/first_reading/`;
+        document.getElementById('moveToFirstDocTitle').innerText = title;
+        document.getElementById('moveToFirstModal').classList.remove('hidden');
+    }
+    function closeMoveToFirstModal() {
+        document.getElementById('moveToFirstModal').classList.add('hidden');
+    }
+    document.addEventListener('keydown', e => {
+        if (e.key !== 'Escape') return;
+        closeReturnModal();
+        closeMoveToFirstModal();
+    });
 </script>
 
 <script>
@@ -195,6 +234,14 @@
     document.querySelectorAll('.doc-row').forEach(row => {
         row.addEventListener('click', () => {
             const docId = row.getAttribute('data-doc-id');
+            // A barangay upload isn't a Document yet at this stage — it's
+            // still just a raw BarangayFiles row (see
+            // barangay/views.py's barangay_to_referral, which is what
+            // eventually turns it into one) — so it needs its own
+            // preview endpoint, not the Document-based modal every other
+            // row here uses.
+            const isBarangay = row.getAttribute('data-doc-kind') === 'barangay';
+            const previewUrl = isBarangay ? `/modal/barangay_file/${docId}/` : `/modal/document/${docId}/`;
             const modal = document.getElementById('docModal');
             const contentDiv = document.getElementById('docContent');
 
@@ -208,12 +255,12 @@
             document.body.style.overflow = 'hidden';
             contentDiv.innerHTML = "<p class='text-center text-slate-400 text-sm mt-10'>Loading document...</p>";
 
-            fetch(`/modal/document/${docId}/`)
+            fetch(previewUrl)
                 .then(r => r.text())
                 .then(html => {
                     contentDiv.innerHTML = html;
                     // innerHTML doesn't execute <script> tags, but the
-                    // fetched modal partial needs its OnlyOffice viewer
+                    // fetched modal partial needs its document viewer
                     // mount script to actually run — re-create each one.
                     contentDiv.querySelectorAll('script').forEach(old => {
                         const s = document.createElement('script');

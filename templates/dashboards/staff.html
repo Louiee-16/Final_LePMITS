@@ -96,18 +96,10 @@
         <td class="px-10 py-6 text-right">
     <div class="flex justify-end gap-2">
         <!-- LINK TO VERSION HISTORY / COMPILATION -->
-        <a href="{% url 'document_detail' doc.id %}" title="View History" 
+        <a href="{% url 'document-history' doc.id %}" title="View History"
            class="w-10 h-10 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-400 hover:text-slate-600 hover:border-slate-200 transition-all">
             <i data-lucide="eye" style="width:15px;height:15px;"></i>
         </a>
-        
-        <!-- BUTTON FOR DIGITAL PEN (Only for Councilors) -->
-        {% if user.role == 'COUNCILOR' %}
-        <a href="{% url 'mock_editor' doc.id %}" title="Digital Pen"
-           class="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 shadow-sm flex items-center justify-center text-slate-600 hover:bg-slate-600 hover:text-white transition-all">
-            <i data-lucide="feather" style="width:15px;height:15px;"></i>
-        </a>
-        {% endif %}
     </div>
         </td>
     </tr>

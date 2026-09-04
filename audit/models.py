@@ -4,13 +4,15 @@ from django.conf import settings
 
 class AuditLog(models.Model):
     ACTION_CHOICES = [
-        ('CREATE', 'Created'),
-        ('UPDATE', 'Modified'),
-        ('DELETE', 'Deleted'),
-        ('LOGIN',  'Login'),
-        ('LOGOUT', 'Logout'),
-        ('FILE',   'Filed'),
-        ('MOVE',   'Status Change'),
+        ('CREATE',       'Created'),
+        ('UPDATE',       'Modified'),
+        ('DELETE',       'Deleted'),
+        ('LOGIN',        'Login'),
+        ('LOGOUT',       'Logout'),
+        ('FAILED_LOGIN', 'Failed Login'),
+        ('FILE',         'Filed'),
+        ('MOVE',         'Status Change'),
+        ('RETURN',       'Returned'),
     ]
 
     SEVERITY_CHOICES = [

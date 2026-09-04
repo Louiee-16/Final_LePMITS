@@ -12,11 +12,28 @@
                 <span>/</span>
                 <span class="text-slate-600">Committee Stage</span>
             </nav>
-            <h1 class="text-4xl font-extrabold text-slate-900 tracking-tight">Committee Referral Registry</h1>
+            <div class="flex items-center gap-3">
+                <h1 class="text-4xl font-extrabold text-slate-900 tracking-tight">Committee Referral Registry</h1>
+                {% if committee_docs %}
+                <span class="text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full" style="background:#7C0D0E1a;color:#7C0D0E;">{{ committee_docs|length }} Active</span>
+                {% endif %}
+            </div>
             <p class="text-slate-500 mt-1 font-medium italic">Manage hearings and draft official committee reports for active legislation.</p>
         </div>
 
         <div class="flex gap-3">
+            <a href="?sort={% if current_sort == '-updated_at' %}updated_at{% else %}-updated_at{% endif %}"
+                class="px-6 py-3 bg-white border rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 shadow-sm"
+                style="{% if 'updated_at' in current_sort %}border-color:#7C0D0E66;color:#7C0D0E;background:#7C0D0E0d;{% else %}border-color:#e2e8f0;color:#94a3b8;{% endif %}">
+                <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;"></i> Referred
+                {% if current_sort == 'updated_at' %}(Oldest){% elif current_sort == '-updated_at' %}(Newest){% endif %}
+            </a>
+            <a href="?sort={% if current_sort == '-reference_no' %}reference_no{% else %}-reference_no{% endif %}"
+                class="px-6 py-3 bg-white border rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 shadow-sm"
+                style="{% if 'reference_no' in current_sort %}border-color:#7C0D0E66;color:#7C0D0E;background:#7C0D0E0d;{% else %}border-color:#e2e8f0;color:#94a3b8;{% endif %}">
+                <i data-lucide="arrow-up-down" style="width:14px;height:14px;vertical-align:middle;"></i> Draft No.
+                {% if current_sort == 'reference_no' %}(A-Z){% elif current_sort == '-reference_no' %}(Z-A){% endif %}
+            </a>
             <button onclick="openCalendarModal()" class="px-6 py-3 bg-white border border-slate-200 text-slate-400 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:text-slate-600 transition-all flex items-center gap-2 shadow-sm">
                 <i data-lucide="calendar-days" style="width:14px;height:14px;vertical-align:middle;"></i> Calendar View
             </button>
@@ -41,16 +58,21 @@
                 <tr class="hover:bg-slate-50/50 transition-all group">
 
                     <!-- Column 1: People's Participation -->
-                    <td class="px-8 py-7">
+                    <td class="px-8 py-7 border-l-4
+                        {% if doc.committee_report.status == 'FAILED' %}border-l-rose-400
+                        {% elif doc.committee_report.status == 'APPROVED' %}border-l-emerald-400
+                        {% elif not doc.hearing_date %}border-l-amber-400
+                        {% else %}border-l-slate-200{% endif %}">
                         {% if user.role == 'SECRETARIAT' or user.role == 'STAFF' %}
                         <form action="{%url 'public-participation' doc.id %}" method="POST">
                             {% csrf_token %}
-                            <button type="submit" 
+                            <button type="submit"
+                                title="Public Participation — click to {% if doc.public_participation %}close{% else %}open{% endif %} public comments for this measure"
                                 class="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all
                                 {% if doc.public_participation %}
-                                    bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-100
+                                    bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200
                                 {% else %}
-                                    bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-100
+                                    bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200
                                 {% endif %}">
                                 
                                 {% if doc.public_participation %}
@@ -77,6 +99,9 @@
 
                     <td class="px-8 py-7">
                         <div class="max-w-xs">
+                            {% if doc.reference_no %}
+                            <span class="inline-block mb-1 text-[9px] font-black text-slate-500 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded uppercase tracking-widest">{{ doc.reference_no }}</span>
+                            {% endif %}
                             <p class="text-sm font-extrabold text-slate-900 group-hover:text-slate-600 transition-colors leading-relaxed line-clamp-3" title="{{doc.title}}">
                                 {{ doc.title }}
                             </p>
@@ -101,25 +126,45 @@
                             <div>
                                 <p class="text-sm font-black text-slate-600">{{ doc.hearing_date|date:"M d, Y" }}</p>
                                 {% if user.role == 'SECRETARIAT' or user.role == 'STAFF' %}
-                                <button onclick="openRescheduleModal('{{ doc.id }}', '{{ doc.hearing_date|date:'Y-m-d' }}')"
+                                <button onclick="openSetDateModal('{{ doc.id }}', '{{ doc.title|escapejs }}')"
                                     class="text-[9px] font-bold text-slate-300 uppercase hover:text-slate-600 transition-colors tracking-widest">
                                     Change Date
                                 </button>
                                 {% endif %}
+                                {% if doc.committee_report %}
+                                <span class="inline-block mt-1 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full
+                                    {% if doc.committee_report.status == 'APPROVED' %}bg-emerald-50 text-emerald-700
+                                    {% elif doc.committee_report.status == 'FAILED' %}bg-rose-50 text-rose-700
+                                    {% else %}bg-amber-50 text-amber-700{% endif %}">
+                                    {% if doc.committee_report.status == 'PENDING' and doc.hearing_number > 1 %}
+                                        {{ doc.hearing_ordinal }} Hearing Scheduled
+                                    {% else %}
+                                        {{ doc.committee_report.get_status_display }}
+                                    {% endif %}
+                                </span>
+                                {% endif %}
                             </div>
                         </div>
                         {% else %}
+                            <!-- No hearing_date — either a fresh referral
+                                 that's never had one, or a hearing that
+                                 just got Reset (see
+                                 committee_level/views.py's
+                                 _sync_report_status_from_hearing, which
+                                 clears it specifically so this state is
+                                 reachable again). Same "must set a date
+                                 before Insert Amendments" gate applies to
+                                 both — surfaced here so it isn't just an
+                                 empty-looking row. -->
+                            <span class="inline-block mb-2 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
+                                {% if doc.hearing_number > 1 %}Pending {{ doc.hearing_ordinal }} Hearing{% else %}Pending Date{% endif %}
+                            </span>
                             {% if user.role == 'SECRETARIAT' or user.role == 'STAFF' %}
-                            <form action="{% url 'set_hearing_date' %}" method="POST" class="flex items-center gap-2">
-                                {% csrf_token %}
-                                <input type="hidden" name="doc_id" value="{{ doc.id }}">
-                                <input type="date" name="hearing_date" required
-                                    class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:ring-4 focus:ring-slate-500/10 focus:border-slate-500 outline-none transition-all">
-                                <button type="submit"
-                                    class="p-2 bg-white border border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-100 rounded-xl shadow-sm transition-all">
-                                    <i data-lucide="check" style="width:11px;height:11px;vertical-align:middle;"></i>
-                                </button>
-                            </form>
+                            <button type="button" onclick="openSetDateModal('{{ doc.id }}', '{{ doc.title|escapejs }}')"
+                                class="px-3 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all inline-flex items-center gap-1.5">
+                                <i data-lucide="calendar-plus" style="width:11px;height:11px;"></i>
+                                {% if doc.hearing_number > 1 %}Set {{ doc.hearing_ordinal }} Hearing{% else %}Set Date{% endif %}
+                            </button>
                             {% else %}
                             <span class="text-[10px] text-slate-300 italic">No date set</span>
                             {% endif %}
@@ -147,18 +192,27 @@
                                     Set Date First
                                 </span>
                                 {% else %}
-                                <!-- Committee Report -->
-                                <a href="{% url 'report_workbench' doc.id %}"
-                                    class="px-4 py-2.5 bg-slate-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-slate-100 hover:bg-slate-700 hover:-translate-y-0.5 transition-all flex items-center gap-1.5">
-                                    <i data-lucide="file-pen-line" style="width:14px;height:14px;vertical-align:middle;"></i>
-                                    {% if doc.committee_report %}Edit Report{% else %}Start Report{% endif %}
-                                </a>
+                                
+                     
+
                                 {% endif %}
                             {% endif %}
-                                <a href="{%url 'committee-amendments' doc.id%}" 
-                                   class="px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 hover:text-slate-600 transition-all">
-                                    <i data-lucide="feather" style="width:12px;height:12px;margin-right:6px;vertical-align:middle;"></i> Insert Amendments
-                                </a>
+                                {% if user.role == 'SECRETARIAT' or user.role == 'STAFF' %}
+                                    {% if doc.hearing_date %}
+                                    <a href="{%url 'committee-amendments' doc.id%}"
+                                       class="px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 hover:text-slate-600 transition-all">
+                                        <i data-lucide="feather" style="width:12px;height:12px;margin-right:6px;vertical-align:middle;"></i> Insert Amendments
+                                    </a>
+
+                                    {% endif %}
+                                {% endif %}
+                            {% if doc.committee_report.status == 'APPROVED' %}
+                            <a href="{% url 'generate_pdf' doc.id %}"
+                                class="w-10 h-10 flex items-center justify-center text-slate-300 hover:text-slate-600 hover:bg-white hover:shadow-md border border-transparent hover:border-slate-100 rounded-xl transition-all"
+                                title="Download Committee Report PDF">
+                                <i data-lucide="download" style="width:13px;height:13px;"></i>
+                            </a>
+                            {% endif %}
                             <!-- View document -->
                             <a href="{% url 'view-document' doc.id%}"
                                 class="w-10 h-10 flex items-center justify-center text-slate-300 hover:text-slate-600 hover:bg-white hover:shadow-md border border-transparent hover:border-slate-100 rounded-xl transition-all"
@@ -186,7 +240,7 @@
 <!-- CALENDAR MODAL -->
 <div id="calendarModal" class="fixed inset-0 z-50 hidden items-center justify-center p-3">
     <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="closeCalendarModal()"></div>
-    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-[1100px] modal-card overflow-hidden flex flex-col" style="max-height:92vh;">
+    <div class="relative bg-white rounded-2xl shadow-2xl modal-card overflow-hidden flex flex-col" style="width:90vw; height:88vh; max-width:1700px; max-height:980px;">
 
         <!-- Dark header bar -->
         <div class="bg-slate-800 px-8 py-4 flex items-center justify-between shrink-0">
@@ -200,88 +254,90 @@
                 </button>
             </div>
             <div class="flex items-center gap-4">
-                <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Hearing Calendar</span>
+                <span class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Hearing Calendar</span>
                 <button onclick="closeCalendarModal()" class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 transition-all">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
             </div>
         </div>
 
+        <!-- Picking-mode banner — shown when the calendar was opened via
+             "Set Date" rather than the general "Calendar View" button. -->
+        <div id="calPickBanner" class="hidden shrink-0 px-6 py-2.5 text-[11px] font-bold items-center gap-2"
+             style="background:#7C0D0E0d; border-bottom:1px solid #7C0D0E33; color:#7C0D0E;"></div>
+
         <!-- Day-of-week header row -->
         <div class="grid grid-cols-7 bg-slate-700 shrink-0">
-            <div class="text-center text-[10px] font-black uppercase tracking-wider text-slate-300 py-2.5 border-r border-slate-600">Sunday</div>
-            <div class="text-center text-[10px] font-black uppercase tracking-wider text-slate-300 py-2.5 border-r border-slate-600">Monday</div>
-            <div class="text-center text-[10px] font-black uppercase tracking-wider text-slate-300 py-2.5 border-r border-slate-600">Tuesday</div>
-            <div class="text-center text-[10px] font-black uppercase tracking-wider text-slate-300 py-2.5 border-r border-slate-600">Wednesday</div>
-            <div class="text-center text-[10px] font-black uppercase tracking-wider text-slate-300 py-2.5 border-r border-slate-600">Thursday</div>
-            <div class="text-center text-[10px] font-black uppercase tracking-wider text-slate-300 py-2.5 border-r border-slate-600">Friday</div>
-            <div class="text-center text-[10px] font-black uppercase tracking-wider text-slate-300 py-2.5">Saturday</div>
+            <div class="text-center text-[12px] font-black uppercase tracking-wider text-slate-300 py-3.5 border-r border-slate-600">Sunday</div>
+            <div class="text-center text-[12px] font-black uppercase tracking-wider text-slate-300 py-3.5 border-r border-slate-600">Monday</div>
+            <div class="text-center text-[12px] font-black uppercase tracking-wider text-slate-300 py-3.5 border-r border-slate-600">Tuesday</div>
+            <div class="text-center text-[12px] font-black uppercase tracking-wider text-slate-300 py-3.5 border-r border-slate-600">Wednesday</div>
+            <div class="text-center text-[12px] font-black uppercase tracking-wider text-slate-300 py-3.5 border-r border-slate-600">Thursday</div>
+            <div class="text-center text-[12px] font-black uppercase tracking-wider text-slate-300 py-3.5 border-r border-slate-600">Friday</div>
+            <div class="text-center text-[12px] font-black uppercase tracking-wider text-slate-300 py-3.5">Saturday</div>
         </div>
 
         <!-- Calendar week rows (rendered by JS) -->
-        <div id="calGrid" class="flex-1 overflow-y-auto divide-y divide-slate-100 border-t border-slate-100"></div>
+        <div id="calGrid" class="flex-1 flex flex-col overflow-hidden divide-y divide-slate-100 border-t border-slate-100"></div>
 
         <!-- Legend bar -->
-        <div id="calLegend" class="shrink-0 px-6 py-2.5 border-t border-slate-100 flex items-center gap-4 flex-wrap bg-slate-50 min-h-[42px]">
-            <span class="text-[9px] font-black uppercase tracking-widest text-slate-400">Legend:</span>
+        <div id="calLegend" class="shrink-0 px-6 py-3 border-t border-slate-100 flex items-center gap-4 flex-wrap bg-slate-50 min-h-[46px]">
+            <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">Legend:</span>
         </div>
     </div>
 </div>
 
-<!-- RESCHEDULE MODAL -->
-<div id="rescheduleModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
-    <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="closeRescheduleModal()"></div>
-    <div class="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-sm p-8 modal-card">
-        <div class="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center mb-5">
-            <i data-lucide="calendar-days" style="width:18px;height:18px;color:#6366f1;"></i>
-        </div>
-        <h2 class="text-base font-black text-slate-900 tracking-tight mb-1">Reschedule Hearing</h2>
-        <p class="text-xs text-slate-400 font-medium mb-6">Set a new hearing date for this document.</p>
+<!-- DAY DETAIL MODAL — opened by clicking any day on the calendar above.
+     Every real day is clickable, even ones with no hearings, so clicking
+     always produces a predictable result instead of sometimes doing
+     nothing. -->
+<div id="dayDetailModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+    <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onclick="closeDayDetailModal()"></div>
+    <div class="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-2xl modal-card flex flex-col" style="max-height:88vh;">
 
-        <form action="{% url 'set_hearing_date' %}" method="POST">
-            {% csrf_token %}
-            <input type="hidden" name="doc_id" id="rescheduleDocId">
-            <div class="mb-5">
-                <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">New Hearing Date</label>
-                <input type="date" name="hearing_date" id="rescheduleDate" required
-                    class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-100 transition-all">
-            </div>
-            <div class="flex gap-3">
-                <button type="button" onclick="closeRescheduleModal()"
-                    class="flex-1 px-4 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-all">
-                    Cancel
-                </button>
-                <button type="submit"
-                    class="flex-1 px-4 py-3 bg-slate-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-slate-100 hover:bg-slate-700 transition-all">
-                    Confirm
+        <div class="px-10 pt-10 pb-6 border-b border-slate-100 shrink-0">
+            <div class="flex items-start justify-between gap-4">
+                <div class="flex items-center gap-4">
+                    <div class="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
+                        <i data-lucide="calendar-days" style="width:22px;height:22px;color:#6366f1;"></i>
+                    </div>
+                    <div>
+                        <h2 id="dayDetailDate" class="text-xl font-black text-slate-900 tracking-tight"></h2>
+                        <p class="text-xs text-slate-400 font-medium mt-0.5">Hearings scheduled for this day</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeDayDetailModal()"
+                    class="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-all shrink-0 mt-0.5">
+                    <i data-lucide="x" style="width:14px;height:14px;vertical-align:middle;"></i>
                 </button>
             </div>
-        </form>
+        </div>
+
+        <div class="flex-1 overflow-y-auto px-10 py-8">
+            <div id="dayDetailPickBar" class="hidden"></div>
+            <div id="dayDetailContent" class="space-y-4"></div>
+        </div>
+
+        <div class="px-10 py-6 border-t border-slate-100 shrink-0">
+            <button type="button" onclick="closeDayDetailModal()"
+                class="w-full px-4 py-3.5 bg-slate-100 text-slate-600 rounded-xl font-bold text-sm uppercase tracking-widest hover:bg-slate-200 transition-all">
+                Close
+            </button>
+        </div>
     </div>
 </div>
 
 <script>
-    // --- Reschedule Modal ---
-    function openRescheduleModal(docId, currentDate) {
-        document.getElementById('rescheduleDocId').value = docId;
-        document.getElementById('rescheduleDate').value = currentDate;
-        const modal = document.getElementById('rescheduleModal');
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-        document.body.style.overflow = 'hidden';
-    }
-
-    function closeRescheduleModal() {
-        const modal = document.getElementById('rescheduleModal');
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-        document.body.style.overflow = '';
+    function _calPad(n) { return String(n).padStart(2, '0'); }
+    function _todayStr() {
+        const t = new Date();
+        return t.getFullYear() + '-' + _calPad(t.getMonth() + 1) + '-' + _calPad(t.getDate());
     }
 
     // --- Calendar Modal ---
     const _hearingData = [
         {% for doc in committee_docs %}{% if doc.hearing_date %}
-        { date: "{{ doc.hearing_date|date:'Y-m-d' }}", title: "{{ doc.title|escapejs }}", type: "{{ doc.doc_type|escapejs }}", committee: "{{ doc.referred_committee.name|default:''|escapejs }}" },
+        { id: {{ doc.id }}, date: "{{ doc.hearing_date|date:'Y-m-d' }}", title: "{{ doc.title|escapejs }}", type: "{{ doc.doc_type|escapejs }}", committee: "{{ doc.referred_committee.name|default:''|escapejs }}" },
         {% endif %}{% endfor %}
     ];
 
@@ -305,7 +361,21 @@
         return _calColorMap[k];
     }
 
-    function _calPad(n) { return String(n).padStart(2, '0'); }
+    // --- "Set Date" picking mode — reuses the same calendar/day-detail
+    // modals the general "Calendar View" button opens, so choosing a first
+    // hearing date benefits from seeing what's already scheduled (per
+    // explicit request) instead of a bare date input with no context.
+    // Non-null only while actively picking a date for a specific document.
+    let _pickModeDoc = null;
+
+    function openSetDateModal(docId, title) {
+        _pickModeDoc = { id: docId, title: title };
+        // Also reachable from the day-detail modal's own "Reschedule"
+        // button — close it first so the calendar isn't reopening behind
+        // an already-open modal.
+        closeDayDetailModal();
+        openCalendarModal();
+    }
 
     function openCalendarModal() {
         const today = new Date();
@@ -317,6 +387,19 @@
         _hearingData.forEach(h => _calGetColor(h.committee || h.type || 'General'));
         _renderCalendar();
         _renderCalLegend();
+
+        const banner = document.getElementById('calPickBanner');
+        if (_pickModeDoc) {
+            banner.innerHTML = `<i data-lucide="calendar-plus" style="width:13px;height:13px;"></i>
+                Picking a hearing date for <strong>${_pickModeDoc.title}</strong> — click any upcoming day to see what's already scheduled, then confirm.`;
+            banner.classList.remove('hidden');
+            banner.classList.add('flex');
+            if (window.lucide) lucide.createIcons();
+        } else {
+            banner.classList.add('hidden');
+            banner.classList.remove('flex');
+        }
+
         const modal = document.getElementById('calendarModal');
         modal.classList.remove('hidden');
         modal.classList.add('flex');
@@ -324,6 +407,10 @@
     }
 
     function closeCalendarModal() {
+        // Closing the whole calendar exits picking mode entirely — closing
+        // just the day-detail modal (below) does not, so browsing several
+        // days while deciding doesn't lose the in-progress pick.
+        _pickModeDoc = null;
         const modal = document.getElementById('calendarModal');
         modal.classList.add('hidden');
         modal.classList.remove('flex');
@@ -341,13 +428,16 @@
         const keys = Object.keys(_calColorMap);
         const legend = document.getElementById('calLegend');
         if (!keys.length) {
-            legend.innerHTML = '<span class="text-[9px] font-black uppercase tracking-widest text-slate-400">No hearings scheduled yet</span>';
+            legend.innerHTML = '<span class="text-[10px] font-black uppercase tracking-widest text-slate-400">No hearings scheduled yet</span>';
             return;
         }
-        legend.innerHTML = '<span class="text-[9px] font-black uppercase tracking-widest text-slate-400 mr-1">Legend:</span>' +
-            keys.map(k => `<span class="flex items-center gap-1.5 text-[9px] font-bold text-slate-600 whitespace-nowrap">
-                <span class="w-2.5 h-2.5 rounded-sm inline-block shrink-0" style="background:${_calColorMap[k]}"></span>${k}
-            </span>`).join('');
+        legend.innerHTML = '<span class="text-[10px] font-black uppercase tracking-widest text-slate-400 mr-1">Legend:</span>' +
+            keys.map(k => `<span class="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 whitespace-nowrap">
+                <span class="w-3 h-3 rounded-sm inline-block shrink-0" style="background:${_calColorMap[k]}"></span>${k}
+            </span>`).join('') +
+            `<span class="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 whitespace-nowrap">
+                <span class="w-3 h-3 rounded-sm inline-block shrink-0" style="background:#94a3b8"></span>Already Held (past date)
+            </span>`;
     }
 
     function _renderCalendar() {
@@ -365,14 +455,14 @@
 
         for (let w = 0; w < totalCells / 7; w++) {
             const rowDiv = document.createElement('div');
-            rowDiv.className = 'grid grid-cols-7';
+            rowDiv.className = 'grid grid-cols-7 flex-1 min-h-0';
 
             for (let d = 0; d < 7; d++) {
                 const idx    = w * 7 + d;
                 const dayNum = idx - firstDay + 1;
                 const cellDiv = document.createElement('div');
                 const borderR = d < 6 ? 'border-r border-slate-100' : '';
-                cellDiv.className = `min-h-[88px] p-2 ${borderR}`;
+                cellDiv.className = `p-3 overflow-y-auto ${borderR}`;
 
                 if (dayNum < 1 || dayNum > daysInMonth) {
                     cellDiv.classList.add('bg-slate-50/40');
@@ -383,22 +473,37 @@
                 const dateStr = _calYear + '-' + _calPad(_calMonth + 1) + '-' + _calPad(dayNum);
                 const hearings = _hearingMap[dateStr] || [];
                 const isToday  = dateStr === todayStr;
+                const isPast   = dateStr < todayStr;
+
+                // Every real day is clickable — clicking always opens the
+                // detail modal, whether or not there's a hearing that day,
+                // so the interaction is predictable rather than sometimes
+                // silently doing nothing.
+                cellDiv.classList.add('cursor-pointer', 'hover:bg-slate-50', 'transition-colors');
+                cellDiv.addEventListener('click', () => openDayDetailModal(dateStr, hearings));
 
                 const dayLabel = isToday
-                    ? `<span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-600 text-white text-[9px] font-black leading-none">${dayNum}</span>`
-                    : `<span class="text-[11px] font-bold text-slate-400">${dayNum}</span>`;
+                    ? `<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-600 text-white text-[11px] font-black leading-none">${dayNum}</span>`
+                    : `<span class="text-[13px] font-bold text-slate-400">${dayNum}</span>`;
 
-                const pills = hearings.slice(0, 3).map(h => {
+                const pills = hearings.slice(0, 5).map(h => {
+                    if (isPast) {
+                        // Greyed out, plus the word "Held" spelled out in the
+                        // pill itself — the point is a status you can read,
+                        // not just a color you have to already know to trust.
+                        return `<div class="w-full text-[11px] font-bold text-slate-600 bg-slate-200 px-2 py-1 rounded-[6px] mb-1 truncate leading-tight"
+                            title="${h.title} • Already held">✓ Held — ${h.title}</div>`;
+                    }
                     const colorKey = h.committee || h.type || 'General';
                     const bg = _calGetColor(colorKey);
-                    return `<div class="w-full text-[8.5px] font-bold text-white px-1.5 py-[3px] rounded-[4px] mb-[3px] truncate leading-tight cursor-default"
+                    return `<div class="w-full text-[11px] font-bold text-white px-2 py-1 rounded-[6px] mb-1 truncate leading-tight"
                         style="background:${bg};" title="${h.title} • ${colorKey}">${h.title}</div>`;
                 }).join('');
 
-                const more = hearings.length > 3
-                    ? `<span class="text-[8px] font-bold text-slate-400">+${hearings.length - 3} more</span>` : '';
+                const more = hearings.length > 5
+                    ? `<span class="text-[10px] font-bold text-slate-400">+${hearings.length - 5} more</span>` : '';
 
-                cellDiv.innerHTML = `<div class="mb-1">${dayLabel}</div>${pills}${more}`;
+                cellDiv.innerHTML = `<div class="mb-1.5">${dayLabel}</div>${pills}${more}`;
                 rowDiv.appendChild(cellDiv);
             }
 
@@ -406,15 +511,108 @@
         }
     }
 
+    // --- Day Detail Modal — opened by clicking any day cell above ---
+    // Placeholder-id URL template — the url tag needs a real pk at render
+    // time, so 999999 stands in and gets swapped for the real doc id below.
+    const _VIEW_DOC_URL_TEMPLATE = "{% url 'view-document' 999999 %}";
+    const _DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const _MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+    function openDayDetailModal(dateStr, hearings) {
+        const [y, m, d] = dateStr.split('-').map(Number);
+        const dateObj = new Date(y, m - 1, d);
+        const todayObj = new Date();
+        const todayStr = todayObj.getFullYear() + '-' + _calPad(todayObj.getMonth()+1) + '-' + _calPad(todayObj.getDate());
+        const isPast = dateStr < todayStr;
+
+        document.getElementById('dayDetailDate').textContent =
+            _DAY_NAMES[dateObj.getDay()] + ', ' + _MONTH_NAMES[m - 1] + ' ' + d + ', ' + y;
+
+        const pickBar = document.getElementById('dayDetailPickBar');
+        if (_pickModeDoc && isPast) {
+            pickBar.innerHTML = `<div class="mb-4 p-4 bg-slate-100 border border-slate-200 rounded-2xl">
+                <p class="text-xs font-bold text-slate-500">Can't set a hearing date in the past — pick an upcoming day instead.</p>
+            </div>`;
+            pickBar.classList.remove('hidden');
+        } else if (_pickModeDoc) {
+            pickBar.innerHTML = `<div class="mb-4 p-4 rounded-2xl flex items-center justify-between gap-4 flex-wrap" style="background:#7C0D0E0d; border:1px solid #7C0D0E33;">
+                <p class="text-xs font-bold" style="color:#7C0D0E;">Set this as the hearing date for <span class="font-black">${_pickModeDoc.title}</span>?</p>
+                <form action="{% url 'set_hearing_date' %}" method="POST" class="shrink-0">
+                    {% csrf_token %}
+                    <input type="hidden" name="doc_id" value="${_pickModeDoc.id}">
+                    <input type="hidden" name="hearing_date" value="${dateStr}">
+                    <button type="submit" class="btn-maroon px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-widest transition-all">
+                        Confirm This Date
+                    </button>
+                </form>
+            </div>`;
+            pickBar.classList.remove('hidden');
+        } else {
+            pickBar.classList.add('hidden');
+            pickBar.innerHTML = '';
+        }
+
+        const content = document.getElementById('dayDetailContent');
+        if (!hearings.length) {
+            content.innerHTML = `<div class="flex flex-col items-center justify-center py-16 text-center">
+                <div class="w-20 h-20 rounded-2xl bg-slate-100 flex items-center justify-center mb-5">
+                    <i data-lucide="calendar-x" style="width:32px;height:32px;color:#cbd5e1;"></i>
+                </div>
+                <p class="text-base font-black text-slate-400 uppercase tracking-widest">No hearings scheduled</p>
+                <p class="text-sm text-slate-300 font-medium mt-1.5">Nothing is scheduled for this day.</p>
+            </div>`;
+        } else {
+            content.innerHTML = hearings.map(h => {
+                const statusLabel = isPast
+                    ? '<span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-slate-200 text-slate-600">Already Held</span>'
+                    : '<span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-700">Upcoming</span>';
+                const rescheduleBtn = isPast ? '' : `
+                    <button type="button" onclick="openSetDateModal('${h.id}', '${h.title}')"
+                        class="px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-all">
+                        Reschedule
+                    </button>`;
+                return `<div class="p-6 bg-slate-50 border border-slate-100 rounded-2xl">
+                    <div class="flex items-start justify-between gap-4 mb-3">
+                        <p class="text-base font-black text-slate-800 leading-snug">${h.title}</p>
+                        ${statusLabel}
+                    </div>
+                    <p class="text-xs text-slate-400 font-bold uppercase tracking-widest mb-4">${h.type}${h.committee ? ' • ' + h.committee : ''}</p>
+                    <div class="flex gap-3">
+                        <a href="${_VIEW_DOC_URL_TEMPLATE.replace('999999', h.id)}"
+                            class="px-4 py-2.5 bg-slate-600 text-white rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-slate-700 transition-all">
+                            View Document
+                        </a>
+                        ${rescheduleBtn}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        if (window.lucide) lucide.createIcons();
+        const modal = document.getElementById('dayDetailModal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeDayDetailModal() {
+        const modal = document.getElementById('dayDetailModal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        document.body.style.overflow = '';
+    }
+
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') {
-            closeRescheduleModal();
+            closeDayDetailModal();
             closeCalendarModal();
         }
     });
 </script>
 
 <style>
+    .btn-maroon { background:#7C0D0E; color:#fff; }
+    .btn-maroon:hover { background:#5c0a0b; }
     input[type="date"]::-webkit-calendar-picker-indicator {
         cursor: pointer;
         filter: invert(0.4);

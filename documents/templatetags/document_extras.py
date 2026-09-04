@@ -47,8 +47,21 @@ def merge_wrapped_paragraphs(html: str) -> str:
        `clause-indent` class so the stylesheet can apply that indent
        specifically, not uniformly to every paragraph.
 
-    Only <p> tags are touched — headings, lists, and blockquotes are left
-    exactly as-is.
+    3. UNWRAP LIST ITEMS: Tiptap's ListItem node always wraps a list item's
+       text in its own <p> (content spec is "paragraph block*"), so saved
+       content is <li><p>text</p></li>, never <li>text</li>. xhtml2pdf
+       renders no list marker at all — not just the wrong one, none —
+       when an <li>'s content starts with a block-level <p> child (browser
+       rendering of the exact same markup is unaffected; confirmed this is
+       xhtml2pdf-specific by rendering both through the real pipeline and
+       reading the actual output pixels, not just the CSS). Unwrapping any
+       <p> that's a direct child of an <li> (keeping its inline content —
+       bold, links, etc. — in place, just dropping the <p> tag itself)
+       fixes this without touching how the same content prints as a live
+       paragraph.
+
+    Only <p> tags are touched for merging/indenting — headings, lists, and
+    blockquotes are otherwise left as-is.
     """
     if not html:
         return html
@@ -81,5 +94,9 @@ def merge_wrapped_paragraphs(html: str) -> str:
     for p in soup.find_all("p"):
         if _CLAUSE_LEAD_RE.match(p.get_text(strip=True)):
             p["class"] = p.get("class", []) + ["clause-indent"]
+
+    for li in soup.find_all("li"):
+        for p in li.find_all("p", recursive=False):
+            p.unwrap()
 
     return mark_safe(str(soup))

@@ -12,10 +12,16 @@
                 <span>/</span>
                 <span class="text-slate-600">Disapproved Registry</span>
             </nav>
-            <h1 class="text-4xl font-[900] text-slate-900 tracking-tight">Disapproved Documents</h1>
+            <h1 class="text-4xl font-extrabold text-slate-900 tracking-tight">Disapproved Documents</h1>
             <p class="text-slate-500 mt-1 font-medium italic">Official Record of Disapproved Documents.</p>
         </div>
 
+        <div class="flex gap-3">
+            <div class="px-5 py-3 bg-white border border-slate-200 rounded-xl shadow-sm text-center">
+                <p class="text-[9px] font-black uppercase tracking-widest text-slate-400">Disapproved</p>
+                <p class="text-2xl font-black text-slate-600">{{ disapproved|length }}</p>
+            </div>
+        </div>
     </div>
 
     <!-- 🔥 MATCHED FILTER BAR STYLE -->
@@ -103,8 +109,11 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="5" class="p-20 text-center text-slate-400 font-bold uppercase text-xs">
-                        No documents found
+                    <td colspan="5" class="p-20 text-center">
+                        <div class="inline-flex items-center justify-center w-20 h-20 bg-white rounded-3xl shadow-sm mb-6 border border-slate-100">
+                            <i data-lucide="folder-open" style="width:40px;height:40px;color:#e2e8f0;"></i>
+                        </div>
+                        <p class="text-slate-400 font-bold uppercase tracking-widest text-xs">No Disapproved Documents Found</p>
                     </td>
                 </tr>
                 {% endfor %}

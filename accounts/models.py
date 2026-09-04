@@ -1,4 +1,5 @@
 from django.contrib.auth.models import AbstractUser
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.utils import timezone
 from datetime import timedelta
@@ -17,7 +18,7 @@ class User(AbstractUser):
     def get_councilor_name(self):
         try:
             return self.councilor_profile.name
-        except:
+        except ObjectDoesNotExist:
             return self.username
 
     def __str__(self):

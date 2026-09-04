@@ -5,7 +5,7 @@
 
 {% if draft.status == 'DRAFT' %}
 <!-- ══════════════════════════════════════════════════════════════
-     EDIT MODE — maximized full-panel OnlyOffice editor, same
+     EDIT MODE — maximized full-panel Casual Docs editor, same
      pattern as templates/documents/draft.html.
      ══════════════════════════════════════════════════════════════ -->
 <div style="margin:-2rem; width:calc(100% + 4rem); height:calc(100% + 4rem); display:flex; flex-direction:column;">
@@ -56,6 +56,11 @@
             {% endfor %}
         </select>
 
+        <button type="button" id="aiCheckBtn"
+            class="shrink-0 px-3 py-2.5 bg-slate-100 text-slate-600 rounded-lg font-bold text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all flex items-center gap-1.5 disabled:opacity-50">
+            <i data-lucide="scale" style="width:12px;height:12px;"></i> Legal Basis
+        </button>
+
         <button id="saveDraftBtn" form="draftEditForm" type="submit" name="action" value="save"
             class="shrink-0 px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-lg font-bold text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all disabled:opacity-50">
             <i data-lucide="save" style="width:12px;height:12px;margin-right:6px;vertical-align:middle;"></i><span class="btn-label">Save Draft</span>
@@ -67,9 +72,13 @@
     </div>
 
     <!-- EDITOR — fills all remaining space -->
-    <div id="onlyofficeContainer" style="flex:1 1 auto; min-height:0; width:100%;"></div>
+    <div id="documentEditorContainer" style="flex:1 1 auto; min-height:0; width:100%;"></div>
 </div>
 
+{% include 'documents/_ai_legal_basis_modal.html' %}
+
+<script src="{% static 'js/document_editors/casualdocs-mount.js' %}"></script>
+<script src="{% static 'js/document_editors/ai-legal-basis.js' %}"></script>
 <script>
     // ── Type pill toggle ─────────────────────────────────────────
     document.querySelectorAll('#typeToggle input').forEach(radio => {
@@ -79,91 +88,48 @@
         });
     });
 
-    // ── OnlyOffice editor — the only content editor on this page ──
-    const onlyofficeDocId = "{{ draft.id }}";
-    let onlyofficeDocKey = null;
+    // ── Casual Docs editor — see documents/wopi.py's
+    // casualdocs_document_bytes/casualdocs_save and
+    // static/js/document_editors/casualdocs-mount.js for the shared mount/
+    // similarity-check logic. ──
+    const documentEditorDocId = "{{ draft.id }}";
+    let activeEditor = null;
 
-    (function () {
-        const onlyofficeServerUrl = "{{ onlyoffice_server_url }}";
+    // ── AI Legal Basis — see static/js/document_editors/ai-legal-basis.js.
+    // Was previously only on templates/documents/draft.html; reopening an
+    // existing draft here is still the same drafting phase, just resuming
+    // instead of starting fresh, so there's no reason this feature should
+    // be missing on this page. ──────────────────────────────────────────
+    AiLegalBasis.init({
+        titleInput: document.getElementById('titleInput'),
+        getDocId: () => documentEditorDocId,
+        csrfToken: '{{ csrf_token }}',
+        urls: {
+            autosave: "{% url 'autosave_draft' %}",
+            legalBasis: "{% url 'ai_legal_basis' %}",
+        },
+        getActiveEditor: () => activeEditor,
+    });
 
-        function loadScript(src) {
-            return new Promise((resolve, reject) => {
-                const s = document.createElement('script');
-                s.src = src;
-                s.onload = resolve;
-                s.onerror = () => reject(new Error('Failed to load ' + src));
-                document.head.appendChild(s);
-            });
-        }
-
-        // ── Similarity check — see templates/documents/draft.html for the
-        // full explanation. Runs after each save lands, writes native Word
-        // comments onto matching paragraphs in the saved .docx.
-        function showSimilarityToast(count) {
-            const existing = document.getElementById('similarityToast');
-            if (existing) existing.remove();
-            const toast = document.createElement('div');
-            toast.id = 'similarityToast';
-            // No auto-dismiss — see draft.html for why.
-            toast.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;background:#1e293b;color:#fff;padding:14px 16px;border-radius:12px;font-size:12px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,0.25);max-width:340px;';
-            toast.innerHTML = `
-                <div style="display:flex;align-items:flex-start;gap:10px;">
-                    <span style="flex:1;line-height:1.5;">
-                        ⚠ ${count} passage${count !== 1 ? 's' : ''} may resemble existing legislation.
-                        <span style="display:block;font-weight:400;color:#cbd5e1;margin-top:4px;">
-                            Reopen this document, then check the <b>Collaboration</b> tab → <b>Comments</b> panel to review.
-                        </span>
-                    </span>
-                    <button style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:14px;flex-shrink:0;" onclick="this.closest('#similarityToast').remove()">✕</button>
-                </div>`;
-            document.body.appendChild(toast);
-        }
-
-        async function checkSimilarity() {
-            try {
-                const resp = await fetch(`/onlyoffice/${onlyofficeDocId}/similarity-check/`, {
-                    method: 'POST',
-                    headers: { 'X-CSRFToken': '{{ csrf_token }}' },
-                });
-                const data = await resp.json();
-                if (data.new_flags > 0) showSimilarityToast(data.new_flags);
-            } catch (err) {
-                console.debug('similarity check failed:', err);
-            }
-        }
-
-        async function mountOnlyOffice() {
-            try {
-                await loadScript(`${onlyofficeServerUrl}/web-apps/apps/api/documents/api.js`);
-                const resp = await fetch(`/onlyoffice/${onlyofficeDocId}/config/`);
-                if (!resp.ok) throw new Error('Could not load OnlyOffice config (' + resp.status + ')');
-                const config = await resp.json();
-                onlyofficeDocKey = config.document.key;
-                config.width = '100%';
-                config.height = '100%';
-                config.type = 'desktop';
-                config.events = {
-                    onDocumentStateChange: function (event) {
-                        if (event.data === false) checkSimilarity();
-                    },
-                };
-                new DocsAPI.DocEditor('onlyofficeContainer', config);
-            } catch (err) {
-                document.getElementById('onlyofficeContainer').innerHTML =
-                    `<div style="padding:40px;text-align:center;color:#dc2626;font-size:13px;font-weight:600;">
-                        The document editor failed to load — is the Document Server running?<br>
-                        <span style="font-weight:400;color:#94a3b8;">${err.message}</span>
-                    </div>`;
-            }
-        }
-
-        mountOnlyOffice();
+    (async function () {
+        const cacheBust = '{% now "U" %}';
+        activeEditor = await CasualDocsMount.mount(document.getElementById('documentEditorContainer'), {
+            docId: documentEditorDocId,
+            fileUrl: `/wopi/casualdocs/${documentEditorDocId}/file/`,
+            saveUrl: `/wopi/casualdocs/${documentEditorDocId}/save/`,
+            csrfToken: '{{ csrf_token }}',
+            authorName: '{{ request.user.get_full_name|default:request.user.username|escapejs }}',
+            cssUrl: "{% static 'js/document_editors/casualdocs-bundle.css' %}?v=" + cacheBust,
+            jsUrl: "{% static 'js/document_editors/casualdocs-bundle.js' %}?v=" + cacheBust,
+            onError: function (err) { console.error('Casual Docs error:', err); },
+        });
     })();
 
     // ── Force a save before Save Draft / File Draft navigate away ──────
-    // See templates/documents/draft.html for the full explanation — OnlyOffice's
-    // own autosave is idle-triggered, so an immediate click right after typing
-    // can navigate away before it fires, silently losing the edit.
+    // See templates/documents/draft.html for the full explanation — the
+    // editor's own autosave is idle-triggered, so an immediate click
+    // right after typing can navigate away before it fires, silently
+    // losing the edit.
     ['saveDraftBtn', 'fileDraftBtn'].forEach(id => {
         const btn = document.getElementById(id);
         if (!btn) return;
@@ -176,16 +142,8 @@
             const label = btn.querySelector('.btn-label');
             if (label) label.textContent = 'Saving…';
 
-            if (onlyofficeDocKey) {
-                try {
-                    await fetch(`/onlyoffice/${onlyofficeDocId}/forcesave/`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-                        body: JSON.stringify({ key: onlyofficeDocKey })
-                    });
-                } catch (err) {
-                    console.warn('forcesave before submit failed:', err);
-                }
+            if (activeEditor && activeEditor.forceSave) {
+                await activeEditor.forceSave();
             }
 
             const form = document.getElementById('draftEditForm');
@@ -280,43 +238,19 @@
                  colors — all of it) instead of a reconstruction from
                  stripped HTML. Read-only.
                  ══════════════════════════════════════════════════════════ -->
-            <div id="onlyofficeViewer{{ draft.id }}" style="width:100%; height:85vh; background:#fff;" class="rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden"></div>
+            <div id="documentViewer{{ draft.id }}" style="width:100%; height:85vh; background:#fff;" class="rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden"></div>
 
+            <script src="{% static 'js/document_editors/casualdocs-mount.js' %}"></script>
             <script>
             (function () {
-                const onlyofficeServerUrl = "{{ onlyoffice_server_url }}";
-
-                function loadScript(src) {
-                    return new Promise((resolve, reject) => {
-                        const s = document.createElement('script');
-                        s.src = src;
-                        s.onload = resolve;
-                        s.onerror = () => reject(new Error('Failed to load ' + src));
-                        document.head.appendChild(s);
-                    });
-                }
-
-                async function mount() {
-                    const container = document.getElementById('onlyofficeViewer{{ draft.id }}');
-                    try {
-                        await loadScript(`${onlyofficeServerUrl}/web-apps/apps/api/documents/api.js`);
-                        const resp = await fetch(`/onlyoffice/{{ draft.id }}/view-config/`);
-                        if (!resp.ok) throw new Error('Could not load document (' + resp.status + ')');
-                        const config = await resp.json();
-                        config.width = '100%';
-                        config.height = '100%';
-                        config.type = 'desktop';
-                        new DocsAPI.DocEditor('onlyofficeViewer{{ draft.id }}', config);
-                    } catch (err) {
-                        container.innerHTML =
-                            `<div style="padding:40px;text-align:center;color:#dc2626;font-size:13px;font-weight:600;">
-                                Could not load the document viewer.<br>
-                                <span style="font-weight:400;color:#94a3b8;">${err.message}</span>
-                            </div>`;
-                    }
-                }
-
-                mount();
+                const cacheBust = '{% now "U" %}';
+                CasualDocsMount.mount(document.getElementById('documentViewer{{ draft.id }}'), {
+                    fileUrl: '/wopi/casualdocs/{{ draft.id }}/file/',
+                    mode: 'viewing',
+                    cssUrl: "{% static 'js/document_editors/casualdocs-bundle.css' %}?v=" + cacheBust,
+                    jsUrl: "{% static 'js/document_editors/casualdocs-bundle.js' %}?v=" + cacheBust,
+                    onError: function (err) { console.error('Casual Docs error:', err); },
+                });
             })();
             </script>
             {% else %}

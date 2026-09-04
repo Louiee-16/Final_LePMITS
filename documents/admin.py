@@ -1,6 +1,20 @@
 from django.contrib import admin
 from .models import Document, LegacyDocument, DocumentChunk, NationalLaw, NationalLawChunk
 
+
+@admin.register(Document)
+class DocumentAdmin(admin.ModelAdmin):
+    # Read-only-ish by design: this is for lookup/troubleshooting, not
+    # editing content, since Document.save() has real side effects
+    # (auto-archiving, version bumping, HTML sanitizing — see documents/
+    # models.py) that a raw admin form edit could trigger unexpectedly.
+    list_display = ['title', 'reference_no', 'doc_type', 'status', 'author', 'current_version', 'updated_at']
+    list_filter = ['status', 'doc_type']
+    search_fields = ['title', 'reference_no']
+    readonly_fields = [f.name for f in Document._meta.fields if f.name not in ('status', 'referred_committee', 'hearing_date')]
+    autocomplete_fields = ['author']
+
+
 @admin.register(LegacyDocument)
 class LegacyDocumentAdmin(admin.ModelAdmin):
     list_display  = ['title', 'reference_no', 'doc_type', 'year', 'ocr_processed', 'chunk_count']

@@ -12,16 +12,13 @@
                 <span class="text-slate-600">Audit Logs</span>
             </nav>
             <h1 class="text-3xl font-black text-slate-900 tracking-tight">System Activity Logs</h1>
-            <p class="text-slate-500 mt-1 font-medium">Tracking every action, change, and system event for transparency.</p>
+            <p class="text-slate-500 mt-1 font-medium">Tracking every action, change, and system event for transparency. Logs are permanent and cannot be deleted from the UI.</p>
         </div>
         
         <div class="flex items-center gap-3">
             <a href="{%url 'export-logs-csv'%}" class="px-5 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2">
                 <i data-lucide="download" style="width:13px;height:13px;color:#94a3b8;vertical-align:middle;"></i> Export CSV
             </a>
-            <button class="px-5 py-2.5 bg-slate-50 border border-slate-100 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-100 transition-all flex items-center gap-2">
-                <i data-lucide="trash-2" style="width:13px;height:13px;vertical-align:middle;"></i> Clear Logs
-            </button>
         </div>
     </div>
 
@@ -50,8 +47,8 @@
                 <i data-lucide="check-check" style="width:22px;height:22px;"></i>
             </div>
             <div>
-                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Successful Sync</p>
-                <p class="text-2xl font-black text-slate-600">100%</p>
+                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Recorded Events</p>
+                <p class="text-2xl font-black text-slate-600">{{ page_obj.paginator.count }}</p>
             </div>
         </div>
     </div>
@@ -69,7 +66,12 @@
                 <option value="CREATE">Created</option>
                 <option value="UPDATE">Modified</option>
                 <option value="DELETE">Deleted</option>
-                <option value="LOGIN">Security/Auth</option>
+                <option value="FILE">Filed</option>
+                <option value="MOVE">Status Change</option>
+                <option value="RETURN">Returned</option>
+                <option value="LOGIN">Login</option>
+                <option value="LOGOUT">Logout</option>
+                <option value="FAILED_LOGIN">Failed Login</option>
             </select>
             <select id="severityFilter" onchange="filterLogs()" class="bg-slate-50 border border-slate-100 text-slate-600 text-xs font-bold px-4 py-2.5 rounded-xl outline-none">
                 <option value="ALL">All Severity</option>
@@ -136,11 +138,26 @@
 <tr><td colspan="5" class="py-16 text-center text-slate-400 text-xs">No logs found.</td></tr>
 {% endfor %}
 
-      
 
-        <div class="px-6 py-4 bg-slate-50/50 border-t border-slate-100 text-center">
-            <button class="text-[10px] font-black text-slate-600 uppercase tracking-widest hover:underline">Load More History</button>
+                </tbody>
+            </table>
         </div>
+
+        {% if page_obj.paginator.num_pages > 1 %}
+        <div class="px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
+            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} &middot; {{ page_obj.paginator.count }} total events
+            </p>
+            <div class="flex items-center gap-2">
+                {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}" class="text-[10px] font-black text-slate-600 uppercase tracking-widest hover:underline">&larr; Newer</a>
+                {% endif %}
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}" class="text-[10px] font-black text-slate-600 uppercase tracking-widest hover:underline">Older &rarr;</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 

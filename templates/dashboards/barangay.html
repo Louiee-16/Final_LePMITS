@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
 <div class="w-full mx-auto space-y-10">
@@ -65,51 +66,85 @@
 </div>
 
 <!-- MODAL -->
-<div id="draftModal" class="fixed inset-0 bg-black/40 hidden flex items-center justify-center z-50">
-    <div class="bg-white w-full max-w-lg rounded-3xl p-8 relative">
+<div id="draftModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+    <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"></div>
+    <div class="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-3xl p-10 modal-card" style="max-height:92vh; overflow-y:auto;">
 
-        <button id="closeModal" class="absolute top-4 right-4">✕</button>
-
-        <h2 class="text-xl font-extrabold mb-6">Upload Barangay Measure</h2>
+        <div class="flex items-start justify-between gap-4 mb-6">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
+                    <i data-lucide="upload" style="width:18px;height:18px;color:#6366f1;"></i>
+                </div>
+                <h2 class="text-lg font-black text-slate-900 tracking-tight">Upload Barangay Measure</h2>
+            </div>
+            <button type="button" id="closeModal"
+                class="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-all shrink-0">
+                <i data-lucide="x" style="width:13px;height:13px;vertical-align:middle;"></i>
+            </button>
+        </div>
 
         <form method="POST" enctype="multipart/form-data" action="{%url 'upload-measure'%}">
             {% csrf_token %}
 
             <!-- TITLE -->
-            <div class="mb-6">
-                <label class="block text-sm font-bold mb-2">Document Title</label>
+            <div class="mb-5">
+                <label class="block text-[11px] font-black uppercase tracking-widest text-slate-400 mb-2">Document Title</label>
                 {{ form.title }}
-                <p id="titleError" class="text-slate-600 text-sm mt-1 hidden"></p>
+                <p id="titleHint" class="text-slate-400 text-xs mt-1.5">Format: Barangay Ordinance No. 12, Series of 2026</p>
+                <p id="titleError" class="text-red-500 text-xs mt-1.5 hidden"></p>
             </div>
 
             <!-- SUBJECT -->
-            <div class="mb-6">
-                <label class="block text-sm font-bold mb-2">Subject</label>
+            <div class="mb-5">
+                <label class="block text-[11px] font-black uppercase tracking-widest text-slate-400 mb-2">Subject</label>
                 {{ form.subject }}
             </div>
 
             <!-- REMARKS -->
-            <div class="mb-6">
-                <label class="block text-sm font-bold mb-2">Remarks</label>
+            <div class="mb-5">
+                <label class="block text-[11px] font-black uppercase tracking-widest text-slate-400 mb-2">Remarks</label>
                 {{ form.remarks }}
             </div>
 
             <!-- FILE -->
-            <div class="mb-6">
-                <label class="block text-sm font-bold mb-2">File</label>
-                {{ form.scanned_pdf }}
+            <div class="mb-8">
+                <label class="block text-[11px] font-black uppercase tracking-widest text-slate-400 mb-2">File (.docx)</label>
+                {{ form.uploaded_docx }}
+
+                <!-- Preview of the exact file just picked — read entirely
+                     in the browser (Casual Docs' documentBuffer accepts a
+                     File directly), no upload happens just to show this.
+                     Nothing to see until a file is actually selected. -->
+                <div id="filePreviewWrap" class="hidden mt-4">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Preview</p>
+                    <div id="filePreviewContainer" class="rounded-xl border border-slate-200 bg-slate-50 overflow-hidden" style="height:420px;"></div>
+                    <p id="filePreviewError" class="hidden text-red-500 text-xs mt-2"></p>
+                </div>
             </div>
 
-            <div class="flex justify-end gap-3">
-                <button type="button" id="cancelModal">Cancel</button>
-                <button type="submit" class="bg-slate-600 text-white px-4 py-2 rounded-xl">
-                    Upload
+            <div class="flex gap-3">
+                <button type="button" id="cancelModal"
+                    class="flex-1 px-5 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-all disabled:opacity-50">
+                    Cancel
+                </button>
+                <button type="submit" id="uploadSubmitBtn"
+                    class="flex-[2] bg-slate-600 text-white px-5 py-3 rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-slate-100 hover:bg-slate-700 transition-all disabled:opacity-60 flex items-center justify-center gap-2">
+                    <span id="uploadSubmitLabel">Upload</span>
                 </button>
             </div>
         </form>
     </div>
 </div>
 
+<style>
+    .modal-card { animation: modalIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
+    @keyframes modalIn {
+        from { opacity: 0; transform: scale(0.92) translateY(12px); }
+        to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+</style>
+
+<script src="{% static 'js/document_editors/casualdocs-mount.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const modal = document.getElementById('draftModal');
@@ -120,62 +155,153 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const titleInput = form.querySelector('input[name="title"]');
     const errorText = document.getElementById('titleError');
-    const submitBtn = form.querySelector('button[type="submit"]');
+    const hintText = document.getElementById('titleHint');
+    const submitBtn = document.getElementById('uploadSubmitBtn');
+    const submitLabel = document.getElementById('uploadSubmitLabel');
 
-    // Strict format
+    // ── File preview — reads the picked file entirely in the browser
+    // (Casual Docs' documentBuffer option takes a File directly, no
+    // server round trip) so a barangay user can confirm it's the right
+    // document before it ever gets uploaded. ───────────────────────────
+    const fileInput = form.querySelector('input[name="uploaded_docx"]');
+    const previewWrap = document.getElementById('filePreviewWrap');
+    const previewContainer = document.getElementById('filePreviewContainer');
+    const previewError = document.getElementById('filePreviewError');
+    let previewEditor = null;
+    let previewToken = 0; // guards against a slow-loading preview landing after a newer file was picked (or the modal closed)
+
+    function destroyPreview() {
+        previewToken++;
+        if (previewEditor && previewEditor.destroy) previewEditor.destroy();
+        previewEditor = null;
+        previewContainer.innerHTML = '';
+        previewError.classList.add('hidden');
+        previewWrap.classList.add('hidden');
+    }
+
+    fileInput.addEventListener('change', async () => {
+        const file = fileInput.files && fileInput.files[0];
+        destroyPreview();
+        if (!file) return;
+
+        const myToken = previewToken;
+        previewWrap.classList.remove('hidden');
+        previewContainer.innerHTML =
+            '<p class="text-center text-slate-400 text-xs pt-10">Loading preview...</p>';
+
+        const cacheBust = '{% now "U" %}';
+        try {
+            const controller = await CasualDocsMount.mount(previewContainer, {
+                documentBuffer: file,
+                mode: 'viewing',
+                cssUrl: "{% static 'js/document_editors/casualdocs-bundle.css' %}?v=" + cacheBust,
+                jsUrl: "{% static 'js/document_editors/casualdocs-bundle.js' %}?v=" + cacheBust,
+                onError: function () {
+                    if (myToken !== previewToken) return;
+                    previewContainer.innerHTML = '';
+                    previewError.textContent = "Couldn't preview this file - make sure it's a real .docx.";
+                    previewError.classList.remove('hidden');
+                },
+            });
+            // The file changed (or the modal closed) again while this was
+            // still loading — don't let a stale mount attach itself.
+            if (myToken !== previewToken) {
+                if (controller && controller.destroy) controller.destroy();
+                return;
+            }
+            previewEditor = controller;
+        } catch (err) {
+            if (myToken !== previewToken) return;
+            previewContainer.innerHTML = '';
+            previewError.textContent = "Couldn't load the preview.";
+            previewError.classList.remove('hidden');
+        }
+    });
+
+    // Required format — also enforced server-side (MeasureUploadForm.clean_title
+    // in barangay/forms.py), this is just faster feedback while typing.
     const pattern = /^Barangay Ordinance No\. \d+, Series of \d{4}$/;
+
+    function openModal() {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        document.body.style.overflow = 'hidden';
+        // Give the user a head start on the required format instead of
+        // making them look up and type the whole prefix themselves —
+        // but only if they haven't already started typing (e.g. the form
+        // re-opened after a validation error, which should keep what they
+        // had).
+        if (!titleInput.value) {
+            titleInput.value = 'Barangay Ordinance No. ';
+        }
+        validateTitle();
+    }
 
     function closeModal() {
         modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        document.body.style.overflow = '';
         form.reset();
         errorText.classList.add('hidden');
-        submitBtn.disabled = true;
+        hintText.classList.remove('hidden');
+        titleInput.classList.remove('border-red-300', 'focus:ring-red-100');
+        // form.reset() clears the file input's value but doesn't fire a
+        // change event, so the preview needs tearing down explicitly.
+        destroyPreview();
     }
 
-    openBtn.onclick = () => modal.classList.remove('hidden');
+    openBtn.onclick = openModal;
     closeBtn.onclick = closeModal;
     cancelBtn.onclick = closeModal;
 
     modal.addEventListener('click', (e) => {
-        if (e.target === modal) closeModal();
+        // Only the backdrop (not the card itself) should close the modal —
+        // it's the direct child before the card in the DOM, so anything
+        // that isn't inside .modal-card counts as a backdrop click.
+        if (!e.target.closest('.modal-card')) closeModal();
     });
 
-    // 🔹 Live validation
+    // Live validation — shows the user what's wrong without fighting their
+    // typing. The previous version force-overwrote the field on every
+    // keystroke that didn't already match, which made it impossible to
+    // actually type the number/year in.
     function validateTitle() {
         const value = titleInput.value.trim();
+        const valid = pattern.test(value);
 
-        if (pattern.test(value)) {
+        if (valid) {
             errorText.classList.add('hidden');
-            titleInput.classList.remove('border-slate-500');
-            titleInput.classList.add('border-slate-500');
-            submitBtn.disabled = false;
+            hintText.classList.remove('hidden');
+            titleInput.classList.remove('border-red-300', 'focus:ring-red-100');
         } else {
-            errorText.innerText = "Use format: Barangay Ordinance No. 123, Series of 2024";
+            errorText.textContent = 'Use format: Barangay Ordinance No. 123, Series of 2024';
             errorText.classList.remove('hidden');
-            titleInput.classList.add('border-slate-500');
-            titleInput.classList.remove('border-slate-500');
-            submitBtn.disabled = true;
+            hintText.classList.add('hidden');
+            titleInput.classList.add('border-red-300', 'focus:ring-red-100');
         }
+        submitBtn.disabled = !valid;
     }
 
-    // Force prefix (optional but helpful)
-    titleInput.addEventListener('input', () => {
-        if (!titleInput.value.startsWith("Barangay Ordinance No.")) {
-            titleInput.value = "Barangay Ordinance No. ";
-        }
-        validateTitle();
-    });
+    titleInput.addEventListener('input', validateTitle);
 
-    // 🔹 Final safety check on submit
+    // Final safety check on submit, plus a visible loading state — this
+    // form uploads a .docx file, which can take a moment.
     form.addEventListener('submit', (e) => {
         if (!pattern.test(titleInput.value.trim())) {
             e.preventDefault();
             validateTitle();
+            return;
         }
+        submitBtn.disabled = true;
+        cancelBtn.disabled = true;
+        submitLabel.innerHTML =
+            '<i data-lucide="loader-circle" class="animate-spin" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;"></i>Uploading…';
+        if (window.lucide) lucide.createIcons();
     });
 
-    // Disable submit initially
-    submitBtn.disabled = true;
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeModal();
+    });
 });
 </script>
 

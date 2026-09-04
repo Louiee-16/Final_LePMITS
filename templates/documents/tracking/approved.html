@@ -12,8 +12,8 @@
                 <span class="text-slate-200">/</span>
                 <span class="text-slate-600">Approved Registry</span>
             </nav>
-            <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Legislative Archive</h1>
-            <p class="text-slate-400 mt-0.5 text-xs font-medium">Official record of enacted ordinances and approved resolutions.</p>
+            <h1 class="text-4xl font-extrabold text-slate-900 tracking-tight">Legislative Archive</h1>
+            <p class="text-slate-500 mt-1 font-medium italic">Official record of enacted ordinances and approved resolutions.</p>
         </div>
 
         <!-- Stats pills -->
@@ -68,14 +68,20 @@
             {% endfor %}
         </select>
 
+        <!-- Clear -->
+        <button onclick="resetSearch()"
+            class="px-4 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all shrink-0">
+            Clear
+        </button>
+
         <!-- Result count -->
         <span id="resultCount" class="text-[10px] font-black uppercase tracking-widest text-slate-400 shrink-0"></span>
     </div>
 
     <!-- ── TABLE ───────────────────────────────────────────────────────────── -->
-    <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+    <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
         <table class="w-full text-left">
-            <thead>
+            <thead class="bg-slate-50">
                 <tr class="border-b border-slate-100">
                     <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 w-32">Date</th>
                     <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 w-48">Reference No.</th>
@@ -278,7 +284,7 @@ function openDocModal(docId, source) {
         .then(html => {
             contentDiv.innerHTML = html;
             // innerHTML doesn't execute <script> tags — re-create each one
-            // so the modal partial's OnlyOffice viewer mount script runs.
+            // so the modal partial's document viewer mount script runs.
             contentDiv.querySelectorAll('script').forEach(old => {
                 const s = document.createElement('script');
                 if (old.src) s.src = old.src; else s.textContent = old.textContent;

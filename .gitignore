@@ -13,6 +13,15 @@ media/
 staticfiles/
 db.sqlite3
 
+# Document editor's working/archived docx+PDF storage — deliberately kept
+# outside media/ (see config/settings.py's DOCUMENT_EDITOR_STORAGE_ROOT)
+# so it's never reachable via a raw MEDIA_URL path in production.
+protected_media/
+
+# Downloaded datasets (e.g. import_republic_acts.py's source parquet) —
+# large, re-downloadable, not something to version-control
+scratch_data/
+
 # Node
 node_modules/
 npm-debug.log

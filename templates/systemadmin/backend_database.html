@@ -32,13 +32,10 @@
                 </div>
                 <div>
                     <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Engine</p>
-                    <p class="text-lg font-black text-slate-900">PostgreSQL 15.0</p>
+                    <p class="text-lg font-black text-slate-900">{{ db_vendor }}</p>
                 </div>
             </div>
-            <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                <div class="bg-slate-500 h-full" style="width: 45%"></div>
-            </div>
-            <p class="text-[10px] text-slate-400 mt-2 font-bold uppercase">Connection Pool: 45% Active</p>
+            <p class="text-[10px] text-slate-400 mt-2 font-bold uppercase truncate" title="{{ db_name }}">Database: <span class="text-slate-600">{{ db_name }}</span></p>
         </div>
 
         <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
@@ -48,10 +45,9 @@
                 </div>
                 <div>
                     <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Tables</p>
-                    <p class="text-lg font-black text-slate-900">32 Registered Models</p>
+                    <p class="text-lg font-black text-slate-900">{{ model_count }} Registered Models</p>
                 </div>
             </div>
-            <p class="text-[10px] text-slate-400 font-bold uppercase">Latest Migration: <span class="text-slate-600">0042_add_audit_logs</span></p>
         </div>
 
 <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
@@ -92,8 +88,7 @@
                         <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Raw Access</th>
                     </tr>
                 </thead>
-                <!-- Replace your hardcoded <tbody> with this loop -->
-<tbody class="divide-y divide-slate-50">
+                <tbody class="divide-y divide-slate-50">
     {% for model in model_registry %}
     <tr class="hover:bg-slate-50/50 transition-colors">
         <td class="px-6 py-4">
@@ -112,15 +107,6 @@
     </tr>
     {% endfor %}
 </tbody>
-
-<!-- Update your Maintenance Buttons to point to the views -->
-<a href="{% url 'clear-system-cache' %}" class="w-full p-4 bg-slate-50 ...">
-    <span class="text-xs font-bold text-slate-600 uppercase tracking-widest">Clear Cache</span>
-</a>
-
-<a href="{% url 'trigger-backup' %}" class="w-full py-3 bg-white ...">
-    <i data-lucide="file-up" style="width:13px;height:13px;margin-right:8px;vertical-align:middle;"></i> Trigger Manual Backup
-</a>
             </table>
         </div>
     </div>
@@ -130,20 +116,26 @@
         <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
             <h3 class="font-bold text-slate-800">Data Lifecycle</h3>
             <div class="space-y-3">
-                <button class="w-full p-4 bg-slate-50 rounded-2xl flex items-center justify-between group hover:bg-slate-100 transition-all">
-                    <div class="flex items-center gap-3">
-                        <i data-lucide="brush" style="width:16px;height:16px;color:#f59e0b;"></i>
-                        <span class="text-xs font-bold text-slate-600 uppercase tracking-widest">Clear Cache</span>
-                    </div>
-                    <i data-lucide="chevron-right" style="width:14px;height:14px;color:#cbd5e1;" class="group-hover:translate-x-1 transition-all"></i>
-                </button>
-                <button class="w-full p-4 bg-slate-50 rounded-2xl flex items-center justify-between group hover:bg-slate-100 transition-all">
-                    <div class="flex items-center gap-3">
-                        <i data-lucide="minimize-2" style="width:16px;height:16px;color:#3b82f6;"></i>
-                        <span class="text-xs font-bold text-slate-600 uppercase tracking-widest">Optimize Tables</span>
-                    </div>
-                    <i data-lucide="chevron-right" style="width:14px;height:14px;color:#cbd5e1;" class="group-hover:translate-x-1 transition-all"></i>
-                </button>
+                <form method="POST" action="{% url 'clear-system-cache' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="w-full p-4 bg-slate-50 rounded-2xl flex items-center justify-between group hover:bg-slate-100 transition-all">
+                        <div class="flex items-center gap-3">
+                            <i data-lucide="brush" style="width:16px;height:16px;color:#f59e0b;"></i>
+                            <span class="text-xs font-bold text-slate-600 uppercase tracking-widest">Clear Cache</span>
+                        </div>
+                        <i data-lucide="chevron-right" style="width:14px;height:14px;color:#cbd5e1;" class="group-hover:translate-x-1 transition-all"></i>
+                    </button>
+                </form>
+                <form method="POST" action="{% url 'optimize-database' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="w-full p-4 bg-slate-50 rounded-2xl flex items-center justify-between group hover:bg-slate-100 transition-all">
+                        <div class="flex items-center gap-3">
+                            <i data-lucide="minimize-2" style="width:16px;height:16px;color:#3b82f6;"></i>
+                            <span class="text-xs font-bold text-slate-600 uppercase tracking-widest">Optimize Tables</span>
+                        </div>
+                        <i data-lucide="chevron-right" style="width:14px;height:14px;color:#cbd5e1;" class="group-hover:translate-x-1 transition-all"></i>
+                    </button>
+                </form>
             </div>
         </div>
 
@@ -152,9 +144,12 @@
             <p class="text-slate-100 text-[10px] leading-relaxed uppercase font-bold tracking-wider">
                 This will trigger a full database dump. This process may slow down the system for a few seconds.
             </p>
-            <button class="w-full py-3 bg-white text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg">
-                <i data-lucide="file-up" style="width:13px;height:13px;margin-right:8px;vertical-align:middle;"></i> Trigger Manual Backup
-            </button>
+            <form method="POST" action="{% url 'trigger-backup' %}">
+                {% csrf_token %}
+                <button type="submit" class="w-full py-3 bg-white text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg">
+                    <i data-lucide="file-up" style="width:13px;height:13px;margin-right:8px;vertical-align:middle;"></i> Trigger Manual Backup
+                </button>
+            </form>
         </div>
     </div>
 </div>

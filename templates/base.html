@@ -210,6 +210,20 @@
         }
         .sec-tab:hover { background: rgba(255,255,255,0.08); color: #e2e8f0; }
         .sec-tab-active { background: #7C0D0E !important; color: #fff !important; }
+        .sec-tab-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 15px;
+            height: 15px;
+            padding: 0 4px;
+            border-radius: 999px;
+            background: #7C0D0E;
+            color: #fff;
+            font-size: 9px;
+            font-weight: 800;
+        }
+        .sec-tab-active .sec-tab-badge { background: #fff; color: #7C0D0E; }
     </style>
     {% block extra_styles %}{% endblock %}
 </head>
@@ -268,9 +282,14 @@
                     <span class="sidebar-label">User Accounts</span>
                 </a>
                 <a href="{%url 'audit-logs'%}" data-tooltip="Audit Logs"
-                   class="sidebar-item {% if 'logs' in request.path %}sidebar-active{% endif %}">
+                   class="sidebar-item {% if 'audit_logs' in request.path %}sidebar-active{% endif %}">
                     <i data-lucide="shield-check" class="nav-icon"></i>
                     <span class="sidebar-label">Audit Logs</span>
+                </a>
+                <a href="{%url 'system-errors'%}" data-tooltip="System Errors"
+                   class="sidebar-item {% if 'system_errors' in request.path %}sidebar-active{% endif %}">
+                    <i data-lucide="bug" class="nav-icon"></i>
+                    <span class="sidebar-label">System Errors</span>
                 </a>
                 <a href="{%url 'general-settings'%}" data-tooltip="System Settings"
                    class="sidebar-item {% if 'settings' in request.path %}sidebar-active{% endif %}">
@@ -595,6 +614,9 @@
                 </a>
                 <a href="{% url 'incoming_docs' %}" class="sec-tab {% if cur == 'incoming_docs' %}sec-tab-active{% endif %}">
                     <i data-lucide="inbox" style="width:11px;height:11px;"></i> Incoming
+                    {% if incoming_docs_count %}
+                    <span class="sec-tab-badge">{{ incoming_docs_count }}</span>
+                    {% endif %}
                 </a>
                 <a href="{% url 'order-of-business' %}" class="sec-tab {% if cur == 'order-of-business' %}sec-tab-active{% endif %}">
                     <i data-lucide="calendar-check" style="width:11px;height:11px;"></i> Agenda
@@ -617,6 +639,26 @@
         {% endif %}
 
         <section id="mainContentSection" class="flex-1 overflow-y-auto custom-scrollbar p-8" style="background:#f8fafc;">
+            <!-- ── GLOBAL DJANGO MESSAGES ──
+                 Renders every messages.success/error/warning/info call from
+                 any view. Without this, messages() calls across the app
+                 silently vanish on any page that doesn't render its own
+                 (which, before this, was every page but two). -->
+            {% if messages %}
+            <div class="space-y-3 mb-6">
+                {% for message in messages %}
+                <div class="px-5 py-3.5 rounded-2xl text-xs font-bold flex items-center gap-3 border
+                    {% if message.tags == 'success' %}bg-green-50 text-green-700 border-green-100
+                    {% elif message.tags == 'warning' %}bg-amber-50 text-amber-700 border-amber-100
+                    {% elif message.tags == 'error' %}bg-red-50 text-red-700 border-red-100
+                    {% else %}bg-slate-50 text-slate-700 border-slate-200{% endif %}">
+                    <i data-lucide="{% if message.tags == 'success' %}check-circle-2{% elif message.tags == 'warning' %}triangle-alert{% elif message.tags == 'error' %}alert-circle{% else %}info{% endif %}"
+                       style="width:14px;height:14px;flex-shrink:0;"></i>
+                    <span>{{ message }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
             {% block content %}{% endblock %}
         </section>
     </main>

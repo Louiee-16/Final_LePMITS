@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="space-y-8">
+
+    <!-- ── HEADER ── -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+            <nav class="flex text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 gap-2 mb-2">
+                <a href="{% url 'dashboard' %}" class="hover:text-slate-600 transition-colors">Admin</a>
+                <span>/</span>
+                <span class="text-slate-600">System Errors</span>
+            </nav>
+            <h1 class="text-3xl font-black text-slate-900 tracking-tight">System Errors</h1>
+            <p class="text-slate-500 mt-1 font-medium">Unhandled exceptions raised anywhere in LePMITS, captured automatically as they happen.</p>
+        </div>
+
+        <div class="flex items-center gap-3">
+            {% if status == 'resolved' and errors %}
+            <form method="POST" action="{% url 'clear-resolved-errors' %}" onsubmit="return confirm('Permanently delete all resolved error records?');">
+                {% csrf_token %}
+                <button type="submit" class="px-5 py-2.5 bg-slate-50 border border-slate-100 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-100 transition-all flex items-center gap-2">
+                    <i data-lucide="trash-2" style="width:13px;height:13px;vertical-align:middle;"></i> Clear Resolved
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ── QUICK OVERVIEW ── -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center text-red-500 text-xl">
+                <i data-lucide="triangle-alert" style="width:22px;height:22px;"></i>
+            </div>
+            <div>
+                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Unresolved</p>
+                <p class="text-2xl font-black text-slate-900">{{ unresolved_count }}</p>
+            </div>
+        </div>
+        <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-600 text-xl">
+                <i data-lucide="bug" style="width:22px;height:22px;"></i>
+            </div>
+            <div>
+                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Recorded</p>
+                <p class="text-2xl font-black text-slate-600">{{ total_count }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── STATUS TABS ── -->
+    <div class="bg-white p-2 rounded-2xl border border-slate-100 shadow-sm inline-flex gap-1">
+        <a href="?status=unresolved" class="px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all {% if status == 'unresolved' %}bg-slate-900 text-white{% else %}text-slate-500 hover:bg-slate-50{% endif %}">Unresolved</a>
+        <a href="?status=resolved" class="px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all {% if status == 'resolved' %}bg-slate-900 text-white{% else %}text-slate-500 hover:bg-slate-50{% endif %}">Resolved</a>
+        <a href="?status=all" class="px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all {% if status == 'all' %}bg-slate-900 text-white{% else %}text-slate-500 hover:bg-slate-50{% endif %}">All</a>
+    </div>
+
+    <!-- ── ERRORS LIST ── -->
+    <div class="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+        {% if errors %}
+        <div class="divide-y divide-slate-50">
+            {% for err in errors %}
+            <details class="group">
+                <summary class="list-none px-6 py-4 flex items-center gap-4 cursor-pointer hover:bg-slate-50/50 transition-colors">
+                    <i data-lucide="chevron-right" style="width:14px;height:14px;color:#cbd5e1;" class="shrink-0 transition-transform group-open:rotate-90"></i>
+
+                    <span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider shrink-0
+                        {% if err.resolved %}bg-slate-50 text-slate-400{% else %}bg-red-50 text-red-600{% endif %}">
+                        {{ err.exception_type|default:"Error" }}
+                    </span>
+
+                    <span class="text-xs font-mono text-slate-500 shrink-0">{{ err.method }}</span>
+                    <span class="text-sm font-bold text-slate-700 truncate flex-1">{{ err.path }}</span>
+
+                    <span class="text-[10px] font-bold text-slate-400 uppercase shrink-0">
+                        {{ err.user.username|default:"Anonymous" }}
+                    </span>
+                    <span class="text-[10px] text-slate-400 font-bold uppercase shrink-0">{{ err.timestamp|timesince }} ago</span>
+
+                    {% if err.resolved %}
+                    <span class="text-[10px] font-black text-green-600 uppercase tracking-wider shrink-0 flex items-center gap-1">
+                        <i data-lucide="check-circle-2" style="width:12px;height:12px;"></i> Resolved
+                    </span>
+                    {% endif %}
+                </summary>
+
+                <div class="px-6 pb-6 pl-16 space-y-4">
+                    <p class="text-sm text-slate-700 font-medium bg-slate-50 rounded-xl px-4 py-3">{{ err.message|default:"No message." }}</p>
+                    <pre class="text-[11px] leading-relaxed text-slate-500 bg-slate-900 text-slate-200 rounded-xl p-4 overflow-x-auto whitespace-pre-wrap">{{ err.traceback|default:"No traceback captured." }}</pre>
+                    <div class="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        <span>{{ err.timestamp|date:"M d, Y — h:i:s A" }} &middot; IP {{ err.ip_address|default:"—" }}</span>
+                        {% if not err.resolved %}
+                        <form method="POST" action="{% url 'resolve-system-error' err.id %}">
+                            {% csrf_token %}
+                            <button type="submit" class="px-4 py-2 bg-slate-900 text-white rounded-lg font-black text-[10px] uppercase tracking-widest hover:bg-slate-700 transition-all">
+                                Mark Resolved
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </details>
+            {% endfor %}
+        </div>
+
+        {% if page_obj.paginator.num_pages > 1 %}
+        <div class="px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
+            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+            </p>
+            <div class="flex items-center gap-2">
+                {% if page_obj.has_previous %}
+                <a href="?status={{ status }}&page={{ page_obj.previous_page_number }}" class="text-[10px] font-black text-slate-600 uppercase tracking-widest hover:underline">&larr; Newer</a>
+                {% endif %}
+                {% if page_obj.has_next %}
+                <a href="?status={{ status }}&page={{ page_obj.next_page_number }}" class="text-[10px] font-black text-slate-600 uppercase tracking-widest hover:underline">Older &rarr;</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="px-6 py-20 text-center">
+            <i data-lucide="shield-check" style="width:32px;height:32px;color:#cbd5e1;margin:0 auto 12px;"></i>
+            <p class="text-slate-400 font-bold italic">
+                {% if status == 'resolved' %}No resolved errors on record.{% else %}No errors recorded. System is running clean.{% endif %}
+            </p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

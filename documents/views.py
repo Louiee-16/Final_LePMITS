@@ -3,7 +3,10 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, Http404, HttpResponse
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.decorators.http import require_POST
+from django.utils.html import strip_tags
+import hashlib
 import json
+from django.db import connection, transaction
 from django.db.models import Q
 from .models import Document, AmendmentNote
 from committees.models import Committee
@@ -15,74 +18,64 @@ from archives.models import Archives
 from barangay.models import BarangayFiles
 from secretariat.models import Session
 from audit.utils import log_action
+from .docx_comments import strip_ai_comments_from_file
 
 
-@login_required
-def create_referred_draft(request, doc_id):
-
-    doc = get_object_or_404(BarangayFiles, id=doc_id)
-    
-    existing_draft = Document.objects.filter(
-        author=request.user,
-        source_barangay_doc=doc,
-        status__in=['DRAFT', 'GHOST']
-    ).first()
-
-    committees = Committee.objects.all()
-
-    if request.method == 'POST':
-        action = request.POST.get('action')
-        doc_id_field = request.POST.get('doc_id', '').strip()
-
-        if doc_id_field:
-            draft = get_object_or_404(Document, id=doc_id_field, author=request.user)
-        else:
-            draft = Document(author=request.user, source_barangay_doc=doc)
-
-        draft.title    = request.POST.get('title', '').strip() or 'Untitled Draft'
-        # content is intentionally left untouched — saved directly to the DB
-        # by the OnlyOffice callback (see onlyoffice_callback), same as
-        # create_draft.
-        draft.doc_type = 'RESOLUTION'
+def _acquire_sequence_lock(*parts):
+    """
+    Serializes concurrent reference-number assignment for the same bucket
+    (e.g. same doc_type + year) via a Postgres advisory lock, held for the
+    rest of the current transaction and released automatically on
+    commit/rollback. A plain COUNT()+1 assignment races when two requests
+    read the same count before either commits — two staff filing or
+    approving measures at the same moment could land on the same
+    reference number. select_for_update() on the matching rows doesn't
+    fully close this: the very first document of a doc_type/year has no
+    existing row to lock against. Locking a stable, always-present key
+    instead of the rows themselves closes that gap too. Must be called
+    inside a transaction.atomic() block, and the number-assignment's
+    .save() must happen before that block exits — the lock only prevents
+    a second request from reading a stale count while it's held.
+    """
+    key = int(hashlib.md5('|'.join(str(p) for p in parts).encode()).hexdigest()[:15], 16)
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT pg_advisory_xact_lock(%s)", [key])
 
 
-        committee_id = request.POST.get('referred_committee')
-        draft.referred_committee_id = committee_id if committee_id else None
-        if action =='save':
-            draft.status   = 'DRAFT'
-            draft.save()
-            return redirect('referral-drafting-page', doc_id=doc.id)
-            
-        elif action == 'submit':
-            draft.status = 'REFERRED'
-            doc.status = 'DRAFT_CREATED'
-            
-            if not draft.reference_no:
-                current_year = timezone.now().year
-                prefix = 'DR'
-                count = Document.objects.filter(
-                    doc_type=draft.doc_type,
-                    status__in=['FILED', 'FIRST_READING', 'COMMITTEE', 'SECOND_READING', 'THIRD_READING', 'APPROVED'],
-                    created_at__year=current_year
-                ).count()
-                draft.reference_no = f"{prefix}-{count + 1:03d}-{current_year}"
-            doc.save()
-            draft.save()
+def assign_reference_number(doc):
+    """Assigns doc.reference_no exactly once, via a persistent
+    per-(doc_type, year) counter (DocumentReferenceCounter) rather than
+    counting existing rows in a hardcoded set of statuses — the old
+    approach silently undercounted (and produced duplicate numbers,
+    confirmed directly in production data) the moment a document moved
+    into a status the list didn't include, or moved backward after
+    already holding a number. This counter doesn't care about status at
+    all, so neither failure mode can happen again.
 
-            # Same checkpoint as create_draft's File Draft — first PDF
-            # snapshot, so the committee stage this feeds into can show a
-            # PDF instead of a live editor for read-only views.
-            _onlyoffice_snapshot_pdf(request, draft)
-
-            return redirect('referrals-from-other-matters')
-
-            
-
-    return render(request, 'documents/referral_drafting_page.html', {
-        'doc': doc,
-        'existing_draft': existing_draft,
-        'committees': committees,
-    })
+    No-ops if doc.reference_no is already set. Callers decide *when* to
+    call this — it's the trigger point that differs between a
+    councilor-authored document (move_to_first, i.e. First Reading) and a
+    barangay-originated one (committee_level's
+    _sync_report_status_from_hearing, on an Approved outcome — barangay
+    documents skip First Reading entirely, going straight to REFERRED, so
+    they need a different numbering trigger). Self-contained: opens its
+    own transaction.atomic() and saves doc itself, so callers don't need
+    to know about the locking.
+    """
+    if doc.reference_no:
+        return
+    from .models import DocumentReferenceCounter
+    current_year = timezone.now().year
+    prefix = 'DO' if doc.doc_type == 'ORDINANCE' else 'DR'
+    with transaction.atomic():
+        _acquire_sequence_lock('draft_reference_no', prefix, current_year)
+        counter, _ = DocumentReferenceCounter.objects.get_or_create(
+            doc_type=doc.doc_type, year=current_year
+        )
+        counter.count += 1
+        counter.save()
+        doc.reference_no = f"{prefix}-{counter.count}-{current_year}"
+        doc.save()
 
 
 @login_required
@@ -99,20 +92,28 @@ def create_draft(request):
             doc = Document(author=request.user)
  
         doc.title    = request.POST.get('title', '').strip() or 'Untitled Draft'
-        # draft.html's own TipTap editor submits a `content` field directly
-        # (sanitized on save() anyway, see Document.save()). view_draft.html's
-        # edit branch still runs on OnlyOffice for now and posts to this same
-        # view without a `content` field — its content is saved separately by
-        # onlyoffice_callback, so the .get() fallback leaves it untouched
-        # rather than blanking it out.
+        # draft.html and view_draft.html's edit branch both run on Casual Docs
+        # now and post to this view without a `content` field — content is
+        # saved separately, live, by the save handler (see
+        # documents/wopi.py::casualdocs_save), so the `in request.POST`
+        # check leaves it untouched here rather than blanking it out. Kept
+        # generic (not assuming content is always absent) since this view
+        # is also reachable from older/other callers that might still post
+        # it directly.
         if 'content' in request.POST:
             doc.content = request.POST.get('content', '')
-        doc.doc_type = request.POST.get('type', 'ORDINANCE')
+        # Only set if a real choice was posted — no default fallback, same
+        # "don't silently default" reasoning as page_size/page_orientation
+        # just below. A fresh draft starts with doc_type blank until the
+        # councilor actually picks Ordinance or Resolution.
+        posted_type = request.POST.get('type')
+        if posted_type in dict(Document.DOC_CHOICES):
+            doc.doc_type = posted_type
 
         # Layout tab (Page Setup) — same "only touch it if the form
         # actually sent it" reasoning as `content` above, since
-        # view_draft.html's OnlyOffice branch posts to this same view
-        # without these fields either. Falls back to whatever's already on
+        # view_draft.html's edit branch posts to this same view without
+        # these fields either. Falls back to whatever's already on
         # doc (existing value, or the model's own default for a brand-new
         # Document) rather than a hardcoded default, so a malformed value
         # can't silently reset an already-configured document's layout.
@@ -138,36 +139,53 @@ def create_draft(request):
             doc.referred_committee = None
  
         if action == 'submit':
+            # Filing is the point of no return (reference number assigned,
+            # goes to First Reading) — a draft that's still literally
+            # "Untitled Draft" or has never had Ordinance/Resolution chosen
+            # shouldn't be allowed through, even though the UI is also
+            # expected to disable the File button for the same reason.
+            # This is the real enforcement; that's just a convenience.
+            title_ok = doc.title.strip() and doc.title.strip().lower() != 'untitled draft'
+            type_ok = doc.doc_type in dict(Document.DOC_CHOICES)
+            if not title_ok or not type_ok:
+                if not title_ok:
+                    messages.error(request, "Give this draft a real title before filing it.")
+                else:
+                    messages.error(request, "Choose Ordinance or Resolution before filing.")
+                if not doc.pk or doc.status == 'GHOST':
+                    doc.status = 'DRAFT'
+                doc.save()
+                return redirect('view-draft', id=doc.id)
+
+            # Filing is the point of no return — the AI inline-check's own
+            # scratch comments (Similarity Check (AI) / LePMITS AI) are a
+            # drafting aid and shouldn't follow the document past this
+            # point. Strip before the checkpoint sync so a stale comment
+            # can't leak into Document.content or the archived docx.
+            if doc.pk:
+                strip_ai_comments_from_file(_onlyoffice_saved_docx_path(doc.id))
+            # Must run before doc.status changes — see
+            # _onlyoffice_checkpoint_sync's docstring.
+            _onlyoffice_checkpoint_sync(doc)
             doc.status = 'FILED'
- 
-            # Assign reference number only once
-            if not doc.reference_no:
-                current_year = timezone.now().year
-                prefix = 'DO' if doc.doc_type == 'ORDINANCE' else 'DR'
- 
-                count = Document.objects.filter(
-                    doc_type=doc.doc_type,
-                    status__in=[
-                        'FILED', 'FIRST_READING', 'COMMITTEE',
-                        'SECOND_READING', 'THIRD_READING', 'APPROVED'
-                    ],
-                    created_at__year=current_year
-                ).count()
- 
-                doc.reference_no = f"{prefix}-{count + 1:03d}-{current_year}"
- 
+            # No reference number here — filing just means "secretariat
+            # can now review this." A number is only assigned once it's
+            # actually accepted into the legislative pipeline, at First
+            # Reading (see move_to_first / assign_reference_number).
+            doc.save()
+
         else:
             # Plain save — keep as DRAFT, never promote
             if not doc.pk or doc.status == 'GHOST':
                 doc.status = 'DRAFT'
-
-        doc.save()
+            doc.save()
 
         if action == 'submit':
             # Filing is the first checkpoint where a PDF snapshot exists —
             # every passive viewer downstream (incoming docs, first
             # reading, etc.) shows this instead of mounting a live editor.
             _onlyoffice_snapshot_pdf(request, doc)
+            _onlyoffice_archive_docx(doc)
 
         log_action(
             request,
@@ -178,26 +196,62 @@ def create_draft(request):
         return redirect('dashboard')
  
     committees = Committee.objects.all()
+    # Only ever reuse an existing GHOST — a never-formally-saved
+    # placeholder, recycled so repeat visits to this page without saving
+    # don't pile up empty orphan rows (nothing else deletes them
+    # automatically; that's what the Discard button's discard_ghost is
+    # for). Deliberately excludes DRAFT: a DRAFT is a real, explicitly
+    # saved draft with its own title/content, and a councilor can have
+    # several in flight at once (see Draft Measures) — "Create Draft"
+    # should always hand back a blank slate (or the one still-unsaved
+    # ghost), never silently reopen and overwrite an already-saved one.
     ghost = Document.objects.filter(
         author=request.user,
-        status__in=['GHOST', 'DRAFT']
+        status='GHOST'
     ).order_by('-updated_at').first()
 
-    # OnlyOffice needs a real Document id to attach its source/callback
-    # endpoints to from the very first keystroke — unlike Quill, there's no
-    # JS-driven autosave to create that row lazily. So a brand-new visit
-    # (no existing ghost/draft) gets one created up front here instead.
-    # is_new_ghost tells the template not to show the "unsaved work
-    # recovered" banner for a placeholder that was just silently created,
-    # as opposed to genuine pre-existing in-progress work.
-    is_new_ghost = not ghost
-    if is_new_ghost:
+    # The editor needs a real Document id to load/save against from the
+    # very first keystroke — unlike Quill, there's no JS-driven
+    # autosave to create that row lazily. So a brand-new visit (no existing
+    # ghost) gets one created up front here instead.
+    ghost_is_new_row = not ghost
+    if ghost_is_new_row:
         ghost = Document.objects.create(
             author=request.user,
             title='Untitled Draft',
             content='',
             status='GHOST',
         )
+
+    # is_new_ghost tells the template not to show the "unsaved work
+    # recovered" banner unless there's genuinely something to recover.
+    # Deliberately NOT just "was a new row created above" — a ghost row can
+    # already exist but still be empty (created on an earlier visit that
+    # the user left without ever typing/saving anything), and showing
+    # "Unsaved work recovered" for a blank document with 0 words is
+    # actively misleading (confirmed live). Plain truthiness on
+    # doc.content isn't enough either — an empty document that's been
+    # through even one docx<->HTML round trip (e.g. a periodic autosave
+    # firing on a still-blank doc) comes back as
+    # '<p class="western">\n<br>\n<br>\n</p>\n', which is non-empty as a
+    # raw string but has no actual text (confirmed against a real row in
+    # the DB). strip_tags() reduces that to whitespace, correctly read as
+    # "nothing here". Also checks for a saved .docx: Document.content no
+    # longer syncs on every autosave (only at status-transition
+    # checkpoints — see _onlyoffice_checkpoint_sync), so a ghost that's
+    # been actively edited in Casual Docs but never reached a checkpoint
+    # would otherwise still show content='' here even with real,
+    # unsaved-to-a-checkpoint work sitting in its .docx. Casual Docs only
+    # calls onSave once something's actually been changed (not on a bare,
+    # untouched mount), so a saved docx existing at all is itself a
+    # reasonable signal that this isn't a pristine, never-touched ghost.
+    has_saved_docx = os.path.exists(_onlyoffice_saved_docx_path(ghost.id))
+    has_real_content = (
+        bool(strip_tags(ghost.content or '').strip())
+        or (ghost.title and ghost.title != 'Untitled Draft')
+        or has_saved_docx
+    )
+    is_new_ghost = ghost_is_new_row or not has_real_content
 
     # Check if the draft was returned with a reason
     return_reason = None
@@ -210,7 +264,6 @@ def create_draft(request):
         'ghost': ghost,
         'is_new_ghost': is_new_ghost,
         'return_reason': return_reason,
-        'onlyoffice_server_url': settings.ONLYOFFICE_SERVER_URL,
     })
 
 
@@ -341,13 +394,24 @@ def return_to_committee(request, doc_id):
     doc = get_object_or_404(Document, id=doc_id)
     user = request.user
     if doc.status == 'SECOND_READING' and user.role in ['SECRETARIAT','STAFF']:
+        # Must run before doc.status changes — see _onlyoffice_checkpoint_sync's docstring.
+        _onlyoffice_checkpoint_sync(doc)
         committee_check = Archives.objects.filter(original_doc = doc_id, status__icontains= 'COMMITTEE')
         if committee_check:
             x = committee_check.count()
             doc.status = f'COMMITTEE [{x+1}]'
         else:
             doc.status = 'COMMITTEE'
-    doc.save()
+        doc.save()
+        # Same checkpoint pattern as every other status transition — was
+        # missing here, which is why no PDF/docx snapshot ever existed for
+        # a document sent back to committee this way.
+        _onlyoffice_snapshot_pdf(request, doc)
+        _onlyoffice_archive_docx(doc)
+        log_action(request, action='MOVE', target=f'{doc.doc_type} — {doc.reference_no or doc.id}',
+                   detail=f'Returned to committee ({doc.status}).')
+    else:
+        doc.save()
     return redirect('second-reading')
 
 
@@ -356,8 +420,15 @@ def move_to_disapproved(request, doc_id):
     third_reading_doc = get_object_or_404(Document, id = doc_id)
     user = request.user
     if third_reading_doc.status == 'THIRD_READING' and user.role in ['SECRETARIAT','STAFF']:
+        # Must run before status changes — see _onlyoffice_checkpoint_sync's docstring.
+        _onlyoffice_checkpoint_sync(third_reading_doc)
         third_reading_doc.status = 'DISAPPROVED'
         third_reading_doc.save()
+        _onlyoffice_snapshot_pdf(request, third_reading_doc)
+        _onlyoffice_archive_docx(third_reading_doc)
+        log_action(request, action='MOVE',
+                   target=f'{third_reading_doc.doc_type} — {third_reading_doc.reference_no or third_reading_doc.id}',
+                   detail='Marked Disapproved.', severity='HIGH')
     return redirect('third-reading')
 
 @login_required
@@ -368,11 +439,20 @@ def move_to_first(request, pk):
         messages.error(request, "You don't have permission to perform this action.")
         return redirect('incoming_docs')
 
-    ref_no = request.POST.get('reference_no')
-    if ref_no:
-        doc.reference_no = ref_no
+    # Must run before doc.status changes — see _onlyoffice_checkpoint_sync's docstring.
+    _onlyoffice_checkpoint_sync(doc)
     doc.status = 'FIRST_READING'
+    # This is the real numbering moment for a councilor-authored document
+    # — see assign_reference_number's docstring for why it moved here
+    # from filing. No-ops (and doesn't save) if doc already has a number
+    # (e.g. returned-then-refiled) — the explicit save below still needs
+    # to run either way to persist the status change.
+    assign_reference_number(doc)
     doc.save()
+    _onlyoffice_snapshot_pdf(request, doc)
+    _onlyoffice_archive_docx(doc)
+    log_action(request, action='MOVE', target=f'{doc.doc_type} — {doc.reference_no or doc.id}',
+               detail='Moved to First Reading.')
     return redirect('incoming_docs')
 
 @login_required
@@ -385,6 +465,8 @@ def move_to_other_matters(request, doc_id):
 
     doc.status = 'OTHER_MATTERS'
     doc.save()
+    log_action(request, action='MOVE', target=doc.title or f'Barangay measure #{doc.id}',
+               detail='Moved to Other Matters.')
     return redirect('incoming_docs')
 
 @login_required
@@ -397,6 +479,8 @@ def unfinished_to_third(request, doc_id):
         return redirect('unfinished-business')
     doc.status = 'THIRD_READING'
     doc.save()
+    log_action(request, action='MOVE', target=f'{doc.doc_type} — {doc.reference_no or doc.id}',
+               detail='Moved from Unfinished Business to Third Reading.')
     return redirect('unfinished-business')
 
 @login_required
@@ -405,22 +489,30 @@ def move_to_third_reading(request, doc_id):
 
     if request.user.role not in ['SECRETARIAT', 'STAFF', 'ADMIN']:
         messages.error(request, "You don't have permission to perform this action.")
-        return redirect('second_reading')
+        return redirect('second-reading')
 
     if request.method != 'POST':
-        return redirect('second_reading')
+        return redirect('second-reading')
 
-    # Apply reference number if provided
-    ref_no = request.POST.get('reference_no', '').strip()
-    if ref_no:
-        doc.reference_no = ref_no
+    # No amendment_status guard here (deliberately removed — see
+    # docs/activity-log.md, "Move to Third Reading" was permanently
+    # unblockable for a while after floor_amendments.html's own controls
+    # for setting it were removed in a UI simplification, unaware this
+    # guard depended on them). Not a gap: this URL is only ever linked
+    # from floor_amendments.html — second_reading.html's only row action
+    # is Insert Amendments — so reaching this endpoint through the UI at
+    # all already means the amendment step was opened, without needing a
+    # second, now-unsatisfiable server-side check for it.
 
-    # Amendments during floor deliberation are now made live, directly in
-    # the .docx via OnlyOffice (see floor_amendments.html) — doc.content is
-    # already current by the time this runs, no amended_content to
-    # promote. amendment_status stays purely informational (the "In
-    # Progress / Finalized / No Amendments" label for this floor session)
-    # and is just cleared on exit, same housekeeping as before.
+    # Amendments during floor deliberation are made live, directly in the
+    # .docx via Casual Docs (see floor_amendments.html) — editing no longer
+    # syncs Document.content on every autosave, only at checkpoints like
+    # this one, right before the status change below. Must run first — see
+    # _onlyoffice_checkpoint_sync's docstring. amendment_status stays purely
+    # informational (the "In Progress / Finalized / No Amendments" label
+    # for this floor session) and is just cleared on exit, same
+    # housekeeping as before.
+    _onlyoffice_checkpoint_sync(doc)
     doc.amended_content = None
     doc.amendment_status = None
 
@@ -428,9 +520,13 @@ def move_to_third_reading(request, doc_id):
     doc.status = 'THIRD_READING'
     doc.save()
 
-    # New checkpoint's PDF, keyed to the version Archives just snapshotted.
+    # New checkpoint's PDF + archived docx, keyed to the version Archives
+    # just snapshotted.
     _onlyoffice_snapshot_pdf(request, doc)
+    _onlyoffice_archive_docx(doc)
 
+    log_action(request, action='MOVE', target=f'{doc.doc_type} — {doc.reference_no or doc.id}',
+               detail='Moved to Third Reading.')
     messages.success(request, f'"{doc.title}" has been moved to Third Reading.')
     return redirect('second-reading')
 
@@ -506,14 +602,18 @@ def autosave_draft(request):
 @login_required
 def discard_ghost(request):
     if request.method == 'POST':
-        Document.objects.filter(
+        deleted, _ = Document.objects.filter(
             author=request.user,
             status='GHOST'
         ).delete()
+        if deleted:
+            log_action(request, action='DELETE', target=f'{deleted} untitled draft(s)',
+                       detail=f'Ghost draft(s) discarded by {request.user.username}.')
     return JsonResponse({'status': 'discarded'})
 
 
 
+@login_required
 def incoming_docs(request):
     incoming_docs = Document.objects.filter(status = 'FILED') 
     barangay_docs = BarangayFiles.objects.filter(status = 'FILED') 
@@ -551,10 +651,16 @@ def refer_to_committee(request, doc_id):
             return redirect('first_reading')
 
         committee = get_object_or_404(Committee, id=committee_id)
-        
+
+        # Must run before doc.status changes — see _onlyoffice_checkpoint_sync's docstring.
+        _onlyoffice_checkpoint_sync(doc)
         doc.status = 'REFERRED'
         doc.referred_committee = committee
-        doc.save() 
+        doc.save()
+        _onlyoffice_snapshot_pdf(request, doc)
+        _onlyoffice_archive_docx(doc)
+        log_action(request, action='MOVE', target=f'{doc.doc_type} — {doc.reference_no or doc.id}',
+                   detail=f'Referred to committee: {committee.name}.')
         recipients = []
 
         def add_email(councilor):
@@ -606,7 +712,10 @@ def floor_amendments(request, doc_id):
 
     if request.user.role not in ['SECRETARIAT', 'STAFF', 'ADMIN']:
         messages.error(request, "You don't have permission to make amendments.")
-        return redirect('second_reading')
+        # 'second_reading' isn't a registered URL name (only the
+        # hyphenated 'second-reading' is) — was a guaranteed 500 on every
+        # permission-denied hit here.
+        return redirect('second-reading')
 
     amendments = doc.amendment_notes.select_related('author').all()
     from councilors.models import Councilor
@@ -614,7 +723,6 @@ def floor_amendments(request, doc_id):
     return render(request, 'documents/tracking/floor_amendments.html', {
         'doc': doc,
         'amendments': amendments,
-        'onlyoffice_server_url': settings.ONLYOFFICE_SERVER_URL,
         'all_councilors': Councilor.objects.filter(is_active=True).order_by('name'),
     })
 
@@ -628,14 +736,18 @@ def save_amendments(request, doc_id):
     # Role guard
     if request.user.role not in ['SECRETARIAT', 'STAFF', 'ADMIN']:
         messages.error(request, "You don't have permission to make amendments.")
-        return redirect('second_reading')
+        # See the same fix/reasoning in floor_amendments above.
+        return redirect('second-reading')
 
     if request.method != 'POST':
-        return redirect('floor-amendments', doc_id=doc_id)
+        # 'floor-amendments' isn't a registered URL name (only the
+        # underscored 'floor_amendments' is, per documents/urls.py) — was
+        # a guaranteed 500 on every non-POST hit here.
+        return redirect('floor_amendments', doc_id=doc_id)
 
     action = request.POST.get('action')
 
-    # Amendments themselves now save live to the docx via OnlyOffice (see
+    # Amendments themselves now save live to the docx via Casual Docs (see
     # floor_amendments.html) — this handler only tracks the informational
     # "In Progress / Finalized / No Amendments" label for the session.
     doc.amendment_status = request.POST.get('amendment_status', 'IN_PROGRESS')
@@ -693,27 +805,36 @@ def approve_measure(request, pk):
             return redirect('third-reading')
 
         current_year = timezone.now().year
-
-
-        approved_count = Document.objects.filter(
-            doc_type=doc.doc_type,
-            status='APPROVED',
-            updated_at__year=current_year
-        ).count()
-
-        next_number = approved_count + 1
-
-
-        if doc.doc_type == 'ORDINANCE':
-            doc.reference_no = f"Ordinance No. {next_number}"
-        else:
-            doc.reference_no = f"Resolution No. {next_number}"
-
         doc.signed_pdf = signed_pdf
+
+        # Must run before doc.status changes — see _onlyoffice_checkpoint_sync's docstring.
+        _onlyoffice_checkpoint_sync(doc)
         doc.status = 'APPROVED'
 
-        doc.save()
+        with transaction.atomic():
+            _acquire_sequence_lock('approved_reference_no', doc.doc_type, current_year)
+            approved_count = Document.objects.filter(
+                doc_type=doc.doc_type,
+                status='APPROVED',
+                updated_at__year=current_year
+            ).count()
+            next_number = approved_count + 1
 
+            if doc.doc_type == 'ORDINANCE':
+                doc.reference_no = f"Ordinance No. {next_number}"
+            else:
+                doc.reference_no = f"Resolution No. {next_number}"
+
+            doc.save()
+
+        # Outside the atomic block on purpose — a slow LibreOffice
+        # conversion here shouldn't hold the reference-number advisory
+        # lock any longer than it needs to be held.
+        _onlyoffice_snapshot_pdf(request, doc)
+        _onlyoffice_archive_docx(doc)
+
+        log_action(request, action='MOVE', target=f'{doc.doc_type} — {doc.reference_no}',
+                   detail=f'"{doc.title}" officially enacted.', severity='HIGH')
         messages.success(request, f"Measure officially enacted as {doc.reference_no}!")
         return redirect('third-reading')
 
@@ -729,8 +850,14 @@ def fail_measure(request, pk):
             messages.error(request, f'"{doc.title}" has not reached Third Reading yet.')
             return redirect('third_reading')
 
+        # Must run before doc.status changes — see _onlyoffice_checkpoint_sync's docstring.
+        _onlyoffice_checkpoint_sync(doc)
         doc.status = 'FAILED'
         doc.save()
+        _onlyoffice_snapshot_pdf(request, doc)
+        _onlyoffice_archive_docx(doc)
+        log_action(request, action='MOVE', target=f'{doc.doc_type} — {doc.reference_no or doc.id}',
+                   detail=f'"{doc.title}" marked Failed at Third Reading.', severity='HIGH')
         messages.error(request, f"{doc.title} was marked as Failed.")
     return redirect('third_reading')
 
@@ -752,6 +879,8 @@ def update_document_councilors(request, doc_id):
     if request.method == 'POST':
         councilor_ids = request.POST.getlist('councilor_ids')
         doc.participating_councilors.set(councilor_ids)
+        log_action(request, action='UPDATE', target=f'{doc.doc_type} — {doc.reference_no or doc.id}',
+                   detail='Participating councilors updated.')
         messages.success(request, "Participating councilors updated.")
 
     return redirect(request.META.get('HTTP_REFERER') or 'dashboard')
@@ -861,6 +990,43 @@ def _can_view_document(user, doc):
     return doc.author_id == user.id or user.role in ('SECRETARIAT', 'STAFF', 'ADMIN')
 
 
+def _can_edit_document(user, doc):
+    """Whether `user` may push edits into `doc` at its current status —
+    i.e. whether documents/wopi.py's casualdocs_save/similarity_check
+    should accept a write. Deliberately narrower than _can_view_document:
+    being allowed to *see* a filed document (anyone logged in, once it's
+    past DRAFT/GHOST — see _can_view_document above) doesn't mean being
+    allowed to *edit* it.
+
+    Mirrors exactly the set of pages that actually wire up a saveUrl for
+    each status, so this also doubles as the status guard the editor
+    endpoints never had: any status not listed here (FILED, FIRST_READING,
+    THIRD_READING, APPROVED, ...) has no editing surface in the UI at all,
+    and is rejected here too rather than silently trusting the frontend
+    never to call save on it.
+      - DRAFT/GHOST         -> draft.html / view_draft.html — author only
+                                (create_draft's own POST handler already
+                                scopes its `Document` lookup to
+                                author=request.user; this matches that).
+                                Barangay-originated documents never pass
+                                through DRAFT/GHOST at all — they're
+                                created directly at REFERRED (see
+                                barangay/views.py's barangay_to_referral).
+      - REFERRED/COMMITTEE* -> committee_level's amending_table.html
+                                (status can be the dynamic 'COMMITTEE [n]'
+                                label set by return_to_committee).
+      - SECOND_READING      -> tracking/floor_amendments.html.
+    Both of the latter two are secretariat-only amendment workbenches —
+    no author-based access, since the document's original author isn't
+    who's editing at those stages.
+    """
+    if doc.status in ('DRAFT', 'GHOST'):
+        return doc.author_id == user.id
+    if doc.status == 'REFERRED' or doc.status == 'SECOND_READING' or doc.status.startswith('COMMITTEE'):
+        return user.role in ('SECRETARIAT', 'STAFF', 'ADMIN')
+    return False
+
+
 @login_required
 def modal_document_viewer(request, doc_id):
     doc = get_object_or_404(Document, id=doc_id)
@@ -883,7 +1049,6 @@ def modal_document_viewer(request, doc_id):
     return render(request, 'documents/modal_document_viewer.html', {
         'doc': doc,
         'snapshot_pdf_url': reverse('document-snapshot-pdf', args=[doc.id]),
-        'onlyoffice_server_url': settings.ONLYOFFICE_SERVER_URL,
     })
 
 
@@ -906,6 +1071,7 @@ def serve_legacy_pdf(request, pk):
 
 
 
+@login_required
 def document_history(request, pk):
     doc = get_object_or_404(Document, pk=pk)
     history = Archives.objects.filter(original_doc=doc).order_by('-version')
@@ -939,7 +1105,6 @@ def view_document(request, doc_id):
         'doc': doc,
         'pdf_doc_id': doc.id,
         'snapshot_pdf_url': reverse('document-snapshot-pdf', args=[doc.id]),
-        'onlyoffice_server_url': settings.ONLYOFFICE_SERVER_URL,
     })
 
 
@@ -954,9 +1119,9 @@ def view_trail_version(request, doc_id):
     # Archived trail versions are point-in-time snapshots — this version's
     # own PDF if one was taken at that checkpoint (see
     # _onlyoffice_snapshot_pdf), otherwise the stored-HTML rendering in
-    # document_view.html. Never the live OnlyOffice docx viewer — that
-    # always reflects the document's *current* state, which would be wrong
-    # under a historical version.
+    # document_view.html. Never the live docx viewer — that always
+    # reflects the document's *current* state, which would be wrong under
+    # a historical version.
     trail.has_snapshot_pdf = os.path.exists(_onlyoffice_saved_pdf_path(trail.original_doc_id, trail.version))
     from django.urls import reverse
     return render(request, 'documents/tracking/document_view.html', {
@@ -986,7 +1151,7 @@ def download_official_pdf(request, pk):
     try:
         pdf_bytes = _onlyoffice_convert_docx_to_pdf(request, doc.id)
     except Exception as e:
-        logger.warning("OnlyOffice PDF conversion failed for doc %s: %s", doc.id, e)
+        logger.warning("PDF conversion failed for doc %s: %s", doc.id, e)
         pdf_bytes = None
 
     if pdf_bytes is not None:
@@ -994,7 +1159,7 @@ def download_official_pdf(request, pk):
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
 
-    # Fallback: this document was never opened in OnlyOffice (legacy,
+    # Fallback: this document was never opened in an editor (legacy,
     # pre-migration data) — no .docx to convert, so reconstruct from the
     # stored HTML the same way this view always used to.
     html_string = render_to_string('documents/pdf/official_copy.html', {'doc': doc})
@@ -1084,7 +1249,7 @@ def download_document_pdf(request, doc_id):
     try:
         pdf_bytes = _onlyoffice_convert_docx_to_pdf(request, doc.id)
     except Exception as e:
-        logger.warning("OnlyOffice PDF conversion failed for doc %s: %s", doc.id, e)
+        logger.warning("PDF conversion failed for doc %s: %s", doc.id, e)
         pdf_bytes = None
 
     if pdf_bytes is not None:
@@ -1092,7 +1257,7 @@ def download_document_pdf(request, doc_id):
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
 
-    # Fallback: this document was never opened in OnlyOffice (legacy,
+    # Fallback: this document was never opened in an editor (legacy,
     # pre-migration data) — no .docx to convert, so reconstruct from the
     # stored HTML the same way this view always used to.
     try:
@@ -1130,6 +1295,61 @@ def download_document_pdf(request, doc_id):
 
     return response
 
+
+@login_required
+def download_document_docx(request, doc_id):
+    """Converts the same rendered document_pdf.html output used for PDF
+    download into a real .docx via headless LibreOffice, so a councilor
+    gets an editable Word file rather than just a PDF. This is a local
+    subprocess call our own server-side code shells out to — not a
+    service anyone's browser talks to, so it doesn't carry the AGPL
+    "network use" question OnlyOffice did, and LibreOffice's own license
+    (MPL 2.0) places no restriction on headless/automated use or on files
+    it merely outputs (verified directly against
+    https://www.libreoffice.org/licenses/)."""
+    from documents import libreoffice
+
+    doc = get_object_or_404(Document, id=doc_id)
+
+    ref = doc.reference_no or str(doc.id)
+    year = str(doc.created_at.year)
+    filename = f"{doc.doc_type}-{ref}.docx" if ref.endswith(year) else f"{doc.doc_type}-{ref}-{year}.docx"
+
+    try:
+        parts = doc.reference_no.split("-")
+        doc.ref_number = int(parts[1])
+    except (AttributeError, IndexError, ValueError):
+        doc.ref_number = doc.reference_no
+
+    seal_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'SanJuanCityCouncilLogo_HD.png')
+    watermark_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'draft_watermark.png')
+    html_string = render_to_string('documents/document_pdf.html', {
+        'doc': doc,
+        'request': request,
+        'seal_path': seal_path,
+        'watermark_path': watermark_path,
+        **_pdf_page_layout(doc),
+    })
+    html_string = re.sub(r'<p[^>]*>\s*<br\s*/?>\s*</p>', '', html_string)
+    html_string = re.sub(r'(\s*<br\s*/?>\s*){2,}', '<br>', html_string)
+
+    try:
+        docx_bytes = libreoffice.convert(
+            html_string.encode("utf-8"), ".html", "docx", label=f"docx_{doc.id}"
+        )
+    except libreoffice.LibreOfficeUnavailable as e:
+        return HttpResponse(f"DOCX export isn't available yet — {e} Try Download PDF instead for now.", status=503)
+    except RuntimeError as e:
+        logger.warning("LibreOffice DOCX conversion failed for doc %s: %s", doc.id, e)
+        status = 504 if "timed out" in str(e) else 500
+        return HttpResponse(str(e), status=status)
+
+    response = HttpResponse(
+        docx_bytes,
+        content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
 
 
 import json
@@ -1180,6 +1400,19 @@ def ai_legal_basis(request):
 
     logger.info("ai_legal_basis: pk=%s title=%r", pk, document.title)
 
+    # document.content only reflects the live docx at status-transition
+    # checkpoints now (see _onlyoffice_checkpoint_sync's docstring) — for a
+    # brand-new, still-unfiled draft that's still ''/stale even after the
+    # editor has real content in its saved .docx, silently degrading this
+    # to a title-only search with no indication to the user. The frontend
+    # already forces a docx save before calling this endpoint (see
+    # draft.html's aiCheckBtn handler), so by the time we're here the
+    # working .docx is current — this just needs to also land in
+    # Document.content before generate_legal_basis reads it. Same
+    # no-status-change call _onlyoffice_checkpoint_sync makes at every real
+    # checkpoint; non-blocking on failure, same as those.
+    _onlyoffice_checkpoint_sync(document)
+
     try:
         result = generate_legal_basis(
             title=document.title,
@@ -1202,7 +1435,6 @@ import json
 import logging
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
-from django.views.decorators.csrf import csrf_exempt
 from .rag.embedder import embed_text
 from .rag.retriever import retrieve
 
@@ -1211,9 +1443,9 @@ logger = logging.getLogger(__name__)
 
 # Common legislative boilerplate words that appear in every ordinance —
 # excluded from keyword overlap so they don't create false positives. Shared
-# between ai_inline_check (live, per-keystroke) and onlyoffice_similarity_check
-# (post-save, OnlyOffice-only) so the two checks agree on what counts as a
-# real match rather than silently drifting apart over time.
+# between ai_inline_check (live, per-keystroke) and
+# _run_similarity_check_on_docx (post-save) so the two checks agree on what
+# counts as a real match rather than silently drifting apart over time.
 _SIMILARITY_STOP_WORDS = {
     'the', 'a', 'an', 'and', 'or', 'of', 'to', 'in', 'is', 'it', 'be',
     'that', 'this', 'for', 'on', 'are', 'with', 'as', 'by', 'at', 'from',
@@ -1237,7 +1469,7 @@ def _similarity_keyword_overlap(query_text: str, snippet: str, min_shared: int =
     return len(shared) >= min_shared
 
 
-@csrf_exempt
+@login_required
 @require_POST
 def ai_inline_check(request):
     """
@@ -1335,7 +1567,14 @@ def legacy_document_detail(request, pk):
 
 import os
 import pytesseract
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+# Was hardcoded to the Windows installer path unconditionally — silently
+# unusable (TesseractNotFoundError on every OCR call, not at import time)
+# on any non-Windows deployment, with no way to fix it short of editing
+# source. Now sourced from settings.TESSERACT_PATH (see config/settings.py
+# for the same per-platform-default pattern already used for
+# LIBREOFFICE_PATH) so it's overridable via .env like every other external
+# binary path in this app.
+pytesseract.pytesseract.tesseract_cmd = settings.TESSERACT_PATH
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
@@ -1670,90 +1909,30 @@ def validate_ocr_with_ai(request):
     return JsonResponse({'cleaned_text': cleaned_text})
 
 
-############################# ONLYOFFICE EDITOR TRIAL #############################
-# Trial integration with a self-hosted OnlyOffice Document Server (run via
-# Docker, see project notes) — evaluating it as a possible replacement for
-# the Quill editor used in draft.html. This is intentionally additive and
-# read-only with respect to the rest of the app: it never writes to
-# Document.content, so the existing Quill drafting flow is untouched no
-# matter what happens here.
-#
-# Docker networking note: the Document Server runs in its own container,
-# not on the host, so from *its* point of view "localhost" means the
-# container itself, not this machine. Docker Desktop's special DNS name
-# host.docker.internal is what actually resolves back to this host — that's
-# why the source/callback URLs below are built differently from a normal
-# request.build_absolute_uri() call.
-def _onlyoffice_host_url(request, path):
-    host_header = request.get_host()
-    port = host_header.split(':')[1] if ':' in host_header else ('443' if request.is_secure() else '80')
-    scheme = 'https' if request.is_secure() else 'http'
-    return f"{scheme}://host.docker.internal:{port}{path}"
-
-
-def _onlyoffice_sign(payload):
-    """Signs an outbound request body for ConvertService/CommandService —
-    confirmed empirically (2026-08-25) that both accept a "token" field
-    whose JWT payload is the request body itself, keyed with our shared
-    secret. Returns the payload dict with "token" added, unchanged if JWT
-    is off."""
-    if not settings.ONLYOFFICE_JWT_SECRET:
-        return payload
-    import jwt
-    signed = dict(payload)
-    signed["token"] = jwt.encode(payload, settings.ONLYOFFICE_JWT_SECRET, algorithm="HS256")
-    return signed
-
-
-def _onlyoffice_verify_inbound(request):
-    """Verifies a request claiming to be from the Document Server — used
-    on every endpoint the container calls (source, pending-docx, callback).
-    Per ONLYOFFICE's documented JWT scheme (confirmed via their docs,
-    2026-08-25): outbound requests carry `Authorization: Bearer <token>`,
-    where the JWT's claims are `{"payload": {...the actual request data...}}`
-    — for a GET fetch that's `{"payload": {"url": ...}}`, for the callback
-    it's `{"payload": <callback body>}`.
-
-    Returns True if verification passes OR if ONLYOFFICE_JWT_SECRET isn't
-    configured (JWT off — matches the same opt-in pattern already used for
-    signing the editor config). Returns False otherwise, including when
-    JWT is on but no/invalid token was presented — the caller should
-    reject the request in that case rather than silently trust it, since
-    that's the entire point of turning JWT on.
-    """
-    if not settings.ONLYOFFICE_JWT_SECRET:
-        return True
-
-    import jwt
-
-    auth_header = request.headers.get("Authorization", "")
-    token = auth_header[7:] if auth_header.startswith("Bearer ") else None
-    if not token and request.method == "POST":
-        try:
-            body = json.loads(request.body.decode("utf-8"))
-            token = body.get("token")
-        except (ValueError, UnicodeDecodeError):
-            token = None
-
-    if not token:
-        return False
-
-    try:
-        jwt.decode(token, settings.ONLYOFFICE_JWT_SECRET, algorithms=["HS256"])
-        return True
-    except jwt.InvalidTokenError:
-        return False
+############################# DOCUMENT EDITOR (CASUAL DOCS) #############################
+# Shared helpers used by both this file and documents/wopi.py for the
+# document-editing integration — path conventions for the saved docx/PDF
+# snapshot files on disk. The actual editor endpoints (casualdocs_document_
+# bytes/casualdocs_save) live in documents/wopi.py; these are kept here
+# because several are also used by plain download/PDF-export code
+# elsewhere in this file that has nothing to do with the editor.
 
 
 def _onlyoffice_saved_docx_path(doc_id):
-    """Path to the real docx from this document's last OnlyOffice save (see
-    onlyoffice_callback). Once one exists, it's what reopening the editor
-    should hand back to OnlyOffice — not a reconstruction from the
+    """Path to the real docx from this document's last editor save (see
+    documents/wopi.py::casualdocs_save). Once one exists, it's what
+    reopening the editor should hand back — not a reconstruction from the
     sanitized Document.content HTML, which is deliberately stripped of
-    anything outside Quill's original tag set (no <span>, no style
-    attributes) and would silently lose color/highlighting a councilor
-    left as a "where I stopped" marker across drafting sessions."""
-    return os.path.join(settings.MEDIA_ROOT, "onlyoffice_pending", f"doc_{doc_id}.docx")
+    anything outside the sanitizer's tag set (no arbitrary <span>, no
+    inline style attributes) and would silently lose color/highlighting a
+    councilor left as a "where I stopped" marker across drafting
+    sessions.
+
+    Lives under settings.DOCUMENT_EDITOR_STORAGE_ROOT, deliberately NOT
+    MEDIA_ROOT — see that setting's comment in config/settings.py for why
+    (every read of this path already goes through a permission-checked
+    Django view; a raw MEDIA_URL path never should)."""
+    return os.path.join(settings.DOCUMENT_EDITOR_STORAGE_ROOT, f"doc_{doc_id}.docx")
 
 
 def _onlyoffice_saved_pdf_path(doc_id, version):
@@ -1762,8 +1941,83 @@ def _onlyoffice_saved_pdf_path(doc_id, version):
     creates an Archives row stamped with Document.current_version at that
     moment). Keyed by (doc_id, version) so each archived version can carry
     its own exact-fidelity PDF, the same way it already carries its own
-    HTML snapshot in Archives.content."""
-    return os.path.join(settings.MEDIA_ROOT, "onlyoffice_pending", f"doc_{doc_id}_v{version}.pdf")
+    HTML snapshot in Archives.content. See _onlyoffice_saved_docx_path
+    above for why this lives under DOCUMENT_EDITOR_STORAGE_ROOT rather
+    than MEDIA_ROOT."""
+    return os.path.join(settings.DOCUMENT_EDITOR_STORAGE_ROOT, f"doc_{doc_id}_v{version}.pdf")
+
+
+def _onlyoffice_saved_docx_version_path(doc_id, version):
+    """Path to the archived .docx for one specific Archives version — the
+    docx-file counterpart to _onlyoffice_saved_pdf_path above. Unlike
+    _onlyoffice_saved_docx_path (the single, continuously-overwritten
+    working copy every editing surface reads/writes), this is a frozen
+    snapshot: once a stage is finalized, its docx stays retrievable as its
+    own artifact instead of being silently overwritten by the next
+    stage's edits. See _onlyoffice_saved_docx_path above for why this
+    lives under DOCUMENT_EDITOR_STORAGE_ROOT rather than MEDIA_ROOT."""
+    return os.path.join(settings.DOCUMENT_EDITOR_STORAGE_ROOT, f"doc_{doc_id}_v{version}.docx")
+
+
+def _committee_report_docx_path(report_id):
+    """Path to a CommitteeReport's own working .docx — separate from a
+    Document's working docx (_onlyoffice_saved_docx_path) since a
+    committee report is a different document entirely from the measure
+    it's about, not a status of the same file. Keyed by CommitteeReport.id,
+    not Document.id, since CommitteeReport isn't a Document."""
+    return os.path.join(settings.DOCUMENT_EDITOR_STORAGE_ROOT, f"report_{report_id}.docx")
+
+
+def _onlyoffice_checkpoint_sync(doc):
+    """Refreshes Document.content from the live .docx — call this BEFORE
+    mutating doc.status and calling doc.save() at a status-transition
+    checkpoint (filing, committee/floor amendment finalize), so the
+    Archives row that save() is about to create captures what's actually
+    in the docx right now, not whatever the last autosave left behind.
+
+    Editing itself (documents/wopi.py::casualdocs_save) no longer syncs
+    content on every save — only here, at the checkpoints that actually
+    get archived — so this is the only place Document.content still needs
+    a docx->HTML conversion at all. Must run before doc.status changes:
+    _sync_docx_to_document_content does its own partial save() first,
+    and Document.save()'s version-bump/Archives-creation logic keys off
+    whether doc.status differs from the DB's current value at save time —
+    calling this after doc.status is already mutated in memory would make
+    that intermediate save look like the real transition and archive a
+    version prematurely, before doc.save() is actually called for real.
+
+    Non-blocking, same reasoning as _onlyoffice_snapshot_pdf: a conversion
+    hiccup here shouldn't stop secretariat staff from filing or advancing
+    a document. On failure this just logs and leaves Document.content as
+    whatever it already was."""
+    docx_path = _onlyoffice_saved_docx_path(doc.id)
+    if not os.path.exists(docx_path):
+        return
+    try:
+        _sync_docx_to_document_content(doc)
+    except Exception as e:
+        logger.warning("Checkpoint content sync failed for doc %s: %s", doc.id, e)
+
+
+def _onlyoffice_archive_docx(doc):
+    """Copies the current working .docx to a version-stamped snapshot —
+    the docx-file counterpart to _onlyoffice_snapshot_pdf. Call this AFTER
+    doc.save() has bumped doc.current_version, so it archives under the
+    version that was actually just created.
+
+    Non-blocking, same reasoning as _onlyoffice_snapshot_pdf: on failure
+    this just logs and leaves no archived docx for this version — the PDF
+    snapshot still exists either way."""
+    import shutil
+    src = _onlyoffice_saved_docx_path(doc.id)
+    if not os.path.exists(src):
+        return
+    dst = _onlyoffice_saved_docx_version_path(doc.id, doc.current_version)
+    try:
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        shutil.copy2(src, dst)
+    except Exception as e:
+        logger.warning("Docx version archive failed for doc %s v%s: %s", doc.id, doc.current_version, e)
 
 
 def _onlyoffice_snapshot_pdf(request, doc):
@@ -1795,166 +2049,39 @@ def _onlyoffice_snapshot_pdf(request, doc):
 
 
 def _onlyoffice_convert_docx_to_pdf(request, doc_id):
-    """Converts this document's saved .docx straight to PDF via the
-    Document Server's ConvertService — same round trip onlyoffice_callback
-    uses for docx->html, just a different outputtype. Downloads should hand
-    back exactly what the councilor authored (fonts, colors, tables), not a
-    reconstruction from stripped HTML, so this is the primary path for
-    download_document_pdf/download_official_pdf. Returns None if this
-    document has no saved .docx yet (never opened in OnlyOffice) — callers
-    fall back to the legacy xhtml2pdf template render."""
-    if not os.path.exists(_onlyoffice_saved_docx_path(doc_id)):
+    """Converts this document's saved .docx straight to PDF via a local
+    LibreOffice conversion (see documents/libreoffice.py). Downloads
+    should hand back exactly what the councilor authored (fonts, colors,
+    tables), not a reconstruction from stripped HTML, so this is the
+    primary path for download_document_pdf/download_official_pdf.
+    Returns None if this document has no saved .docx yet (never opened in
+    an editor) — callers fall back to the legacy xhtml2pdf template
+    render. `request` is unused now (kept for call-site compatibility —
+    an older remote-conversion flow needed it to build a fetchable URL;
+    the local converter takes the file directly, no URL round trip).
+    Raises documents.libreoffice.LibreOfficeUnavailable if LibreOffice
+    isn't installed on this server — download_document_pdf/
+    download_official_pdf already catch that (logged as a warning) and
+    fall back to the legacy HTML render, same as any other conversion
+    failure; _onlyoffice_snapshot_pdf's caller does the same and simply
+    leaves that version without a snapshot."""
+    docx_path = _onlyoffice_saved_docx_path(doc_id)
+    if not os.path.exists(docx_path):
         return None
 
-    import time
-    import requests as req
-
-    pending_url = _onlyoffice_host_url(request, f"/onlyoffice/{doc_id}/pending-docx/")
-    convert_resp = req.post(
-        f"{settings.ONLYOFFICE_SERVER_URL}/ConvertService.ashx",
-        json=_onlyoffice_sign({
-            "async": False,
-            "filetype": "docx",
-            "key": f"pdf{doc_id}-{int(time.time())}",
-            "outputtype": "pdf",
-            "title": "export.docx",
-            "url": pending_url,
-        }),
-        headers={"Accept": "application/json"},
-        timeout=60,
-    )
-    convert_resp.raise_for_status()
-    convert_data = convert_resp.json()
-    pdf_url = convert_data.get("fileUrl") or convert_data.get("FileUrl")
-    if not pdf_url:
-        raise ValueError(f"ConvertService returned no fileUrl: {convert_data}")
-
-    pdf_resp = req.get(pdf_url, timeout=30)
-    pdf_resp.raise_for_status()
-    return pdf_resp.content
-
-
-def _build_onlyoffice_editor_config(request, doc, track_changes=False):
-    from django.urls import reverse
-
-    document_key = f"doc{doc.id}-{int(doc.updated_at.timestamp())}"
-    callback_url = _onlyoffice_host_url(request, reverse('onlyoffice-callback', args=[doc.id]))
-
-    if os.path.exists(_onlyoffice_saved_docx_path(doc.id)):
-        # Full-fidelity reopen: hand back the actual docx from the last
-        # save, so nothing outside the HTML sanitizer's allowlist (color,
-        # highlighting, etc.) gets lost between editing sessions.
-        file_type = "docx"
-        source_url = _onlyoffice_host_url(request, reverse('onlyoffice-pending-docx', args=[doc.id]))
-        title = f"{doc.title or 'Untitled'}.docx"
-    else:
-        # No saved docx yet (never opened in OnlyOffice before) — fall
-        # back to converting the stored HTML, same as the original trial.
-        file_type = "html"
-        source_url = _onlyoffice_host_url(request, reverse('onlyoffice-document-source', args=[doc.id]))
-        title = f"{doc.title or 'Untitled'}.html"
-
-    editor_config = {
-        "document": {
-            "fileType": file_type,
-            "key": document_key,
-            "title": title,
-            "url": source_url,
-        },
-        "documentType": "word",
-        "editorConfig": {
-            "callbackUrl": callback_url,
-            "user": {
-                "id": str(request.user.id),
-                "name": request.user.get_full_name() or request.user.username,
-            },
-            "customization": {
-                "forcesave": True,
-                # Explicit even though it's already the Document Server's
-                # own default — saves automatically shortly after the user
-                # pauses typing (governed server-side by the Document
-                # Server's savetimeoutdelay, ~5s by default), as the
-                # replacement for Quill's fixed-interval autosave.
-                "autosave": True,
-            },
-        },
-    }
-
-    if track_changes:
-        # Used only by the Committee/Second-Reading amendment pages — not
-        # initial drafting, where there's no prior version to track against.
-        # document.permissions.review (+ edit) turns reviewing on for this
-        # user; customization.review.trackChanges forces it ON by default
-        # rather than leaving it as something the user has to switch on via
-        # the Review tab themselves. Confirmed via ONLYOFFICE's own docs
-        # (api.onlyoffice.com/docs/docs-api/get-started/how-it-works/reviewing)
-        # — a core docx feature, not gated to a paid edition.
-        editor_config["document"]["permissions"] = {"edit": True, "review": True}
-        editor_config["editorConfig"]["customization"]["review"] = {"trackChanges": True}
-
-    if settings.ONLYOFFICE_JWT_SECRET:
-        import jwt
-        editor_config["token"] = jwt.encode(
-            editor_config, settings.ONLYOFFICE_JWT_SECRET, algorithm="HS256"
-        )
-
-    return editor_config
+    from documents import libreoffice
+    with open(docx_path, "rb") as f:
+        docx_bytes = f.read()
+    return libreoffice.convert(docx_bytes, ".docx", "pdf", label=f"pdf_{doc_id}")
 
 
 @login_required
-def onlyoffice_view_config(request, doc_id):
-    """Read-only counterpart to _build_onlyoffice_editor_config, used by the
-    document viewer templates at every legislative stage (secretariat
-    incoming, first/second/third reading, approved, etc.) so a filed
-    document is shown exactly as the councilor authored it — same fonts,
-    colors, tables, everything the sanitized Document.content HTML can't
-    carry. Returns 404 if this document was never opened in OnlyOffice (no
-    saved .docx yet, e.g. legacy pre-migration data); callers fall back to
-    rendering the stored HTML in that case."""
-    doc = get_object_or_404(Document, pk=doc_id)
-    if not os.path.exists(_onlyoffice_saved_docx_path(doc.id)):
-        return JsonResponse({"error": "no_docx"}, status=404)
-
-    from django.urls import reverse
-
-    document_key = f"view-doc{doc.id}-{int(doc.updated_at.timestamp())}"
-    source_url = _onlyoffice_host_url(request, reverse('onlyoffice-pending-docx', args=[doc.id]))
-
-    editor_config = {
-        "document": {
-            "fileType": "docx",
-            "key": document_key,
-            "title": f"{doc.title or 'Untitled'}.docx",
-            "url": source_url,
-            "permissions": {"edit": False, "comment": False, "download": True, "print": True},
-        },
-        "documentType": "word",
-        "editorConfig": {
-            "mode": "view",
-            "user": {
-                "id": str(request.user.id),
-                "name": request.user.get_full_name() or request.user.username,
-            },
-            "customization": {"chat": False},
-        },
-    }
-
-    if settings.ONLYOFFICE_JWT_SECRET:
-        import jwt
-        editor_config["token"] = jwt.encode(
-            editor_config, settings.ONLYOFFICE_JWT_SECRET, algorithm="HS256"
-        )
-
-    editor_config["onlyofficeServerUrl"] = settings.ONLYOFFICE_SERVER_URL
-    return JsonResponse(editor_config)
-
-
-@login_required
+@xframe_options_exempt
 def document_snapshot_pdf(request, doc_id):
     """Serves the PDF snapshot for a live document's *current* version —
     the primary way every passive viewer (incoming docs, first/second/third
     reading, approved, general document-view pages) shows a document now:
-    a plain PDF is far lighter than mounting a full OnlyOffice viewer just
+    a plain PDF is far lighter than mounting a full document editor just
     to look at something read-only. 404s if no snapshot exists yet for the
     current version (e.g. a DRAFT/GHOST that's never been filed, or a
     Document Server hiccup skipped the snapshot at the last checkpoint) —
@@ -1970,7 +2097,142 @@ def document_snapshot_pdf(request, doc_id):
     return FileResponse(open(path, "rb"), content_type="application/pdf")
 
 
+_W14_PARAID_ATTR = "{http://schemas.microsoft.com/office/word/2010/wordml}paraId"
+
+
+def document_original_html(request, doc_id):
+    """Serves the current-version archived .docx as HTML, each paragraph
+    tagged data-para-id with its Word w14:paraId. Feeds the read-only
+    "original" panel in amending_table.html's side-by-side comparison —
+    the live Casual Docs editor exposes the same paraId via
+    ref.current.getSelection(), so a click there can look up the matching
+    element here by data-para-id. 404s if no archived docx exists yet for
+    the current version, same as document_snapshot_pdf.
+
+    Walks docx.element.body's children directly, in actual document
+    order, handling both <w:p> and <w:tbl> — not docx.paragraphs, which
+    only returns top-level paragraphs and silently skips every table.
+    Confirmed directly against a real committee-stage ordinance this was
+    dropping two real tables for: the "Sponsored by" box (a real,
+    directly-edited field baked into the docx itself, not the same as
+    Document.sponsor_councilors() — that computed value can name someone
+    different once a document has been through committee-level editing,
+    confirmed live) and an actual legal-content table (a roles/offices
+    table inside the ordinance body) that isn't just metadata at all —
+    the previous paragraph-only extraction was silently losing real
+    ordinance content, not just cosmetic."""
+    doc = get_object_or_404(Document, pk=doc_id)
+    if not _can_view_document(request.user, doc):
+        raise Http404
+
+    path = _onlyoffice_saved_docx_version_path(doc.id, doc.current_version)
+    if not os.path.exists(path):
+        raise Http404
+
+    from django.utils.html import escape
+    from docx import Document as DocxDocument
+    from docx.table import Table
+    from docx.text.paragraph import Paragraph
+
+    def render_run_html(run):
+        # Walking the run's own XML children (not run.text) so a <w:br/>
+        # inside a run becomes a real <br> instead of silently vanishing —
+        # confirmed directly: the "Sponsored by" cell is one paragraph
+        # with a line break before the name, not two paragraphs, so
+        # run.text alone would jam them together as "Sponsored
+        # by:Councilor ...".
+        html_parts = []
+        for child in run._r:
+            tag = child.tag.split("}")[-1]
+            if tag == "t":
+                html_parts.append(escape(child.text or ""))
+            elif tag == "br":
+                html_parts.append("<br>")
+            elif tag == "tab":
+                html_parts.append("&emsp;")
+        text = "".join(html_parts)
+        if run.bold:
+            text = f"<strong>{text}</strong>"
+        if run.italic:
+            text = f"<em>{text}</em>"
+        if run.underline:
+            text = f"<u>{text}</u>"
+        return text
+
+    def render_runs(para):
+        # Preserves bold/italic/underline per run — paragraph.text alone
+        # collapses to plain text, losing exactly the formatting (e.g. bold
+        # "SECTION 1. TITLE.") that makes the original readable as a legal
+        # document instead of a wall of undifferentiated text.
+        return "".join(render_run_html(run) for run in para.runs)
+
+    def pt_to_px(length, default=0):
+        # Word stores paragraph spacing/indent in points/EMU — python-docx
+        # already exposes these as Length objects with a .pt accessor, no
+        # raw XML digging needed. A flat CSS margin on every paragraph (the
+        # previous approach) collapses a tight list into the same rhythm as
+        # a spaced-out section break; reading the document's own values
+        # keeps that distinction.
+        return round(length.pt * 96 / 72, 1) if length is not None else default
+
+    def render_paragraph_html(para):
+        if not para.text.strip():
+            return None
+        para_id = para._p.get(_W14_PARAID_ATTR)
+        attr = f' data-para-id="{para_id}"' if para_id else ""
+        align = "center" if para.alignment == 1 else "justify"  # WD_ALIGN_PARAGRAPH.CENTER == 1
+        pf = para.paragraph_format
+        indent = pt_to_px(pf.left_indent, default=0)
+        # No explicit space_before/space_after exists at the paragraph or
+        # style level in these documents (confirmed directly) — falling
+        # back to Word's own document-wide defaults would be a much deeper
+        # rabbit hole for a read-only preview panel. Indentation is
+        # reliable data we do have: an indented paragraph is a list item,
+        # which reads as a tighter-knit group than regular flowing text.
+        default_after = 4 if indent > 0 else 14
+        space_before = pt_to_px(pf.space_before, default=0)
+        space_after = pt_to_px(pf.space_after, default=default_after)
+        style = f"text-align:{align};margin:{space_before}px 0 {space_after}px {indent}px;"
+        return f'<p{attr} style="{style}">{render_runs(para)}</p>'
+
+    def render_table_html(table):
+        # A plain, minimal table rendering — this is a read-only preview
+        # panel, not a pixel-exact reconstruction (column widths/merged
+        # cells aren't attempted). Cell paragraphs get the same
+        # data-para-id treatment as body ones, so a click/highlight inside
+        # a table cell (e.g. the Sponsored by box) works the same way.
+        rows_html = []
+        for row in table.rows:
+            cells_html = []
+            for cell in row.cells:
+                cell_parts = [render_paragraph_html(p) for p in cell.paragraphs]
+                cell_html = "".join(p for p in cell_parts if p)
+                cells_html.append(
+                    f'<td style="border:1px solid #cbd5e1;padding:6px 10px;'
+                    f'vertical-align:top;">{cell_html}</td>'
+                )
+            rows_html.append(f"<tr>{''.join(cells_html)}</tr>")
+        return f'<table style="width:100%;border-collapse:collapse;margin:10px 0;">{"".join(rows_html)}</table>'
+
+    docx = DocxDocument(path)
+    parts = []
+    for child in docx.element.body:
+        tag = child.tag.split("}")[-1]
+        if tag == "p":
+            html = render_paragraph_html(Paragraph(child, docx))
+            if html:
+                parts.append(html)
+        elif tag == "tbl":
+            parts.append(render_table_html(Table(child, docx)))
+        # Anything else (sectPr, bookmarks, etc.) carries no visible
+        # content for a read-only preview — same as before this rewrite.
+
+    html = "\n".join(parts) if parts else '<p class="empty">This version has no text content.</p>'
+    return HttpResponse(html)
+
+
 @login_required
+@xframe_options_exempt
 def archive_snapshot_pdf(request, archive_id):
     """Serves the PDF snapshot for one specific historical Archives
     version — used by the trail/history viewer so a past version shows
@@ -1989,261 +2251,67 @@ def archive_snapshot_pdf(request, archive_id):
     return FileResponse(open(path, "rb"), content_type="application/pdf")
 
 
-@login_required
-def onlyoffice_editor_test(request, doc_id):
-    doc = get_object_or_404(Document, pk=doc_id)
-    editor_config = _build_onlyoffice_editor_config(request, doc)
+def _sync_docx_to_document_content(doc):
+    """Converts doc's saved .docx (already written to
+    _onlyoffice_saved_docx_path(doc.id) by the caller) into HTML and writes
+    it into Document.content — the shared second half of "the editor just
+    saved a docx, now reflect that in the document record". Called by
+    wopi.casualdocs_save right after it writes the pushed docx bytes to
+    disk.
 
-    return render(request, "documents/onlyoffice_test.html", {
-        "doc": doc,
-        "onlyoffice_server_url": settings.ONLYOFFICE_SERVER_URL,
-        "editor_config_json": json.dumps(editor_config),
-    })
-
-
-@login_required
-def onlyoffice_editor_config(request, doc_id):
-    """JSON config endpoint used by the inline editor embedded directly in
-    draft.html, as opposed to the standalone onlyoffice_editor_test page."""
-    doc = get_object_or_404(Document, pk=doc_id)
-    editor_config = _build_onlyoffice_editor_config(request, doc)
-    editor_config["onlyofficeServerUrl"] = settings.ONLYOFFICE_SERVER_URL
-    return JsonResponse(editor_config)
-
-
-@login_required
-def onlyoffice_amend_config(request, doc_id):
-    """Same live-editing config as onlyoffice_editor_config, but with Track
-    Changes forced on — used only by the Committee/Second-Reading "Insert
-    Amendments" pages (amending_table.html, floor_amendments.html), so
-    edits made there show up as redlined insertions/deletions in the docx
-    itself instead of a live side-by-side diff view (which isn't possible
-    with OnlyOffice's iframe editor — it doesn't expose cursor/selection
-    events to the host page the way Quill did)."""
-    doc = get_object_or_404(Document, pk=doc_id)
-    editor_config = _build_onlyoffice_editor_config(request, doc, track_changes=True)
-    editor_config["onlyofficeServerUrl"] = settings.ONLYOFFICE_SERVER_URL
-    return JsonResponse(editor_config)
-
-
-def onlyoffice_document_source(request, doc_id):
-    """Fetched directly by the Document Server container (not the browser),
-    so it deliberately doesn't require a Django login — the container has
-    no session/cookies to send. Instead, when ONLYOFFICE_JWT_SECRET is set,
-    it requires the container's own Authorization: Bearer JWT proving the
-    request really came from the Document Server — see
-    _onlyoffice_verify_inbound."""
-    if not _onlyoffice_verify_inbound(request):
-        return HttpResponse(status=403)
-    doc = get_object_or_404(Document, pk=doc_id)
-    html = f"<!DOCTYPE html><html><head><meta charset='utf-8'></head><body>{doc.content or ''}</body></html>"
-    return HttpResponse(html, content_type="text/html; charset=utf-8")
-
-
-def onlyoffice_pending_docx(request, doc_id):
-    """Serves the most recently OnlyOffice-edited copy of a document. Two
-    callers: the Document Server container fetches this mid-callback to
-    convert the file to HTML for Document.content (see onlyoffice_callback),
-    and _build_onlyoffice_editor_config points the editor here directly on
-    reopen, once a saved copy exists, for full-fidelity round-tripping.
-    Fetched by the container either way, not the browser — no login;
-    JWT-verified instead when ONLYOFFICE_JWT_SECRET is set, same as
-    onlyoffice_document_source."""
-    if not _onlyoffice_verify_inbound(request):
-        return HttpResponse(status=403)
-    path = _onlyoffice_saved_docx_path(doc_id)
-    if not os.path.exists(path):
-        raise Http404
-    with open(path, "rb") as f:
-        data = f.read()
-    return HttpResponse(
-        data,
-        content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    )
-
-
-@login_required
-def onlyoffice_forcesave(request, doc_id):
-    """Called by the drafting pages right before Save Draft/File Draft
-    navigates away, so an edit the user just made isn't lost.
-
-    Why this exists: OnlyOffice's own autosave is idle-triggered (fires a
-    few seconds after typing stops — see ONLYOFFICE Integration notes). If
-    a user types something and immediately clicks Save Draft, the page can
-    navigate away before that autosave ever fires, silently losing the
-    edit even though the Save Draft form POST itself succeeds (it only
-    ever touches title/type/committee, never content). This command tells
-    the Document Server to save *right now* regardless of idle state, via
-    its CommandService API, then blocks briefly until the resulting
-    callback (see onlyoffice_callback) has actually landed, so the caller
-    knows it's safe to navigate.
-    """
-    if request.method != 'POST':
-        return JsonResponse({"error": 1})
-
-    doc = get_object_or_404(Document, pk=doc_id)
-
-    try:
-        body = json.loads(request.body.decode('utf-8'))
-    except (ValueError, UnicodeDecodeError):
-        return JsonResponse({"error": 1})
-
-    document_key = body.get("key")
-    if not document_key:
-        return JsonResponse({"error": 1})
-
-    import time
-    import requests as req
-
-    before_updated_at = doc.updated_at
-
-    try:
-        cmd_resp = req.post(
-            f"{settings.ONLYOFFICE_SERVER_URL}/coauthoring/CommandService.ashx",
-            json=_onlyoffice_sign({"c": "forcesave", "key": document_key}),
-            timeout=10,
-        )
-        cmd_data = cmd_resp.json()
-    except Exception as e:
-        logger.warning("OnlyOffice forcesave command failed: %s", e)
-        return JsonResponse({"error": 1})
-
-    # error 4 = "no changes to save" (document server docs) — the editor
-    # had nothing unsaved, which is a success case, not a failure.
-    if cmd_data.get("error") not in (0, 4):
-        logger.warning("OnlyOffice forcesave command returned %s", cmd_data)
-        return JsonResponse({"error": 1, "detail": cmd_data})
-    if cmd_data.get("error") == 4:
-        return JsonResponse({"error": 0, "no_changes": True})
-
-    # Poll briefly for onlyoffice_callback to have actually landed and
-    # updated the row, rather than trusting the command response alone —
-    # the callback is a separate, Document-Server-initiated request that
-    # can arrive slightly after this command call returns.
-    for _ in range(25):  # ~5s ceiling
-        time.sleep(0.2)
-        doc.refresh_from_db(fields=["updated_at"])
-        if doc.updated_at != before_updated_at:
-            return JsonResponse({"error": 0})
-
-    logger.warning("OnlyOffice forcesave: callback did not land within timeout for doc %s", doc_id)
-    return JsonResponse({"error": 0, "timeout": True})
-
-
-@csrf_exempt
-def onlyoffice_callback(request, doc_id):
-    """Receives OnlyOffice's save notifications and writes the edit back to
-    the real Document.content — this is the one place in the trial that
-    actually mutates live data. Status codes that matter: 2 = ready for
-    saving (editor closed), 6 = force-saved while still open.
-
-    OnlyOffice only ever hands us the edited file as a .docx, so getting it
-    into Document.content (plain HTML, same shape Quill produces) takes an
-    extra round trip: download the .docx, re-host it at a URL the container
-    can reach, ask the Document Server to convert *that* to HTML, then pull
-    the result back. Document.save() already sanitizes content down to the
-    same restricted tag set Quill output uses (see documents/sanitize.py),
-    so whatever formatting OnlyOffice's HTML export doesn't map onto that
+    Round-trips through a local LibreOffice conversion (see
+    documents/libreoffice.py) — a single subprocess call, not a
+    multi-request re-hosting dance. Document.save() re-sanitizes content
+    down to the same restricted tag set the export gets mapped onto (see
+    documents/sanitize.py), so anything the export doesn't map onto that
     set is dropped, not stored as-is.
+
+    Raises on failure — casualdocs_save translates that into a 500.
     """
-    if request.method != 'POST':
-        return JsonResponse({"error": 1})
+    from bs4 import BeautifulSoup
+    from documents import libreoffice
 
-    if not _onlyoffice_verify_inbound(request):
-        return JsonResponse({"error": 1})
+    docx_path = _onlyoffice_saved_docx_path(doc.id)
+    with open(docx_path, "rb") as f:
+        docx_bytes = f.read()
+    html_bytes = libreoffice.convert(docx_bytes, ".docx", "html", label=f"sync_{doc.id}")
 
-    doc = get_object_or_404(Document, pk=doc_id)
+    soup = BeautifulSoup(html_bytes, "html.parser")
 
-    try:
-        body = json.loads(request.body.decode('utf-8'))
-    except (ValueError, UnicodeDecodeError):
-        return JsonResponse({"error": 1})
+    # LibreOffice's HTML export represents bold/italic as <b>/<i> (wrapped
+    # in <span style="..."> that the sanitizer already strips harmlessly)
+    # rather than <strong>/<em>. The sanitizer's allowlist only recognizes
+    # strong/em, so <b>/<i> would otherwise be silently dropped — tag
+    # removed, text kept, styling gone, no error. Renaming them here keeps
+    # that formatting. Confirmed directly against real Collabora output
+    # (which uses the same LibreOffice HTML export filter) — same
+    # convention OnlyOffice's export used. Re-verify against LibreOffice's
+    # own output once it's installed here, in case its HTML filter differs.
+    for b_tag in soup.find_all("b"):
+        b_tag.name = "strong"
+    for i_tag in soup.find_all("i"):
+        i_tag.name = "em"
 
-    status = body.get("status")
-    if status in (2, 6) and body.get("url"):
-        import time
-        import requests as req
-        from bs4 import BeautifulSoup
+    body_tag = soup.find("body")
+    new_content = body_tag.decode_contents() if body_tag else str(soup)
 
-        try:
-            docx_resp = req.get(body["url"], timeout=30)
-            docx_resp.raise_for_status()
-
-            pending_path = _onlyoffice_saved_docx_path(doc_id)
-            os.makedirs(os.path.dirname(pending_path), exist_ok=True)
-            with open(pending_path, "wb") as f:
-                f.write(docx_resp.content)
-
-            pending_url = _onlyoffice_host_url(
-                request, f"/onlyoffice/{doc_id}/pending-docx/"
-            )
-            convert_resp = req.post(
-                f"{settings.ONLYOFFICE_SERVER_URL}/ConvertService.ashx",
-                json=_onlyoffice_sign({
-                    "async": False,
-                    "filetype": "docx",
-                    "key": f"save{doc_id}-{int(time.time())}",
-                    "outputtype": "html",
-                    "title": "edited.docx",
-                    "url": pending_url,
-                }),
-                headers={"Accept": "application/json"},
-                timeout=60,
-            )
-            convert_resp.raise_for_status()
-            convert_data = convert_resp.json()
-            html_url = convert_data.get("fileUrl") or convert_data.get("FileUrl")
-            if not html_url:
-                raise ValueError(f"ConvertService returned no fileUrl: {convert_data}")
-
-            html_resp = req.get(html_url, timeout=30)
-            html_resp.raise_for_status()
-
-            soup = BeautifulSoup(html_resp.content, "html.parser")
-
-            # OnlyOffice's HTML export represents bold/italic as <b>/<i>
-            # (wrapped in <span style="..."> that the sanitizer already
-            # strips harmlessly) rather than Quill's <strong>/<em>. The
-            # sanitizer's allowlist only recognizes strong/em, so <b>/<i>
-            # were being silently dropped — tag removed, text kept, styling
-            # gone, no error. Renaming them here keeps that formatting.
-            for b_tag in soup.find_all("b"):
-                b_tag.name = "strong"
-            for i_tag in soup.find_all("i"):
-                i_tag.name = "em"
-
-            body_tag = soup.find("body")
-            new_content = body_tag.decode_contents() if body_tag else str(soup)
-
-            doc.content = new_content
-            doc.save(update_fields=["content", "updated_at"])
-            logger.info("OnlyOffice trial: saved edits back into Document %s content", doc_id)
-        except Exception as e:
-            logger.warning("OnlyOffice trial: save-back failed (%s)", e)
-            return JsonResponse({"error": 1})
-
-    return JsonResponse({"error": 0})
+    doc.content = new_content
+    doc.save(update_fields=["content", "updated_at"])
 
 
-@login_required
-@require_POST
-def onlyoffice_similarity_check(request, doc_id):
-    """Runs right after the frontend detects a save has just landed (see
-    config.events.onDocumentStateChange in draft.html/view_draft.html/
-    referral_drafting_page.html — fires with event.data === false once
-    OnlyOffice reports no unsaved changes remain).
+def _run_similarity_check_on_docx(doc):
+    """Shared core of the "inline check" feature's post-save replacement —
+    called from wopi.similarity_check. Operates purely on doc's
+    saved .docx file via python-docx; has no dependency on which editor
+    produced it.
 
-    This is the "inline check" feature's OnlyOffice-era replacement. The
-    original version highlighted a matching paragraph live, inline, as you
-    typed — not reproducible here, since OnlyOffice's canvas is an opaque
-    iframe, not a DOM we can reach into or highlight. Instead: each
-    paragraph of the freshly-saved content is checked with the exact same
+    Checks each paragraph of the freshly-saved content with the exact same
     matching logic ai_inline_check uses (same retrieve() call, same 0.78
-    score floor, same _similarity_keyword_overlap filter), and any match
-    gets written as a real Word comment directly onto that paragraph in
-    the saved .docx — visible the next time the document is reopened, not
-    instantly, but a genuine native per-paragraph marker rather than a
-    generic "N similar paragraphs" summary.
+    score floor, same _similarity_keyword_overlap filter), and writes any
+    match as a real Word comment directly onto that paragraph in the saved
+    .docx — visible the next time the document is reopened, not instantly,
+    but a genuine native per-paragraph marker rather than a generic "N
+    similar paragraphs" summary.
 
     Paragraphs already checked once (by content hash, in
     Document.flagged_similarity_hashes) are skipped on later calls — both
@@ -2251,15 +2319,16 @@ def onlyoffice_similarity_check(request, doc_id):
     (python-docx 1.2.0 can only add comments, not enumerate or remove
     existing ones — confirmed directly against the installed library, not
     assumed) and to avoid re-embedding unchanged text on every save.
+
+    Returns the number of newly-flagged paragraphs. No-ops (returns 0) if
+    doc has no saved .docx yet.
     """
     import hashlib
     from bs4 import BeautifulSoup
 
-    doc = get_object_or_404(Document, pk=doc_id)
-
-    docx_path = _onlyoffice_saved_docx_path(doc_id)
+    docx_path = _onlyoffice_saved_docx_path(doc.id)
     if not os.path.exists(docx_path):
-        return JsonResponse({"error": 0, "new_flags": 0})
+        return 0
 
     soup = BeautifulSoup(doc.content or "", "html.parser")
     already_flagged = set(doc.flagged_similarity_hashes or [])
@@ -2284,7 +2353,7 @@ def onlyoffice_similarity_check(request, doc_id):
             # sign anything had failed.
             results = retrieve(text, top_k=3, timeout=20)
         except Exception as e:
-            logger.warning("[onlyoffice_similarity_check] retrieve failed for doc %s: %s", doc_id, e)
+            logger.warning("[similarity_check] retrieve failed for doc %s: %s", doc.id, e)
             continue
 
         newly_checked_hashes.append(text_hash)
@@ -2320,7 +2389,7 @@ def onlyoffice_similarity_check(request, doc_id):
                         )
                         flagged_count += 1
                     except Exception as e:
-                        logger.warning("[onlyoffice_similarity_check] add_comment failed: %s", e)
+                        logger.warning("[similarity_check] add_comment failed: %s", e)
                     break
 
         if flagged_count:
@@ -2330,4 +2399,6 @@ def onlyoffice_similarity_check(request, doc_id):
         doc.flagged_similarity_hashes = list(already_flagged | set(newly_checked_hashes))
         doc.save(update_fields=["flagged_similarity_hashes"])
 
-    return JsonResponse({"error": 0, "new_flags": flagged_count})
+    return flagged_count
+
+

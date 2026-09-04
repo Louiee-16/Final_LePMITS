@@ -33,24 +33,6 @@
         <!-- ── LEFT COLUMN: ACCOUNT CONFIGURATION (4/12) ── -->
         <div class="lg:col-span-4 space-y-6">
             
-            <!-- Account Portrait Section -->
-            <div class="bg-white rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50 p-8 text-center relative overflow-hidden group">
-                <div class="absolute top-0 left-0 w-full h-2 bg-slate-600"></div>
-                
-                <div class="relative inline-block group">
-                    <div class="w-32 h-32 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 flex items-center justify-center text-slate-300 mb-4 transition-all group-hover:border-slate-300 group-hover:bg-slate-50/30">
-                        <i data-lucide="user-plus" style="width:36px;height:36px;" class="transition-transform group-hover:scale-110"></i>
-                    </div>
-                    <label for="avatar" class="absolute bottom-6 right-0 w-8 h-8 bg-slate-600 text-white rounded-xl flex items-center justify-center shadow-lg cursor-pointer hover:bg-slate-700 transition-all">
-                        <i data-lucide="camera" style="width:11px;height:11px;vertical-align:middle;"></i>
-                    </label>
-                    <input type="file" id="avatar" class="hidden">
-                </div>
-                
-                <h3 class="font-bold text-slate-800">Identity Image</h3>
-                <p class="text-[10px] text-slate-400 uppercase font-black tracking-widest mt-1">Optional Portrait</p>
-            </div>
-
             <!-- Role & Permission Section -->
             <div class="bg-white rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50 p-8 space-y-6">
                 <div class="flex items-center gap-3 border-b border-slate-50 pb-4">
@@ -87,6 +69,15 @@
                                     <div class="text-center py-2 bg-white border border-slate-100 rounded-xl text-xs font-black text-slate-400 peer-checked:bg-slate-600 peer-checked:text-white peer-checked:border-slate-600 transition-all cursor-pointer">DISTRICT II</div>
                                 </label>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Barangay Specific: Office Name -->
+                    <div id="barangayField" class="hidden animate-in fade-in slide-in-from-top-2 duration-300">
+                        <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100 space-y-2">
+                            <label class="text-[10px] font-black text-slate-600 uppercase tracking-widest">Barangay Name</label>
+                            <input type="text" name="office_or_district" placeholder="e.g. Barangay Corazon de Jesus"
+                                class="w-full px-4 py-3 bg-white border border-slate-100 rounded-xl text-sm font-medium focus:ring-2 focus:ring-slate-600 outline-none transition-all">
                         </div>
                     </div>
 
@@ -220,12 +211,13 @@ function confirmPassword() {
 function toggleCouncilFields() {
     const role = document.getElementById('roleSelect').value;
     const districtField = document.getElementById('districtField');
+    const barangayField = document.getElementById('barangayField');
+    const barangayInput = barangayField.querySelector('input[name="office_or_district"]');
 
-    if (role === 'COUNCILOR') {
-        districtField.classList.remove('hidden');
-    } else {
-        districtField.classList.add('hidden');
-    }
+    districtField.classList.toggle('hidden', role !== 'COUNCILOR');
+    barangayField.classList.toggle('hidden', role !== 'BARANGAY');
+    barangayInput.required = (role === 'BARANGAY');
 }
+document.addEventListener('DOMContentLoaded', toggleCouncilFields);
 </script>
 {% endblock %}

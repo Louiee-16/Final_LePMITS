@@ -5,7 +5,7 @@ from documents.models import Document
 class CommitteeReport(models.Model):
 
     STATUS_CHOICES = [
-        ('PENDING',  'Pending Hearing'),
+        ('PENDING',  'Hearing Scheduled'),
         ('APPROVED', 'Approved on Committee Level'),
         ('FAILED',   'Did not pass Committee Level'),
     ]
@@ -23,8 +23,8 @@ class CommitteeReport(models.Model):
 
     @property
     def latest_outcome(self):
-        """Returns the outcome of the most recent hearing, or None."""
-        latest = self.hearings.first()  # ordered by -hearing_date
+        """Returns the outcome of the most recent (non-deleted) hearing, or None."""
+        latest = self.hearings.filter(deleted_at__isnull=True).first()  # ordered by -hearing_date
         return latest.outcome if latest else None
 
 
@@ -45,9 +45,18 @@ class HearingLog(models.Model):
     version_discussed = models.PositiveIntegerField(default=1)
 
     created_at = models.DateTimeField(auto_now_add=True)
+    # Soft delete — set by delete_hearing_log (same-day undo window, see
+    # its docstring), cleared by restore_hearing_log. Actually removed
+    # from the DB only once the day it was deleted on has passed (see
+    # committee_level/views.py's _purge_expired_deleted_hearings) — kept
+    # around meanwhile so Restore has something to restore.
+    deleted_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        ordering = ['-hearing_date']
+        # -id as a tiebreaker: -hearing_date alone leaves same-day entries
+        # in an undefined order (confirmed — Postgres doesn't guarantee
+        # insertion order without an explicit secondary sort key).
+        ordering = ['-hearing_date', '-id']
 
     def save(self, *args, **kwargs):
         if not self.pk:

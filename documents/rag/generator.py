@@ -114,10 +114,75 @@ def _retrieve_national_law_chunks(title: str, top_k: int = 5) -> list[dict]:
             }
             for c in chunks
         ]
-         
-    except Exception as e:
-        logger.warning("National law chunk retrieval failed: %s", e)
+    except Exception:
         return []
+
+
+# A small, curated set of general enabling/framework legislation that's
+# always offered to the LLM as a candidate, regardless of embedding rank.
+# Confirmed directly: pure semantic search over the corpus's one-paragraph
+# act summaries never surfaces RA 7160 in the top 30 results for either of
+# two real test drafts (an arts/academic-benefits ordinance and a
+# medical/financial-assistance ordinance), even though it's the single most
+# universally-applicable legal basis for any LGU ordinance — the Local
+# Government Code's summary just doesn't textually resemble narrow
+# ordinance language the way small, topic-specific acts do. See
+# _build_prompt's foundational_section for why these get a looser
+# relevance standard than the topic-matched retrieval results.
+_FOUNDATIONAL_LAW_NUMBERS = ["RA 7160"]
+
+
+def _foundational_laws() -> list[dict]:
+    """Fetches _FOUNDATIONAL_LAW_NUMBERS from the local corpus, shaped like
+    _local_enacted_laws()'s output so the rest of the pipeline (prompt
+    building, citation validation) treats them identically to a normal
+    retrieval hit."""
+    from documents.models import NationalLaw
+    laws = []
+    for law_number in _FOUNDATIONAL_LAW_NUMBERS:
+        law = NationalLaw.objects.filter(law_number=law_number).first()
+        if law:
+            laws.append({
+                "ra_number": law_number,
+                "description": law.description,
+                "date": None,
+                "url": None,
+            })
+        else:
+            logger.warning("Foundational law %r not found in the local corpus.", law_number)
+    return laws
+
+
+def _local_enacted_laws(query: str, top_k: int = 8) -> list[dict]:
+    """
+    Enacted-law lookup against the locally-imported Republic Acts corpus
+    (11,866 acts, 1946-2025 — see
+    documents/management/commands/import_republic_acts.py, sourced from
+    huggingface.co/datasets/bettergovph/gov-library) instead of live
+    keyword-searching LawPhil.net's own search API. Semantic (embedding)
+    search over the whole corpus at once, rather than several individual
+    keyword terms searched one at a time — more robust to exactly how
+    _extract_search_keywords happened to phrase things (confirmed earlier
+    this session: the same title's keyword extraction varied between runs
+    purely from LLM sampling variance).
+
+    Returns dicts shaped exactly like search_enacted_laws()'s LawPhil.net
+    output ({"ra_number", "description", "date", "url"}) so _build_prompt
+    consumes either source identically without caring which one ran.
+    law_number is already the clean "RA 9003" form import_republic_acts
+    normalizes to, and _ra_short_ref's regex extracts the number back out
+    of that just as readily as LawPhil's "Republic Act No. 9,003" form.
+    """
+    chunks = _retrieve_national_law_chunks(query, top_k=top_k)
+    return [
+        {
+            "ra_number":   c["law_number"],
+            "description": c["chunk_text"],  # the dataset's pre-generated per-act summary
+            "date":        None,  # not stored locally — omitted from the prompt's "(enacted <date>)" rather than guessed
+            "url":         None,  # not stored locally — see import_republic_acts.py if this needs adding later
+        }
+        for c in chunks
+    ]
 
 
 
@@ -423,8 +488,11 @@ def _clean_content_excerpt(content: str | None) -> str:
 
 def generate_legal_basis(title: str, doc_type: str | None = None, content: str | None = None) -> list[dict]:
     """
-    Searches two real sources for national legislation related to this
-    draft — LawPhil.net for actually-enacted Republic Acts, and the Open
+    Searches two sources for national legislation related to this draft —
+    a locally-imported corpus of 11,866 Republic Acts (see
+    _local_enacted_laws / documents/management/commands/
+    import_republic_acts.py, sourced from huggingface.co/datasets/
+    bettergovph/gov-library) for actually-enacted law, and the Open
     Congress API for pending bills — and asks the AI to explain which of
     the RETRIEVED results are genuinely relevant. The AI never cites
     anything from its own memory: earlier versions let it, and it
@@ -435,17 +503,19 @@ def generate_legal_basis(title: str, doc_type: str | None = None, content: str |
     dropped, not shown.
 
     `content`, if given, is an excerpt of the draft's actual body (WHEREAS
-    clauses, operative provisions) — used to judge which retrieved results
-    are genuinely relevant, since the title alone is often too generic.
+    clauses, operative provisions) — used both to enrich the local corpus's
+    semantic search query and to judge which retrieved results are
+    genuinely relevant, since the title alone is often too generic.
 
     Returns a list of citations, each shaped:
         {"law_title": str, "reason": str, "ref": str,
          "status": "enacted" | "pending", "url": str | None}
     `status` distinguishes a real, in-force Republic Act ("enacted", from
-    LawPhil.net) from a bill that's merely been filed in Congress and
+    the local corpus) from a bill that's merely been filed in Congress and
     carries no legal authority yet ("pending", from Open Congress). `url`
     is only set when the source has a real link — never a guessed or
-    LLM-supplied address.
+    LLM-supplied address (the local corpus doesn't currently store source
+    URLs, so enacted citations have none for now).
 
     Local-ordinance precedent is a separate concern already surfaced by
     the inline drafting check (ai_inline_check /
@@ -453,6 +523,31 @@ def generate_legal_basis(title: str, doc_type: str | None = None, content: str |
     """
     if not title or not title.strip():
         raise ValueError("generate_legal_basis() requires a non-empty document title.")
+
+    content_excerpt = _clean_content_excerpt(content)
+
+    # Enacted-law lookup now runs against the local Republic Acts corpus
+    # (see _local_enacted_laws) instead of live-searching LawPhil.net — a
+    # local DB query + local Ollama embedding call, no network request to
+    # anywhere external. Deliberately run unconditionally, NOT gated behind
+    # RAG_EXTERNAL_LAW_SEARCH_ENABLED: that flag exists so an unpublished
+    # draft's title never leaves this system, and unlike the old live
+    # LawPhil search, this path never sends the title anywhere external in
+    # the first place — there's nothing for the flag to protect against
+    # here. Only the pending-bills lookup below (Open Congress API, a
+    # genuinely external call) still needs to respect it.
+    query = f"{title}\n\n{content_excerpt[:600]}" if content_excerpt else title
+    enacted_laws = _local_enacted_laws(query, top_k=8)
+    logger.info(
+        "Local enacted-law corpus: %d result(s) for title %r.",
+        len(enacted_laws), title
+    )
+
+    # Offered separately from the embedding-ranked results above — see
+    # _foundational_laws()'s docstring for why these need their own path
+    # rather than relying on retrieval rank to surface them.
+    existing_refs = {law["ra_number"] for law in enacted_laws}
+    foundational_laws = [law for law in _foundational_laws() if law["ra_number"] not in existing_refs]
 
     if getattr(settings, "RAG_EXTERNAL_LAW_SEARCH_ENABLED", True):
         keywords = _extract_search_keywords(title)
@@ -463,47 +558,49 @@ def generate_legal_basis(title: str, doc_type: str | None = None, content: str |
         # to 5 from a 5-item fetch leaves too little to choose from.
         national_laws = _dedupe_bills(raw_laws, keep=5)
 
-        # Search LawPhil once per candidate term and merge, deduped by RA
-        # number — trying several individual terms is far more robust than
-        # betting on one combined phrase (see _extract_search_keywords).
-        seen_ra: set[str] = set()
-        enacted_laws = []
-        for term in keywords["law_terms"]:
-            for law in search_enacted_laws(term, limit=5):
-                ra = law.get("ra_number")
-                if ra and ra not in seen_ra:
-                    seen_ra.add(ra)
-                    enacted_laws.append(law)
-        enacted_laws = enacted_laws[:8]
-
         logger.info(
-            "For keywords %r (title: %r): %d pending bill(s) (%d after dedup), "
-            "%d enacted law(s) from LawPhil.net",
-            keywords, title, len(raw_laws), len(national_laws), len(enacted_laws)
+            "For keywords %r (title: %r): %d pending bill(s) (%d after dedup)",
+            keywords, title, len(raw_laws), len(national_laws)
         )
     else:
-        national_laws, enacted_laws = [], []
-        logger.info("RAG_EXTERNAL_LAW_SEARCH_ENABLED is False — skipping both lookups.")
-
-    content_excerpt = _clean_content_excerpt(content)
+        national_laws = []
+        logger.info("RAG_EXTERNAL_LAW_SEARCH_ENABLED is False — skipping pending-bills lookup.")
     prompt = _build_prompt(
         title=title, doc_type=doc_type,
         national_laws=national_laws, enacted_laws=enacted_laws,
+        foundational_laws=foundational_laws,
         content_excerpt=content_excerpt,
     )
     raw = _dispatch_to_backend(prompt, _resolve_backend())
 
-    return _parse_citations(raw, national_laws, enacted_laws)
+    return _parse_citations(raw, national_laws, enacted_laws + foundational_laws)
 
 
-def _build_prompt(title: str, doc_type: str | None, national_laws: list, enacted_laws: list, content_excerpt: str = "") -> str:
+def _build_prompt(title: str, doc_type: str | None, national_laws: list, enacted_laws: list, foundational_laws: list | None = None, content_excerpt: str = "") -> str:
     """
-    Build the RAG prompt from two real sources: enacted Republic Acts
-    retrieved via LawPhil.net, and pending bills retrieved via the Open
-    Congress API. National law only — local-ordinance precedent is out of
-    scope for this feature (see generate_legal_basis()'s docstring).
+    Build the RAG prompt from three sources: enacted Republic Acts retrieved
+    via the local corpus, pending bills retrieved via the Open Congress API,
+    and a small curated set of foundational/enabling laws (see
+    _foundational_laws()) that are always offered regardless of retrieval
+    rank. National law only — local-ordinance precedent is out of scope for
+    this feature (see generate_legal_basis()'s docstring).
     """
     doc_label = doc_type or "ORDINANCE"
+    foundational_laws = foundational_laws or []
+
+    if not foundational_laws:
+        foundational_section = ""
+    else:
+        foundational_section = (
+            "FOUNDATIONAL / ENABLING LAWS — these grant general legislative authority rather than "
+            "regulating one specific subject; cite one only if this measure genuinely falls within "
+            "the kind of power it grants (e.g. a benefits, appropriations, or general-welfare measure "
+            "may cite the Local Government Code's general welfare clause as its enabling authority):\n"
+        )
+        for law in foundational_laws:
+            ref = _ra_short_ref(law) or "?"
+            description = (law.get("description") or "").replace("<br>", " — ")
+            foundational_section += f"- ref: {ref}:\n  {description}\n"
 
     if not enacted_laws:
         enacted_section = "ENACTED REPUBLIC ACTS FROM LAWPHIL.NET: none found for this topic.\n"
@@ -554,6 +651,8 @@ Republic Act numbers and descriptions before (e.g. once claimed RA 10153 was the
 Water Act"; it's actually an unrelated 2011 election law). Only the items listed below are
 real, verified data; anything else would be an unverifiable guess.
 
+{foundational_section}
+
 {enacted_section}
 
 {pending_section}
@@ -563,27 +662,32 @@ real, verified data; anything else would be an unverifiable guess.
 The measure being drafted:
 {doc_label}: "{title}"
 
-From the lists above ONLY, select the ones genuinely relevant to this measure — same
-subject matter or same regulatory mechanism, not just a shared generic word. Prefer an
-enacted Republic Act over a pending bill on the same topic when both are listed, since only
-the enacted one carries real legal authority. If several pending bills cover the same
-underlying topic, treat that as one point (e.g. note that multiple legislators have filed
-on it) rather than listing near-duplicates separately.
+From the lists above ONLY, select the ones genuinely relevant to this measure. For the
+ENACTED and PENDING lists: same subject matter or same regulatory mechanism, not just a
+shared generic word. For the FOUNDATIONAL list: a broader framework-level connection is
+acceptable there specifically, since that's the nature of an enabling law — still ground it
+in why THIS TYPE of measure falls within the power it grants, not filler that would apply to
+literally any ordinance regardless of subject. Prefer an enacted Republic Act over a pending
+bill on the same topic when both are listed, since only the enacted one carries real legal
+authority. If several pending bills cover the same underlying topic, treat that as one point
+(e.g. note that multiple legislators have filed on it) rather than listing near-duplicates
+separately.
 
 "reason" must be a real explanation (2-4 sentences): what the law/bill actually says or
 proposes, then concretely why it's relevant to THIS measure — referencing its specific
-mechanism (ban, tax, permit, labeling, penalty, etc.). A sentence that would fit any
-ordinance on any topic is not acceptable. If citing a pending bill, say explicitly that it
-is a pending bill, not existing law.
+mechanism (ban, tax, permit, labeling, penalty, etc.), or for a FOUNDATIONAL law, the specific
+grant of power it relies on. A sentence that would fit any ordinance on any topic regardless
+of subject is not acceptable, even for a foundational law. If citing a pending bill, say
+explicitly that it is a pending bill, not existing law.
 
 Respond with ONLY a JSON array — no markdown code fences, no other text. Each item:
 {{"ref": "<exact ref value from one of the lists above>", "law_title": "<the law's or bill's name/title>", "reason": "<2-4 sentences: what it says/proposes, then why it's relevant to this measure>"}}
 
 STRICT RULES:
 - "ref" MUST exactly match a ref value from one of the lists above — never invent one, never cite anything not listed there
-- Do not cite any Republic Act, the Local Government Code, or any other law that is not in the ENACTED list above — you have no way to verify it
+- Do not cite any Republic Act, the Local Government Code, or any other law that is not in one of the lists above — you have no way to verify it
 - Do not cite local San Juan City ordinances — this feature covers national legislation only
-- If nothing in either list is genuinely relevant, return an empty JSON array: []
+- If nothing in any of the lists is genuinely relevant, return an empty JSON array: []
 """
 
 
@@ -673,43 +777,6 @@ def _call_gemini(prompt: str) -> str:
     return response_text.strip()
 
 
-def _call_gpt(prompt: str) -> str:
-    """Call the OpenAI GPT API and return the response text."""
-    try:
-        from openai import OpenAI  # requires: pip install openai
-    except ImportError as exc:
-        raise RuntimeError(
-            "The 'openai' Python package is required for LLM_BACKEND='gpt'. "
-            "Install it with: pip install openai"
-        ) from exc
-
-    api_key = getattr(settings, "OPENAI_API_KEY", None)
-    if not api_key:
-        raise RuntimeError(
-            "OPENAI_API_KEY is not set in settings.py. "
-            "Add it or switch LLM_BACKEND to another provider."
-        )
-
-    model = getattr(settings, "GPT_MODEL", "gpt-4.1-mini")
-
-    logger.info("Calling OpenAI GPT API (model=%s, max_tokens=%d).", model, _MAX_TOKENS)
-
-    client = OpenAI(api_key=api_key)
-
-    response = client.chat.completions.create(
-        model=model,
-        max_tokens=_MAX_TOKENS,
-        messages=[
-            {"role": "user", "content": prompt}
-        ],
-    )
-
-    response_text = response.choices[0].message.content or ""
-
-    logger.info("GPT API call complete — %d chars returned.", len(response_text))
-    return response_text.strip()
-
-
 def _call_claude(prompt: str) -> str:
     """Call the Anthropic Claude API and return the response text."""
     try:
@@ -772,6 +839,19 @@ def _call_ollama(prompt: str) -> str:
             {"role": "user", "content": prompt}
         ],
         "stream": False,
+        # Suppresses extended "thinking" output on models that support it
+        # (Qwen3.5, Gemma4, DeepSeek-R1-style, etc.) — this is Ollama's own
+        # top-level request field for that, not something nested in
+        # "options". _build_prompt's "/no_think" prefix does the same thing
+        # via prompt text, but that's a Qwen-specific chat-template
+        # convention: harmless-but-inert noise to every other model family.
+        # Confirmed directly: the exact same real 8-candidate-law citation
+        # prompt against gemma4:e4b took 116s without this field (the model
+        # burning almost the entire 4096-token budget on unsuppressed
+        # reasoning) and 0.4s with it — a ~300x difference, not a tuning
+        # nicety. Without this, "thinking" models were coming within
+        # seconds of the 120s HTTP timeout below on every call.
+        "think": False,
         "options": {
             "temperature": 0.3,
             "num_predict": 4096,
@@ -822,28 +902,5 @@ def _call_ollama(prompt: str) -> str:
     response_text = _strip_thinking(response_text)
     logger.info("Ollama call complete — %d chars returned.", len(response_text))
     return response_text
-
-# ---------------------------------------------------------------------------
-# Public entry point
-# ---------------------------------------------------------------------------
-
-def call_llm(prompt: str) -> str:
-    """
-    Dispatch *prompt* to whichever LLM backend is configured in settings.LLM_BACKEND.
-    Returns the model's plain-text response.
-    """
-    backend = getattr(settings, "LLM_BACKEND", _DEFAULT_BACKEND).lower().strip()
-    if backend == "claude":
-        return _call_claude(prompt)
-    elif backend == "gemini":
-        return _call_gemini(prompt)
-    elif backend == "ollama":
-        print('will call ollama')
-        return _call_ollama(prompt)
-    else:
-        raise RuntimeError(
-            f"Unknown LLM_BACKEND value: {backend!r}. "
-            "Set settings.LLM_BACKEND to 'claude', 'gemini', or 'ollama'."
-        )
 
 

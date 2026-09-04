@@ -19,6 +19,11 @@
 
         <div class="flex-1"></div>
 
+        <span id="saveStatusTag" class="save-status-label px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest shrink-0 bg-slate-50 text-slate-400 border border-slate-200">
+            <i data-lucide="check" style="width:11px;height:11px;margin-right:4px;vertical-align:middle;"></i>
+            <span id="saveStatusTagText">No changes yet</span>
+        </span>
+
         {% if doc.amendment_status %}
         <span class="px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest shrink-0
             {% if doc.amendment_status == 'IN_PROGRESS' %}bg-slate-50 text-slate-600 border border-slate-200
@@ -52,10 +57,7 @@
             {% endif %}
         </button>
 
-        <button type="button" onclick="openSaveModal()"
-            class="shrink-0 px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-lg font-bold text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all">
-            <i data-lucide="tag" style="width:12px;height:12px;margin-right:6px;vertical-align:middle;"></i><span class="btn-label">Mark Status</span>
-        </button>
+
 
         <a href="{% url 'report_workbench' doc.id %}" id="reportLink"
             class="shrink-0 px-4 py-2.5 bg-slate-600 text-white rounded-lg font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-slate-100 hover:bg-slate-700 transition-all">
@@ -63,10 +65,77 @@
         </a>
     </div>
 
-    <!-- EDITOR — real .docx, live, exactly like the drafting page. No more
-         side-by-side diff view (dropped in favor of direct docx editing —
-         see LePMITS/06 - OnlyOffice Integration.md). -->
-    <div id="onlyofficeContainer" style="flex:1 1 auto; min-height:0; width:100%;"></div>
+    <!-- MAIN SPLIT PANEL — original (read-only, as of entering this stage)
+         on the left, live editor on the right. See document_original_html
+         (documents/views.py) for the left panel's data-para-id source and
+         getSelection()/scrollToParaId() (frontend/casualdocs-entry.jsx) for
+         how the two sides stay linked. -->
+    <div id="panelWrapper" class="grid panel-normal" style="flex:1 1 auto; min-height:0;">
+
+        <!-- ── LEFT: ORIGINAL (READ-ONLY) PANEL ─────────────── -->
+        <div id="originalPanel" class="flex flex-col border-r border-slate-200 bg-white overflow-hidden transition-all duration-300">
+
+            <div class="px-5 py-3.5 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between shrink-0">
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <div class="w-2 h-2 rounded-full bg-slate-300 shrink-0"></div>
+                    <span id="originalLabel" class="text-[10px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap overflow-hidden">
+                        Original (Read-Only)
+                    </span>
+                </div>
+
+                <div id="originalControls" class="flex items-center gap-1.5 shrink-0 ml-2">
+                    <button type="button" onclick="collapsePanel()" title="Collapse original panel"
+                        class="panel-btn text-slate-400 hover:text-slate-700 hover:bg-slate-100" id="collapseBtn">
+                        <i data-lucide="chevron-left" style="width:12px;height:12px;vertical-align:middle;"></i>
+                    </button>
+                    <button type="button" onclick="expandPanel()" title="Expand original panel"
+                        class="panel-btn text-slate-400 hover:text-slate-700 hover:bg-slate-100" id="expandBtn">
+                        <i data-lucide="chevron-right" style="width:12px;height:12px;vertical-align:middle;"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Collapsed state — just a restore button -->
+            <div id="collapsedState" class="hidden flex-1 flex flex-col items-center justify-center gap-4 py-8 px-2">
+                <div class="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center">
+                    <i data-lucide="file-text" style="width:16px;height:16px;color:#94a3b8;"></i>
+                </div>
+                <p class="text-[9px] font-black uppercase tracking-widest text-slate-400 [writing-mode:vertical-lr] rotate-180">
+                    Original
+                </p>
+                <button type="button" onclick="restorePanel()"
+                    class="w-8 h-8 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-all"
+                    title="Restore original panel">
+                    <i data-lucide="chevron-right" style="width:12px;height:12px;vertical-align:middle;"></i>
+                </button>
+            </div>
+
+            <!-- Original content — fetched as HTML (not an iframe) so a click
+                 in the live editor can query its data-para-id elements directly.
+                 Sponsored by renders as part of this content now — it's a
+                 real table inside the archived .docx itself (confirmed
+                 directly: the same table the live editor's own "Sponsored
+                 by" box edits), not a separately-computed value, so
+                 document_original_html walks the docx body in order
+                 (paragraphs and tables) rather than needing a special case
+                 here for it. -->
+            <div id="originalContentWrap" class="flex-1 overflow-y-auto bg-slate-100 px-6 py-8">
+                <div id="originalContent" class="text-slate-800 bg-white mx-auto shadow-sm border border-slate-200 rounded-sm"></div>
+            </div>
+        </div>
+
+        <!-- ── RIGHT: LIVE EDITOR PANEL ──────────────────────── -->
+        <div class="flex flex-col bg-white overflow-hidden">
+            <div class="px-6 py-3.5 border-b border-slate-100 flex items-center gap-2.5 shrink-0">
+                <div class="w-2 h-2 rounded-full bg-slate-400"></div>
+                <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">Amended (Editable)</span>
+            </div>
+            <!-- real .docx, live, with Track Changes forced on so edits made
+                 here show up as redlined insertions/deletions. -->
+            <div id="documentEditorContainer" style="flex:1 1 auto; min-height:0; width:100%;"></div>
+        </div>
+
+    </div>
 </div>
 
 
@@ -75,9 +144,10 @@
 ══════════════════════════════════════════════ -->
 <div id="commentsModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
     <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="closeCommentsModal()"></div>
-    <div class="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-lg modal-card flex flex-col" style="max-height: 80vh;">
+    <div id="commentsModalCard" class="relative bg-white rounded-[2rem] shadow-2xl modal-card flex flex-col"
+         style="width:640px; height:70vh; max-width:95vw; max-height:95vh; min-width:360px; min-height:280px;">
 
-        <div class="px-8 pt-8 pb-5 border-b border-slate-100 shrink-0">
+        <div id="commentsModalHeader" class="px-8 pt-8 pb-5 border-b border-slate-100 shrink-0" style="cursor:move;">
             <div class="flex items-start justify-between gap-4">
                 <div class="flex items-center gap-3">
                     <div class="w-11 h-11 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
@@ -147,6 +217,12 @@
             </button>
         </div>
 
+        <div id="commentsModalResizeHandle" class="absolute bottom-0 right-0 w-5 h-5" style="cursor:nwse-resize; touch-action:none;">
+            <svg width="14" height="14" viewBox="0 0 14 14" style="position:absolute; bottom:4px; right:4px; opacity:0.35;">
+                <path d="M12 2 L2 12 M12 7 L7 12 M12 12 L12 12" stroke="#64748b" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+        </div>
+
     </div>
 </div>
 
@@ -213,138 +289,226 @@
 </div>
 
 
-<!-- ══════════════════════════════════════════════
-     MARK AMENDMENT STATUS MODAL — purely informational now;
-     amendments themselves save live to the docx.
-══════════════════════════════════════════════ -->
-<div id="saveModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
-    <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="closeSaveModal()"></div>
-    <div class="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-sm p-8 modal-card">
-
-        <div class="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center mb-5">
-            <i data-lucide="tag" style="width:18px;height:18px;color:#6366f1;"></i>
-        </div>
-
-        <h2 class="text-base font-black text-slate-900 tracking-tight mb-1">Mark Amendment Status</h2>
-        <p class="text-xs text-slate-400 font-medium mb-6 leading-relaxed">
-            A label for where this amendment session currently stands. Amendments themselves are already saved directly to the document as you edit.
-        </p>
-
-        <form id="statusForm" method="POST" action="{% url 'save-committee-amendments' doc.id %}">
-            {% csrf_token %}
-
-            <div class="space-y-3 mb-6">
-                <label class="save-status-label flex items-start gap-4 p-4 border-2 border-slate-100 rounded-2xl cursor-pointer hover:bg-slate-50 transition-all">
-                    <input type="radio" name="amendment_status" value="IN_PROGRESS" class="hidden" {% if doc.amendment_status == 'IN_PROGRESS' or not doc.amendment_status %}checked{% endif %}>
-                    <div class="w-9 h-9 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 mt-0.5">
-                        <i data-lucide="gauge" style="width:16px;height:16px;color:#f59e0b;"></i>
-                    </div>
-                    <div>
-                        <p class="text-xs font-black uppercase tracking-widest text-slate-700">In Progress</p>
-                        <p class="text-[11px] text-slate-400 font-medium mt-0.5">Amendments are still being worked on.</p>
-                    </div>
-                </label>
-
-                <label class="save-status-label flex items-start gap-4 p-4 border-2 border-slate-100 rounded-2xl cursor-pointer hover:bg-slate-50 transition-all">
-                    <input type="radio" name="amendment_status" value="FINALIZED" class="hidden" {% if doc.amendment_status == 'FINALIZED' %}checked{% endif %}>
-                    <div class="w-9 h-9 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 mt-0.5">
-                        <i data-lucide="check-circle-2" style="width:16px;height:16px;color:#10b981;"></i>
-                    </div>
-                    <div>
-                        <p class="text-xs font-black uppercase tracking-widest text-slate-700">Finalized</p>
-                        <p class="text-[11px] text-slate-400 font-medium mt-0.5">All amendments are done and reviewed.</p>
-                    </div>
-                </label>
-
-                <label class="save-status-label flex items-start gap-4 p-4 border-2 border-slate-100 rounded-2xl cursor-pointer hover:bg-slate-50 transition-all">
-                    <input type="radio" name="amendment_status" value="NO_AMENDMENTS" class="hidden" {% if doc.amendment_status == 'NO_AMENDMENTS' %}checked{% endif %}>
-                    <div class="w-9 h-9 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0 mt-0.5">
-                        <i data-lucide="minus-circle" style="width:16px;height:16px;color:#94a3b8;"></i>
-                    </div>
-                    <div>
-                        <p class="text-xs font-black uppercase tracking-widest text-slate-700">No Amendments</p>
-                        <p class="text-[11px] text-slate-400 font-medium mt-0.5">No changes were made to this draft.</p>
-                    </div>
-                </label>
-            </div>
-
-            <div class="flex gap-3">
-                <button type="button" onclick="closeSaveModal()"
-                    class="flex-1 px-4 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-all">
-                    Cancel
-                </button>
-                <button type="submit"
-                    class="flex-1 px-4 py-3 bg-slate-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-slate-100 hover:bg-slate-700 transition-all">
-                    <i data-lucide="save" style="width:13px;height:13px;margin-right:8px;vertical-align:middle;"></i> Save
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
 
 
+
+<script src="{% static 'js/document_editors/casualdocs-mount.js' %}"></script>
 <script>
-    // ── OnlyOffice editor — the only content editor on this page ──
-    const onlyofficeDocId = "{{ doc.id }}";
-    let onlyofficeDocKey = null;
+    // ── Casual Docs editor, mode: 'suggesting' (its native track-changes
+    // mode) — see documents/wopi.py's casualdocs_document_bytes/
+    // casualdocs_save and static/js/document_editors/casualdocs-mount.js
+    // for the shared mount/similarity-check logic. ──
+    const documentEditorDocId = "{{ doc.id }}";
+    let activeEditor = null;
 
-    (function () {
-        const onlyofficeServerUrl = "{{ onlyoffice_server_url }}";
+    // ── "Saved" tag — reflects whether the document currently has
+    // unsaved edits or was last saved, without needing a page reload.
+    // Fed by the shared mount controller's onDirtyChange/onSaved
+    // (casualdocs-mount.js -> frontend/casualdocs-entry.jsx), which
+    // itself reads saved_at back from documents/wopi.py::casualdocs_save's
+    // JSON response. ──────────────────────────────────────────────────
+    const saveStatusTag = document.getElementById('saveStatusTag');
+    const saveStatusTagText = document.getElementById('saveStatusTagText');
 
-        function loadScript(src) {
-            return new Promise((resolve, reject) => {
-                const s = document.createElement('script');
-                s.src = src;
-                s.onload = resolve;
-                s.onerror = () => reject(new Error('Failed to load ' + src));
-                document.head.appendChild(s);
-            });
+    function setSaveStatus(state, text) {
+        saveStatusTagText.textContent = text;
+        saveStatusTag.classList.remove('bg-slate-50', 'text-slate-400', 'bg-amber-50', 'text-amber-600', 'border-amber-200', 'bg-emerald-50', 'text-emerald-600', 'border-emerald-200');
+        if (state === 'dirty') {
+            saveStatusTag.classList.add('bg-amber-50', 'text-amber-600', 'border-amber-200');
+        } else if (state === 'saved') {
+            saveStatusTag.classList.add('bg-emerald-50', 'text-emerald-600', 'border-emerald-200');
+        } else {
+            saveStatusTag.classList.add('bg-slate-50', 'text-slate-400');
+        }
+        if (window.lucide) window.lucide.createIcons();
+    }
+
+    function formatSavedAt(isoString) {
+        const d = new Date(isoString);
+        return 'Saved ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    (async function () {
+        const cacheBust = '{% now "U" %}';
+        activeEditor = await CasualDocsMount.mount(document.getElementById('documentEditorContainer'), {
+            docId: documentEditorDocId,
+            fileUrl: `/wopi/casualdocs/${documentEditorDocId}/file/`,
+            saveUrl: `/wopi/casualdocs/${documentEditorDocId}/save/`,
+            csrfToken: '{{ csrf_token }}',
+            authorName: '{{ request.user.get_full_name|default:request.user.username|escapejs }}',
+            mode: 'suggesting',
+            cssUrl: "{% static 'js/document_editors/casualdocs-bundle.css' %}?v=" + cacheBust,
+            jsUrl: "{% static 'js/document_editors/casualdocs-bundle.js' %}?v=" + cacheBust,
+            onDirtyChange: function (isDirty) {
+                if (isDirty) setSaveStatus('dirty', 'Unsaved changes');
+            },
+            onSaved: function (savedAt) { setSaveStatus('saved', formatSavedAt(savedAt)); },
+            onError: function (err) { console.error('Casual Docs error:', err); },
+        });
+        wireParaIdHighlighting();
+    })();
+
+    // ── Original (read-only) panel ──────────────────────────────────
+    // States: 'normal' (50/50), 'collapsed' (~56px), 'expanded' (65%).
+    const wrapper        = document.getElementById('panelWrapper');
+    const originalContentWrap = document.getElementById('originalContentWrap');
+    const originalContent = document.getElementById('originalContent');
+    const collapsedState = document.getElementById('collapsedState');
+    const originalLabel  = document.getElementById('originalLabel');
+    const collapseBtn    = document.getElementById('collapseBtn');
+    const expandBtn      = document.getElementById('expandBtn');
+
+    let panelState = localStorage.getItem('amending-panel-state') || 'normal';
+
+    function applyState(state) {
+        panelState = state;
+        localStorage.setItem('amending-panel-state', state);
+
+        wrapper.classList.remove('panel-normal', 'panel-collapsed', 'panel-expanded');
+        wrapper.classList.add(`panel-${state}`);
+
+        if (state === 'collapsed') {
+            originalContentWrap.classList.add('hidden');
+            collapsedState.classList.remove('hidden');
+            collapsedState.classList.add('flex');
+            originalLabel.classList.add('hidden');
+            collapseBtn.classList.add('opacity-30', 'pointer-events-none');
+            expandBtn.classList.remove('opacity-30', 'pointer-events-none');
+        } else {
+            originalContentWrap.classList.remove('hidden');
+            collapsedState.classList.add('hidden');
+            collapsedState.classList.remove('flex');
+            originalLabel.classList.remove('hidden');
+            collapseBtn.classList.remove('opacity-30', 'pointer-events-none');
+            expandBtn.classList.toggle('opacity-30', state === 'expanded');
+            expandBtn.classList.toggle('pointer-events-none', state === 'expanded');
+        }
+    }
+    function collapsePanel() { applyState(panelState === 'normal' ? 'collapsed' : 'normal'); }
+    function expandPanel()   { applyState(panelState === 'normal' ? 'expanded' : 'normal'); }
+    function restorePanel()  { applyState('normal'); }
+    applyState(panelState);
+
+    // Fetched once on load — the original is frozen for the whole editing
+    // session (doc.current_version doesn't change until this stage exits),
+    // so there's nothing to re-fetch as amendments are made.
+    (async function loadOriginal() {
+        try {
+            const resp = await fetch("{% url 'document-original-html' doc.id %}");
+            if (!resp.ok) throw new Error('not available');
+            originalContent.innerHTML = await resp.text();
+        } catch (err) {
+            originalContent.innerHTML =
+                '<p class="text-xs text-slate-400 italic">No snapshot available for this version.</p>';
+        }
+    })();
+
+    // Clicking a paragraph in the original panel scrolls the live editor to
+    // the matching paragraph (same w14:paraId) — the reverse direction of
+    // the highlight-on-select wiring below.
+    originalContent.addEventListener('click', function (e) {
+        const p = e.target.closest('[data-para-id]');
+        if (!p || !activeEditor || !activeEditor.scrollToParaId) return;
+        activeEditor.scrollToParaId(p.dataset.paraId);
+    });
+
+    // ── Link the editor's current selection to the matching paragraph in
+    // the original panel — highlights it and scrolls it into view. Casual
+    // Docs has no onSelectionChange prop, so this reacts to mouseup/keyup
+    // on the editor container and reads the authoritative paraId via
+    // activeEditor.getSelection() (see frontend/casualdocs-entry.jsx),
+    // rather than trying to read it off the live editor's own DOM.
+    let highlightTimer = null;
+    function wireParaIdHighlighting() {
+        const editorEl = document.getElementById('documentEditorContainer');
+        if (!editorEl || !activeEditor || !activeEditor.getSelection) return;
+
+        editorEl.addEventListener('mouseup', scheduleHighlight);
+        editorEl.addEventListener('keyup', scheduleHighlight);
+    }
+    function scheduleHighlight() {
+        if (highlightTimer) clearTimeout(highlightTimer);
+        highlightTimer = setTimeout(highlightSelectedParagraph, 200);
+    }
+    // Reused across calls rather than recreated — a single marker moved to
+    // wherever it's currently needed (or detached entirely when it isn't).
+    let newSectionMarker = null;
+    function getNewSectionMarker() {
+        if (newSectionMarker) return newSectionMarker;
+        newSectionMarker = document.createElement('div');
+        newSectionMarker.className = 'new-section-marker';
+        newSectionMarker.innerHTML =
+            '<i data-lucide="corner-down-right" style="width:12px;height:12px;margin-right:5px;vertical-align:middle;"></i>New section inserted here';
+        return newSectionMarker;
+    }
+
+    function highlightSelectedParagraph() {
+        const selection = activeEditor.getSelection();
+        const previousHighlight = originalContent.querySelector('.para-highlight');
+        if (previousHighlight) previousHighlight.classList.remove('para-highlight');
+        if (newSectionMarker && newSectionMarker.parentNode) newSectionMarker.remove();
+
+        if (!selection || !selection.paraId) return;
+        const match = originalContent.querySelector(`[data-para-id="${CSS.escape(selection.paraId)}"]`);
+        if (match) {
+            match.classList.add('para-highlight');
+            match.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            return;
         }
 
-        async function mountOnlyOffice() {
-            try {
-                await loadScript(`${onlyofficeServerUrl}/web-apps/apps/api/documents/api.js`);
-                // Track-changes config, not the plain drafting one — see
-                // onlyoffice_amend_config.
-                const resp = await fetch(`/onlyoffice/${onlyofficeDocId}/amend-config/`);
-                if (!resp.ok) throw new Error('Could not load OnlyOffice config (' + resp.status + ')');
-                const config = await resp.json();
-                onlyofficeDocKey = config.document.key;
-                config.width = '100%';
-                config.height = '100%';
-                config.type = 'desktop';
-                new DocsAPI.DocEditor('onlyofficeContainer', config);
-            } catch (err) {
-                document.getElementById('onlyofficeContainer').innerHTML =
-                    `<div style="padding:40px;text-align:center;color:#dc2626;font-size:13px;font-weight:600;">
-                        The document editor failed to load — is the Document Server running?<br>
-                        <span style="font-weight:400;color:#94a3b8;">${err.message}</span>
-                    </div>`;
+        // No match — this paragraph didn't exist when this stage began, so
+        // it was added during this review. Rather than a generic "this is
+        // new" notice, place a marker right where it actually sits: walk
+        // backward through the live document's own paragraph order to the
+        // nearest earlier paragraph that *does* still exist in the
+        // original, and drop the marker right after it there.
+        if (!activeEditor.getOrderedParaIds) return;
+        const orderedIds = activeEditor.getOrderedParaIds();
+        const selectedIndex = orderedIds.indexOf(selection.paraId);
+        if (selectedIndex === -1) return;
+
+        let anchor = null;
+        let insertBefore = false;
+        for (let i = selectedIndex - 1; i >= 0; i--) {
+            anchor = originalContent.querySelector(`[data-para-id="${CSS.escape(orderedIds[i])}"]`);
+            if (anchor) break;
+        }
+        if (!anchor) {
+            // Inserted before anything that survives from the original —
+            // fall back to the nearest *later* match instead, marker
+            // placed just before it.
+            for (let i = selectedIndex + 1; i < orderedIds.length; i++) {
+                anchor = originalContent.querySelector(`[data-para-id="${CSS.escape(orderedIds[i])}"]`);
+                if (anchor) { insertBefore = true; break; }
             }
         }
 
-        mountOnlyOffice();
-    })();
+        const marker = getNewSectionMarker();
+        if (!anchor) {
+            // No surviving paragraph anywhere — nothing to anchor to (e.g.
+            // the original had no data-para-id content at all).
+            originalContent.prepend(marker);
+        } else if (insertBefore) {
+            anchor.before(marker);
+        } else {
+            anchor.after(marker);
+        }
+        marker.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        if (window.lucide) window.lucide.createIcons();
+    }
 
     // ── Force a save before leaving the page, however that happens ─────
-    // Amendments now save live to the docx (same pipeline as drafting),
-    // but OnlyOffice's own autosave is idle-triggered — navigating away
-    // right after typing can outrun it. Every exit from this page routes
-    // through this first, same pattern as draft.html. Notably, the actual
-    // "Move to Second Reading" / "Move to Unfinished Business" actions
-    // live on the committee report workbench (a separate page reached via
-    // "Create Committee Report"), not here — which is exactly why this
-    // page's own exits all forcesave first.
+    // Amendments save live to the docx (same pipeline as drafting), but
+    // the editor's own autosave is idle-triggered — navigating away right
+    // after typing can outrun it. Every exit from this page routes through
+    // this first, same pattern as draft.html. Notably, the actual "Move to
+    // Second Reading" / "Move to Unfinished Business" actions live on the
+    // committee report workbench (a separate page reached via "Create
+    // Committee Report"), not here — which is exactly why this page's own
+    // exits all forcesave first.
     async function forceSaveEditor() {
-        if (!onlyofficeDocKey) return;
-        try {
-            await fetch(`/onlyoffice/${onlyofficeDocId}/forcesave/`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-                body: JSON.stringify({ key: onlyofficeDocKey })
-            });
-        } catch (err) {
-            console.warn('forcesave before navigation failed:', err);
+        if (activeEditor && activeEditor.forceSave) {
+            await activeEditor.forceSave();
         }
     }
 
@@ -381,23 +545,83 @@
 
     // ── Comments modal ───────────────────────────────────────────────
     function openCommentsModal()  { openModalById('commentsModal'); }
-    function closeCommentsModal() { closeModalById('commentsModal'); }
+    function closeCommentsModal() {
+        closeModalById('commentsModal');
+        // Reset drag/resize state so the modal starts centered at its
+        // default size next time it's opened, rather than wherever the
+        // user last left it.
+        const card = document.getElementById('commentsModalCard');
+        card.style.position = '';
+        card.style.left = '';
+        card.style.top = '';
+        card.style.margin = '';
+        card.style.width = '640px';
+        card.style.height = '70vh';
+    }
+
+    // ── Comments modal: drag + resize ────────────────────────────────
+    (function initCommentsModalDragResize() {
+        const card   = document.getElementById('commentsModalCard');
+        const header = document.getElementById('commentsModalHeader');
+        const handle = document.getElementById('commentsModalResizeHandle');
+
+        function beginDrag(e) {
+            if (e.target.closest('button')) return;
+            const rect = card.getBoundingClientRect();
+            card.style.position = 'fixed';
+            card.style.margin = '0';
+            card.style.left = rect.left + 'px';
+            card.style.top = rect.top + 'px';
+            const startX = e.clientX, startY = e.clientY;
+            const startLeft = rect.left, startTop = rect.top;
+
+            function onMove(ev) {
+                card.style.left = (startLeft + (ev.clientX - startX)) + 'px';
+                card.style.top  = (startTop  + (ev.clientY - startY)) + 'px';
+            }
+            function onUp() {
+                document.removeEventListener('pointermove', onMove);
+                document.removeEventListener('pointerup', onUp);
+            }
+            document.addEventListener('pointermove', onMove);
+            document.addEventListener('pointerup', onUp);
+        }
+
+        function beginResize(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const rect = card.getBoundingClientRect();
+            card.style.position = 'fixed';
+            card.style.margin = '0';
+            card.style.left = rect.left + 'px';
+            card.style.top = rect.top + 'px';
+            const startX = e.clientX, startY = e.clientY;
+            const startWidth = rect.width, startHeight = rect.height;
+
+            function onMove(ev) {
+                card.style.width  = (startWidth  + (ev.clientX - startX)) + 'px';
+                card.style.height = (startHeight + (ev.clientY - startY)) + 'px';
+            }
+            function onUp() {
+                document.removeEventListener('pointermove', onMove);
+                document.removeEventListener('pointerup', onUp);
+            }
+            document.addEventListener('pointermove', onMove);
+            document.addEventListener('pointerup', onUp);
+        }
+
+        header.addEventListener('pointerdown', beginDrag);
+        handle.addEventListener('pointerdown', beginResize);
+    })();
 
     // ── Councilors present modal ─────────────────────────────────────
     function openCouncilorsModal()  { openModalById('councilorsModal'); }
     function closeCouncilorsModal() { closeModalById('councilorsModal'); }
 
     // ── Mark status modal ────────────────────────────────────────────
-    function openSaveModal()  { openModalById('saveModal'); }
-    function closeSaveModal() { closeModalById('saveModal'); }
 
-    document.addEventListener('keydown', e => {
-        if (e.key === 'Escape') {
-            closeModalById('commentsModal');
-            closeModalById('councilorsModal');
-            closeModalById('saveModal');
-        }
-    });
+
+
 </script>
 
 <style>
@@ -407,5 +631,60 @@
         to   { opacity: 1; transform: scale(1) translateY(0); }
     }
     .save-status-label { user-select: none; }
+
+    /* ── Panel grid states — same pattern as referral_drafting_page.html ── */
+    #panelWrapper {
+        display: grid;
+        transition: grid-template-columns 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .panel-normal    { grid-template-columns: 1fr 1fr; }
+    .panel-collapsed { grid-template-columns: 56px 1fr; }
+    .panel-expanded  { grid-template-columns: 65fr 35fr; }
+
+    .panel-btn {
+        width: 26px;
+        height: 26px;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s ease;
+        flex-shrink: 0;
+    }
+
+    /* ── Original panel content — matches the actual document's own
+         Times New Roman look, not the app's default sans-serif UI font. ── */
+    /* A4 width at 96dpi (210mm), 1-inch margins — matches the actual page
+       size/margins this app's documents default to (documents/models.py). */
+    #originalContent {
+        font-family: "Times New Roman", Times, serif;
+        font-size: 13px;
+        line-height: 1.7;
+        max-width: 794px;
+        padding: 96px;
+    }
+    #originalContent p[data-para-id] { cursor: pointer; border-radius: 6px; padding: 3px 8px; }
+    #originalContent p[data-para-id]:hover { background: #f8fafc; }
+    #originalContent .para-highlight { background: #fef9c3; }
+
+    /* Marks where a paragraph with no match in the original was inserted
+       during this review — see highlightSelectedParagraph(). Amber, not
+       red: this isn't an error, just a "here's what changed" pointer,
+       consistent with the amber "Unsaved changes" save-status tag above. */
+    .new-section-marker {
+        display: flex;
+        align-items: center;
+        margin: 4px 0;
+        padding: 6px 10px;
+        border-radius: 6px;
+        border: 1px dashed #f59e0b;
+        background: #fffbeb;
+        color: #b45309;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
 </style>
 {% endblock %}

@@ -8,6 +8,15 @@ from councilors.models import Councilor
 from pgvector.django import VectorField
 from documents.sanitize import sanitize_document_html
 
+# Vector width shared by every VectorField below — must match whatever
+# settings.OLLAMA_EMBED_MODEL actually outputs (see documents/rag/embedder.py's
+# embed_text, which asserts against this constant at call time rather than
+# letting a mismatch surface as an opaque pgvector insert error). Changing
+# this value requires a migration that wipes and rebuilds every stored
+# embedding — see documents/migrations/0016_vector_4096.py's comment for why
+# (pgvector/Postgres can't resize a vector column in place) and don't repeat
+# that silently: back up first, then `python manage.py embed_documents --force`.
+EMBEDDING_DIMENSIONS = 4096
 
 
 class Document(models.Model):
@@ -31,7 +40,10 @@ class Document(models.Model):
     reference_no = models.CharField(max_length=100, blank=True, null=True)
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='my_docs')
     content = models.TextField()
-    doc_type = models.CharField(max_length=15, choices=DOC_CHOICES, default='ORDINANCE')
+    # No default — a fresh draft shouldn't silently start as an Ordinance
+    # before the councilor has actually chosen. create_draft's submit path
+    # blocks filing while this is blank.
+    doc_type = models.CharField(max_length=15, choices=DOC_CHOICES, default='', blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='DRAFT')
     referred_committee = models.ForeignKey(Committee, on_delete=models.SET_NULL, null=True, blank=True, related_name='committee')
     current_version = models.IntegerField(default=1)
@@ -40,7 +52,7 @@ class Document(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     amended_content = models.TextField(blank=True, null=True)
-    embedding = VectorField(dimensions=4096,null=True,blank=True)
+    embedding = VectorField(dimensions=EMBEDDING_DIMENSIONS,null=True,blank=True)
     amendment_status = models.CharField(
         max_length=20,
         choices=[
@@ -70,10 +82,11 @@ class Document(models.Model):
     # required before a measure can move to APPROVED (see approve_measure).
     signed_pdf = models.FileField(upload_to='signed_documents/%Y/', null=True, blank=True)
     # Content hashes of paragraphs already flagged with a similarity comment
-    # in the OnlyOffice-saved .docx (see onlyoffice_similarity_check). Lets
-    # repeated post-save checks add a comment only once per paragraph text —
-    # python-docx can't enumerate/delete existing comments, so this is what
-    # keeps the check from re-flagging the same unchanged paragraph forever.
+    # in the saved .docx (see _run_similarity_check_on_docx in views.py).
+    # Lets repeated post-save checks add a comment only once per paragraph
+    # text — python-docx can't enumerate/delete existing comments, so this
+    # is what keeps the check from re-flagging the same unchanged paragraph
+    # forever.
     flagged_similarity_hashes = models.JSONField(default=list, blank=True)
     # Layout-tab page setup (draft.html) — live in the editor preview and
     # carried through to the exported PDF's @page/@frame CSS (see
@@ -180,7 +193,7 @@ class LegacyDocument(models.Model):
     year = models.IntegerField(null=True, blank=True)
     pdf_file = models.FileField(upload_to='legacy_documents/%Y/', max_length = 500)
     extracted_text = models.TextField(blank=True)  # OCR result stored here
-    embedding = VectorField(dimensions=4096, null=True, blank=True)
+    embedding = VectorField(dimensions=EMBEDDING_DIMENSIONS, null=True, blank=True)
     ocr_processed = models.BooleanField(default=False)
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
@@ -240,7 +253,7 @@ class NationalLawChunk(models.Model):
     chunk_text = models.TextField()
     chunk_type = models.CharField(max_length=50, default='SECTION')
     chunk_index = models.IntegerField()
-    embedding  = VectorField(dimensions=4096, null=True, blank=True)
+    embedding  = VectorField(dimensions=EMBEDDING_DIMENSIONS, null=True, blank=True)
 
     class Meta:
         ordering = ['chunk_index']
@@ -266,9 +279,38 @@ class DocumentChunk(models.Model):
     )
     chunk_type = models.CharField(max_length=50)
     chunk_text = models.TextField()
-    embedding = VectorField(dimensions=4096, null=True, blank=True)
+    embedding = VectorField(dimensions=EMBEDDING_DIMENSIONS, null=True, blank=True)
     chunk_index = models.IntegerField()
 
     class Meta:
         db_table = "document_chunk"
         ordering = ["chunk_index"]
+
+
+class DocumentReferenceCounter(models.Model):
+    """Persistent, monotonic per-(doc_type, year) counter backing
+    Document.reference_no — replaces the old "count existing rows in these
+    statuses" approach, which silently undercounted (and produced
+    duplicate numbers) the moment a document moved into a status the
+    hardcoded list didn't include, or moved backward (e.g. returned to
+    draft) after already holding a number. See documents/views.py's
+    assign_reference_number, the only place this should ever be
+    incremented — always under _acquire_sequence_lock's advisory lock, so
+    concurrent callers for the same (doc_type, year) still can't collide.
+
+    doc_type, not origin, is the key: a councilor-authored Resolution and
+    a barangay-originated Resolution share this same counter (both get a
+    "DR-#-YYYY" number), since they're the same doc_type and must never
+    collide with each other.
+    """
+    doc_type = models.CharField(max_length=15, choices=Document.DOC_CHOICES)
+    year = models.IntegerField()
+    count = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['doc_type', 'year'], name='unique_doc_type_year_counter'),
+        ]
+
+    def __str__(self):
+        return f"{self.doc_type} {self.year}: {self.count}"

@@ -65,19 +65,56 @@ INSTALLED_APPS = [
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'formatters': {
+        'with_time': {
+            'format': '%(asctime)s %(levelname)s %(name)s: %(message)s',
+        },
+    },
     'handlers':{
         'console':{
             'class':'logging.StreamHandler',
         },
+        # Console-only logging meant no way to inspect what actually
+        # happened on a given request after the fact — every diagnostic
+        # needed the person at the runserver terminal to relay it live.
+        # This mirrors the same output to a plain file so it can be read
+        # back directly. Not size-capped (RotatingFileHandler) on
+        # purpose while this is actively being used for debugging —
+        # revisit if this sticks around long-term.
+        'file': {
+            # RotatingFileHandler, not plain FileHandler — the latter had
+            # no size cap at all, and this log has already accumulated
+            # unbounded INFO-level output from every request. 10MB x 5
+            # backups is a generous ceiling for a small internal app.
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': BASE_DIR / 'logs' / 'debug.log',
+            'maxBytes': 10 * 1024 * 1024,
+            'backupCount': 5,
+            'formatter': 'with_time',
+            # Without this, FileHandler falls back to the OS locale
+            # encoding — cp1252 on this Windows machine — which silently
+            # DROPS (not mangles — the record never reaches the file at
+            # all) any log message containing a character outside that
+            # codepage. Confirmed directly: an INFO log with a plain →
+            # arrow (documents/signals.py's auto_embed_on_approval)
+            # never made it into this file at all, only raised
+            # "--- Logging error ---" to stderr. Many log messages across
+            # this codebase already use —/em-dashes in their text, which
+            # happen to have a cp1252 mapping (silently "worked" by
+            # accident) — anything without one (→, emoji, curly quotes
+            # outside cp1252's range) was being lost outright.
+            'encoding': 'utf-8',
+        },
     },
     'root':{
-        'handlers': ['console'],
+        'handlers': ['console', 'file'],
         'level': 'INFO'
     },
 }
 
 
 LOGIN_REDIRECT_URL = 'dashboard'
+LOGIN_URL = 'login'
 LOGOUT_REDIRECT_URL = 'login'
 AUTH_USER_MODEL = 'accounts.User'
 MIDDLEWARE = [
@@ -88,7 +125,9 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'systemadmin.middleware.SessionIdleTimeoutMiddleware'
+    'systemadmin.middleware.SessionIdleTimeoutMiddleware',
+    'systemadmin.middleware.MaintenanceModeMiddleware',
+    'systemadmin.middleware.SystemErrorLoggingMiddleware',
 ]
 
 
@@ -99,10 +138,64 @@ SESSION_COOKIE_NAME = "sessionid_mgmt"
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 #SESSION_COOKIE_AGE = 3600
 SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SECURE = False
+# Was hardcoded False, which was correct for local DEBUG=True http:// dev
+# but meant the session cookie authenticating access to draft legislation
+# would still be sent unencrypted over plain HTTP in production too.
+# Tied to DEBUG the same way this file already conditions ALLOWED_HOSTS/
+# etc. — secure in any real (DEBUG=False) deployment, unrestricted for
+# local dev, with no separate env var to remember to set.
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+
+# Additional production hardening — SecurityMiddleware is already installed
+# but these are all opt-in per-setting, and none of them were set. Tied to
+# DEBUG the same way SESSION/CSRF_COOKIE_SECURE already are: inert for local
+# dev, active for any real (DEBUG=False) deployment. CSRF_TRUSTED_ORIGINS is
+# required by Django whenever CSRF-protected POSTs arrive over HTTPS behind
+# a reverse proxy — must include scheme, e.g. "https://lepmits.example.gov".
+SECURE_CONTENT_TYPE_NOSNIFF = True
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+CSRF_TRUSTED_ORIGINS = [
+    o.strip() for o in os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',') if o.strip()
+]
+
+# Only set if BEHIND_HTTPS_PROXY=TRUE is explicitly opted into via .env.
+# Blindly trusting X-Forwarded-Proto whenever DEBUG=False would be a spoofing
+# hole if this app is ever deployed reachable directly (no proxy in front) —
+# an attacker could set that header themselves and trick Django's
+# request.is_secure() into treating a plain HTTP request as secure, silently
+# defeating SECURE_SSL_REDIRECT and secure-cookie behavior above. Only turn
+# this on once it's confirmed the actual deployment puts a reverse proxy
+# (nginx/Caddy/etc.) in front that overwrites this header rather than
+# passing through whatever the client sent.
+if os.getenv('BEHIND_HTTPS_PROXY', 'FALSE').strip().upper() == 'TRUE':
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 ROOT_URLCONF = 'config.urls'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# Working/archived .docx and PDF snapshot storage for the document editor
+# (see documents/views.py's _onlyoffice_saved_docx_path/_saved_pdf_path/
+# _saved_docx_version_path) — deliberately OUTSIDE MEDIA_ROOT, not a
+# subdirectory of it. Every read of these files already goes through a
+# permission-checked Django view (documents/wopi.py's
+# casualdocs_document_bytes, documents/views.py's document_snapshot_pdf/
+# archive_snapshot_pdf — all call _can_view_document/_can_edit_document),
+# never a direct MEDIA_URL path (confirmed: nothing under templates/ or
+# static/ references "onlyoffice_pending"). config/urls.py only routes
+# MEDIA_URL through Django (and therefore through those permission checks)
+# when DEBUG=True — in a real deployment, /media/ is typically served
+# directly by the webserver, entirely bypassing Django and every
+# permission check in this app. Keeping this tree out of MEDIA_ROOT means
+# that's true only for genuinely public media (draft images, legacy PDFs)
+# and never for a document's actual content, regardless of how the
+# production webserver is configured to serve /media/.
+DOCUMENT_EDITOR_STORAGE_ROOT = BASE_DIR / 'protected_media' / 'onlyoffice_pending'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -115,6 +208,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'committees.context_processors.committees_processor',
                 'systemadmin.context_processors.system_settings',
+                'documents.context_processors.incoming_docs_count',
             ],
         },
     },
@@ -173,7 +267,11 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = '/static/'
-#STATIC_ROOT = BASE_DIR / 'staticfiles'
+# collectstatic's output directory — distinct from STATICFILES_DIRS below
+# (this app's own source static/ tree, which collectstatic reads FROM).
+# Was commented out, so `collectstatic` had nowhere defined to write to and
+# production static serving was never actually wired up.
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
@@ -223,14 +321,9 @@ CLAUDE_MODEL = os.getenv('CLAUDE_MODEL')        # optional override
 
 
 
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-GPT_MODEL = os.getenv('GPT_MODEL')
 OLLAMA_ENDPOINT = os.getenv('OLLAMA_ENDPOINT')  # optional override
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 GEMINI_MODEL = os.getenv('GEMINI_MODEL')
-
-
-OCR_CLEANUP_BACKEND = os.getenv('OCR_CLEANUP_BACKEND')
 
 # Legal-basis drafting assistant sends the draft title to the public Open
 # Congress API (bettergov.ph) to look up related national legislation before
@@ -239,11 +332,60 @@ OCR_CLEANUP_BACKEND = os.getenv('OCR_CLEANUP_BACKEND')
 # only on the AI model's own training knowledge).
 RAG_EXTERNAL_LAW_SEARCH_ENABLED = os.getenv('RAG_EXTERNAL_LAW_SEARCH_ENABLED', 'TRUE').strip().upper() == 'TRUE'
 
-# Trial OnlyOffice Document Server integration (see documents/views.py
-# onlyoffice_* views). Runs as a separate local Docker container, not part
-# of this Django app. JWT request-signing is left off for this local trial
-# to keep the first test simple — must be turned on (both here and on the
-# container) before this is used for real, since without it the source-
-# document and callback endpoints trust any caller that can reach them.
-ONLYOFFICE_SERVER_URL = os.getenv('ONLYOFFICE_SERVER_URL', 'http://localhost:8082')
-ONLYOFFICE_JWT_SECRET = os.getenv('ONLYOFFICE_JWT_SECRET', '')
+# LibreOffice, invoked headless (soffice --headless --convert-to docx ...)
+# for DOCX export (see documents/views.py:download_document_docx). This
+# isn't a service anyone's browser talks to — it's a local subprocess our
+# own server-side code shells out to, the same way you'd call ffmpeg or
+# imagemagick. LibreOffice is MPL 2.0, doesn't distinguish headless from
+# interactive use, and explicitly places no obligation on files it merely
+# outputs (verified directly against https://www.libreoffice.org/licenses/,
+# not assumed).
+# Default path matches the standard Windows installer location, but only
+# on Windows — was previously hardcoded to that path unconditionally
+# (same class of bug as TESSERACT_PATH below had, before it was fixed):
+# a production server is essentially always Linux, and without a platform
+# check here, an unset LIBREOFFICE_PATH env var on that server would
+# resolve to a Windows-only path that doesn't exist there, making
+# LibreOffice look "not installed" even if it genuinely is — the actual
+# Linux binary is typically just "soffice" if it's on PATH, which is also
+# pytesseract's own upstream default, used here too. Still fully
+# overridable via .env either way (e.g. a non-standard install location
+# on either platform).
+# Also the sole conversion backend for docx<->html/pdf now (see
+# documents/libreoffice.py) — every conversion this app does (DOCX export,
+# PDF snapshots/downloads, Casual Docs' first-open bootstrap and save-back
+# HTML sync) goes through the same local subprocess call, no Docker
+# container involved. Collabora's container previously ran alongside this
+# purely as a conversion service; retired since it needed container
+# permissions/seccomp changes (MKNOD, SYS_ADMIN) for what a local
+# subprocess does with none of that.
+LIBREOFFICE_PATH = os.getenv(
+    'LIBREOFFICE_PATH',
+    r'C:\Program Files\LibreOffice\program\soffice.exe' if os.name == 'nt' else 'soffice',
+)
+
+# Tesseract OCR binary, used by documents/views.py for legacy-document text
+# extraction (extract_legacy_metadata) and its scanned-page fallback. Same
+# per-platform-default pattern as LIBREOFFICE_PATH above: the Windows
+# installer path by default, but overridable via .env — on Linux this is
+# typically just "tesseract" if it's on PATH (pytesseract's own default,
+# used here too so a Linux box with tesseract installed normally needs no
+# override at all).
+TESSERACT_PATH = os.getenv(
+    'TESSERACT_PATH',
+    r'C:\Program Files\Tesseract-OCR\tesseract.exe' if os.name == 'nt' else 'tesseract',
+)
+
+# Django's own default (2.5MB) is enforced against HttpRequest.body's
+# Content-Length (see django/http/request.py) — and documents/wopi.py's
+# casualdocs_save reads the whole edited .docx via request.body (a plain
+# octet-stream POST, not multipart, so FILE_UPLOAD_MAX_MEMORY_SIZE doesn't
+# apply here). A .docx with even a couple of the editor's own inserted
+# images crosses 2.5MB easily, which previously meant a silent-looking
+# save failure — Django returns 400 before the view ever runs, and the
+# frontend's postDocx() only console.error's it (see
+# frontend/casualdocs-entry.jsx), so the user saw no visible error at all
+# while the edit was actually lost. 25MB matches the ceiling this app
+# already accepts for legacy PDF uploads (see documents/views.py's
+# upload_legacy_document) as a reasonable upper bound for one document.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 25 * 1024 * 1024

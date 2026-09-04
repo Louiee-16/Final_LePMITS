@@ -3,12 +3,18 @@ from django.shortcuts import render,redirect, get_object_or_404
 from .forms import CommitteeForm
 from .models import Committee
 from django.contrib.auth.decorators import login_required
+from audit.utils import log_action
 
+@login_required
 def add_committee(request):
+    if request.user.role not in ['SECRETARIAT', 'STAFF', 'ADMIN']:
+        return redirect('committee_list')
+
     if request.method == 'POST':
         form = CommitteeForm(request.POST)
         if form.is_valid():
-            form.save()
+            committee = form.save()
+            log_action(request, action='CREATE', target=f"Created committee: {committee.name}")
             return redirect('committee_list')
     else:
         form = CommitteeForm()
@@ -31,6 +37,7 @@ def edit_committee(request, committee_id):
         form = CommitteeForm(request.POST, instance=committee)
         if form.is_valid():
             form.save()
+            log_action(request, action='UPDATE', target=f"Edited committee: {committee.name}")
         return redirect('committee_list')
     else:
         form = CommitteeForm(instance=committee)

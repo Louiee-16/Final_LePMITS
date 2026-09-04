@@ -22,16 +22,6 @@
         </div>
     </div>
 
-    <!-- MESSAGES -->
-    {% if messages %}
-        {% for message in messages %}
-        <div class="px-5 py-3.5 rounded-2xl text-xs font-bold bg-slate-50 border border-slate-200 text-slate-700">
-            <i data-lucide="{% if message.tags == 'success' %}check-circle-2{% else %}alert-circle{% endif %}" style="width:13px;height:13px;margin-right:8px;vertical-align:middle;"></i>
-            {{ message }}
-        </div>
-        {% endfor %}
-    {% endif %}
-
     <form method="POST" enctype="multipart/form-data" id="uploadForm" action="{% url 'UPLOAD-LEGACY-DOCUMENT' %}">
         {% csrf_token %}
 

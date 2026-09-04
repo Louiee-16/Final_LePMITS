@@ -1,0 +1,42 @@
+<!-- AI LEGAL BASIS MODAL — shared by any drafting page that includes this
+     partial and initializes static/js/document_editors/ai-legal-basis.js
+     against its own #aiCheckBtn/title input (see that file's header
+     comment for the exact contract). Requires the including page to have
+     a button with id="aiCheckBtn" already in its own markup — this
+     partial is just the modal, not the trigger. -->
+<div id="aiModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+    <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="AiLegalBasis.close()"></div>
+    <div class="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-3xl p-8 max-h-[88vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-5">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center">
+                    <i data-lucide="scale" style="width:16px;height:16px;color:#8b5cf6;"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-black uppercase tracking-widest text-slate-700">Legal Basis Assistant</p>
+                    <p class="text-[10px] text-slate-400 font-medium">Enacted national law + related pending bills</p>
+                </div>
+            </div>
+            <button type="button" onclick="AiLegalBasis.close()" class="w-8 h-8 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-all shrink-0">
+                <i data-lucide="x" style="width:14px;height:14px;"></i>
+            </button>
+        </div>
+
+        <div id="aiLoading" class="hidden">
+            <div class="bg-slate-50 border border-slate-100 rounded-2xl p-5 flex items-center gap-4">
+                <svg style="width:16px;height:16px;color:#a78bfa;animation:spin 1s linear infinite;flex-shrink:0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                <p class="text-xs text-slate-400 font-medium italic">Searching local database and consulting legal references…</p>
+            </div>
+        </div>
+
+        <div id="aiResults" class="hidden">
+            <div class="bg-slate-50 border border-slate-100 rounded-2xl p-7">
+                <div class="flex items-center gap-2 mb-4">
+                    <i data-lucide="book-open" style="width:13px;height:13px;color:#6366f1;"></i>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-700">National Law &amp; Legislation</p>
+                </div>
+                <div id="nationalLaws" class="text-[13.5px] text-slate-600 leading-relaxed space-y-1"></div>
+            </div>
+        </div>
+    </div>
+</div>

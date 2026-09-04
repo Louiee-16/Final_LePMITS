@@ -7,61 +7,14 @@ from barangay.models import BarangayFiles
 from documents.models import Document
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from documents.urls import urlpatterns
 from django.utils import timezone
 from django.db.models import Q
-from documents.models import Document
 from datetime import datetime, timedelta
-from django.views.decorators.clickjacking import xframe_options_sameorigin, xframe_options_exempt
-from django.http import FileResponse, HttpResponse, Http404
 from django.utils.crypto import get_random_string
 from django.conf import settings
+from audit.utils import log_action
 
-################## DRAFT CREATION
-def referral_drafting_page(request, doc_id):
-    doc = get_object_or_404(BarangayFiles, id=doc_id,status = 'REFERRED')
-    existing_draft = Document.objects.filter(
-            author=request.user,
-            source_barangay_doc=doc,
-            status__in=['DRAFT', 'GHOST']
-        ).first()
-
-    # OnlyOffice needs a real Document id to attach to from the very first
-    # keystroke, same reasoning as create_draft's auto-create — see
-    # documents/views.py.
-    if not existing_draft:
-        existing_draft = Document.objects.create(
-            author=request.user,
-            source_barangay_doc=doc,
-            title='Untitled Draft',
-            content='',
-            doc_type='RESOLUTION',
-            status='GHOST',
-        )
-
-    context = {
-        'doc':doc,
-        'existing_draft': existing_draft,
-        'committees': Committee.objects.all(),
-        'onlyoffice_server_url': settings.ONLYOFFICE_SERVER_URL,
-    }
-    return render(request,'documents/referral_drafting_page.html',context)
-
-
-################### FOR VIEWING
-def referrals_from_other_matters(request):
-    councilor = Councilor.objects.get(user=request.user)
-    committees = councilor.chaired_committees.all()
-    referral_from_otherMatters = BarangayFiles.objects.filter(referred_committee__in = committees, status = 'REFERRED')
-
-    context={
-        'referrals':referral_from_otherMatters,
-
-    }
-
-    return render(request,'councilors/referrals_from_other_matters.html',context)
-
-
+@login_required
 def referred_to_committee(request, committee_id):
     councilor = request.user
     committees = get_object_or_404(Committee, id = committee_id )
@@ -72,6 +25,7 @@ def referred_to_committee(request, committee_id):
     return render(request, 'councilors/referred_to_committee.html', context)
 
 
+@login_required
 def councilor_dashboard(request):
     now = datetime.now()
     days_ahead = 0 - now.weekday() 
@@ -84,12 +38,14 @@ def councilor_dashboard(request):
     councilor = request.user.councilor_profile
     committees = councilor.chaired_committees.all()
     draft_measures = Document.objects.filter(status = 'DRAFT')
-    referred_from_otherMatters = BarangayFiles.objects.filter(referred_committee__in = committees, status = 'REFERRED')
+    # Barangay-originated documents referred to one of this councilor's
+    # committees now land here directly (barangay_to_referral creates the
+    # Document at referral time) rather than sitting in a separate
+    # "Pending Referrals" queue first — see barangay/views.py.
     referred_to_my_committees = Document.objects.filter(referred_committee__in = committees)
     context={
         'committees': committees,
         'draft_measures':draft_measures,
-        'referred_other_matters':referred_from_otherMatters,
         'referred_to_my_committees': referred_to_my_committees,
 
         "month": session_datetime.strftime("%B"),
@@ -100,7 +56,12 @@ def councilor_dashboard(request):
 
     }
     return render(request, 'dashboards/councilor.html', context)
+@login_required
 def add_councilor(request):
+    if request.user.role not in ['SECRETARIAT', 'STAFF', 'ADMIN']:
+        messages.error(request, "You don't have permission to add councilors.")
+        return redirect('councilors_list')
+
     if request.method == "POST":
         form = CouncilorForm(request.POST, request.FILES)
         if form.is_valid():
@@ -116,6 +77,7 @@ def add_councilor(request):
             councilor.user = user
             councilor.save()
 
+            log_action(request, action='CREATE', target=f"Created councilor account for {user.username}")
             messages.warning(
                 request,
                 f"Account for {user.username} created. Temporary password: {temp_password} "
@@ -126,29 +88,43 @@ def add_councilor(request):
         form = CouncilorForm()
     return render(request, 'councilors/add_councilor.html',{'form':form})
 
+@login_required
 def councilors(request):
     councilor = Councilor.objects.filter(is_active=True)
     return render(request,'councilors/councilor_list.html', {'councilor':councilor})
 
+@login_required
 def editCouncilor(request, councilor_id):
+    if request.user.role not in ['SECRETARIAT', 'STAFF', 'ADMIN']:
+        messages.error(request, "You don't have permission to edit councilors.")
+        return redirect('councilors_list')
+
     councilor = get_object_or_404(Councilor,id=councilor_id)
 
     if request.method == "POST":
         form = CouncilorForm(request.POST, request.FILES, instance=councilor)
         if form.is_valid():
             form.save()
+            log_action(request, action='UPDATE', target=f"Edited councilor profile: {councilor.name}")
             return redirect('councilors_list')
     else:
         form = CouncilorForm(instance=councilor)
 
     return render(request, 'councilors/edit_councilor.html',{'form':form, 'councilor':councilor})
 
+@login_required
 def end_term(request, councilor_id):
+    if request.user.role not in ['SECRETARIAT', 'STAFF', 'ADMIN']:
+        messages.error(request, "You don't have permission to end a councilor's term.")
+        return redirect('councilors_list')
+
     councilor = get_object_or_404(Councilor, id=councilor_id)
     councilor.is_active = False
     councilor.save()
+    log_action(request, action='UPDATE', target=f"Ended term for councilor: {councilor.name}", severity='HIGH')
     return redirect('councilors_list')
 
+@login_required
 def filed_measures(request):
     filed_measures = request.user.my_docs.filter(status = 'FILED')
     context = {
@@ -156,6 +132,8 @@ def filed_measures(request):
         'author' : request.user.councilor_profile
     }
     return render(request, 'councilors/filed_measures.html', context)
+
+@login_required
 def draft_measures(request):
     from documents.models import ReturnReason
     drafts = request.user.my_docs.filter(status='DRAFT').order_by('-updated_at')
@@ -170,11 +148,14 @@ def draft_measures(request):
     }
     return render(request, 'councilors/draft_measures.html', context)
 
+@login_required
 def delete_draft(request, id):
     draft = get_object_or_404(Document, id = id)
-    
+
     if draft.status == 'DRAFT':
         if draft.author == request.user:
+            log_action(request, action='DELETE', target=draft.title or f'Draft #{draft.id}',
+                       detail=f'{draft.doc_type} draft deleted by its author.')
             draft.delete()
     return redirect('draft-measures')
         
@@ -199,7 +180,6 @@ def view_draft(request, id):
     context ={
         'draft':draft,
         'snapshot_pdf_url': reverse('document-snapshot-pdf', args=[draft.id]),
-        'onlyoffice_server_url': settings.ONLYOFFICE_SERVER_URL,
     }
     return render(request, 'councilors/view_draft.html', context)
 @login_required
@@ -251,6 +231,8 @@ def update_draft(request, doc_id):
             ).count()
             doc.reference_no = f"{prefix}-{count + 1:03d}-{current_year}"
 
+        log_action(request, action='FILE', target=f'{doc.doc_type} — {doc.reference_no}',
+                   detail=f'"{doc.title}" filed by {request.user.username}')
         messages.success(request, f'"{doc.title}" has been officially filed.')
     else:
         messages.success(request, "Draft saved.")
@@ -259,17 +241,4 @@ def update_draft(request, doc_id):
     return redirect('draft_detail', doc_id=doc.id)
 
 
-    ############## for document handling
-from django.http import FileResponse
-import os
-
-@xframe_options_exempt
-def serve_pdf(request, barangay_doc_id):
-    doc = get_object_or_404(BarangayFiles, id=barangay_doc_id)
-
-    return FileResponse(
-        open(doc.scanned_pdf.path, 'rb'),
-        as_attachment=False,
-        content_type='application/pdf'
-    )
 

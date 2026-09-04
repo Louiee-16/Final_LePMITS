@@ -1,12 +1,17 @@
+import json
+import time
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth import authenticate, login as auth_login
 from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
 from django.views.decorators.csrf import ensure_csrf_cookie, csrf_protect
 from django.core.mail import send_mail
 from django.conf import settings
 from documents.models import Document
-from audit.utils import log_action
+from audit.utils import log_action, get_client_ip
+from . import ratelimit
 from .models import TwoFactorCode
 
 
@@ -30,13 +35,20 @@ def login_view(request):
     error = None
 
     if request.method == 'POST':
+        client_ip = get_client_ip(request)
+        if ratelimit.is_locked_out('login', client_ip):
+            error = 'Too many failed login attempts. Please try again in a few minutes.'
+            return render(request, 'accounts/login.html', {'form': form, 'error': error})
+
         if form.is_valid():
             user = form.get_user()
+            ratelimit.clear('login', client_ip)
 
             if not user.email:
-                # No email on record — log straight in (edge case for admin accounts)
+                # No email on record — log straight in (edge case for admin accounts).
+                # auth_login() fires the user_logged_in signal, which audit.signals
+                # already records — do not log this again here.
                 auth_login(request, user)
-                log_action(request, 'LOGIN', target=user.username)
                 return redirect('dashboard')
 
             # Generate OTP and send email
@@ -65,6 +77,14 @@ def login_view(request):
             return redirect('otp-verify')
         else:
             error = 'Invalid username or password.'
+            ratelimit.record_failure('login', client_ip)
+            attempted_username = request.POST.get('username', '').strip()
+            log_action(
+                request, 'FAILED_LOGIN',
+                target=attempted_username or '(unknown)',
+                detail='Invalid username or password at login.',
+                severity='HIGH',
+            )
 
     return render(request, 'accounts/login.html', {'form': form, 'error': error})
 
@@ -104,6 +124,12 @@ def verify_otp(request):
                 'masked_email': masked, 'resent': True
             })
 
+        if ratelimit.is_locked_out('otp', user.pk):
+            error = 'Too many incorrect attempts. Please request a new code and try again in a few minutes.'
+            return render(request, 'accounts/otp_verify.html', {
+                'masked_email': masked, 'error': error,
+            })
+
         code = request.POST.get('code', '').strip()
         otp = TwoFactorCode.objects.filter(
             user=user, code=code, is_used=False
@@ -111,16 +137,20 @@ def verify_otp(request):
 
         if not otp:
             error = 'Invalid code. Please check your email and try again.'
+            ratelimit.record_failure('otp', user.pk)
         elif otp.is_expired():
             error = 'This code has expired. Please request a new one.'
+            ratelimit.record_failure('otp', user.pk)
         else:
             otp.is_used = True
             otp.save()
+            ratelimit.clear('otp', user.pk)
             backend = request.session.pop('2fa_backend', 'django.contrib.auth.backends.ModelBackend')
             user.backend = backend
+            # auth_login() fires the user_logged_in signal, which audit.signals
+            # already records — do not log this again here.
             auth_login(request, user)
             request.session.pop('2fa_user_id', None)
-            log_action(request, 'LOGIN', target=user.username)
             return redirect('dashboard')
 
     return render(request, 'accounts/otp_verify.html', {
@@ -180,10 +210,6 @@ def dashboard_redirect(request):
 
 
 
-from django.http import HttpResponseRedirect, JsonResponse
-import json
-from django.contrib.auth import authenticate, login
-import time
 def session_status(request):
     if not request.user.is_authenticated:
         return JsonResponse({'alive': False, 'remaining': 0})
@@ -198,18 +224,24 @@ def session_status(request):
 
 def session_relogin(request):
     if request.method == "POST":
+        client_ip = get_client_ip(request)
+        if ratelimit.is_locked_out('relogin', client_ip):
+            return JsonResponse({'success': False, 'error': 'Too many failed attempts. Please try again in a few minutes.'}, status=429)
+
         data = json.loads(request.body)
         username = data.get('username')
         password = data.get('password')
-        user = authenticate(request,username=username, password=password)
+        user = authenticate(request, username=username, password=password)
 
         if user:
-            login(request, user)
+            ratelimit.clear('relogin', client_ip)
+            auth_login(request, user)
             request.session['last_activity'] = int(time.time())
-            return JsonResponse({'success':True})
+            return JsonResponse({'success': True})
 
-        return JsonResponse({'success':False, 'error':'Invalid credentials.'})
-    return JsonResponse({'error':'Method not allowed.'}, status =405)
+        ratelimit.record_failure('relogin', client_ip)
+        return JsonResponse({'success': False, 'error': 'Invalid credentials.'})
+    return JsonResponse({'error': 'Method not allowed.'}, status=405)
 
 
 def session_heartbeat(request):

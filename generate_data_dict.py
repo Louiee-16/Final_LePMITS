@@ -158,7 +158,7 @@ add_table(doc, 'Table: barangay_barangay', HEADERS, [
 add_table(doc, 'Table: barangay_barangayfiles', HEADERS, [
     ['id',                   'AutoField',    'Primary key',                       'Auto-generated'],
     ['origin_barangay_id',   'ForeignKey (barangay_barangay)', 'Source barangay', 'Cascade delete, Required'],
-    ['scanned_pdf',          'FileField',    'Uploaded scanned document',         'Upload to: barangay_scans/YYYY/, Optional'],
+    ['uploaded_docx',        'FileField',    'Uploaded draft resolution (.docx)', 'Upload to: barangay_uploads/YYYY/, Optional'],
     ['date_submitted',       'DateTimeField','Submission timestamp',              'Auto-generated'],
     ['remarks',              'TextField',    'Additional remarks',                'Max: 600, Optional'],
     ['title',                'CharField',    'Document title',                    'Max: 100, Optional'],

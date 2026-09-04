@@ -4,7 +4,7 @@ rag/embedder.py  —  LePMITS Embedding Pipeline
 Expects clean, pre-extracted text (stored on the model as extracted_text /
 content).  This module only:
   1. Chunks the text by legislative markers  (chunk_legal_text)
-  2. Embeds each chunk via nomic-embed-text on Ollama  (embed_text)
+  2. Embeds each chunk via settings.OLLAMA_EMBED_MODEL on Ollama  (embed_text)
   3. Persists vectors back to the model  (embed_document_chunks)
 """
 
@@ -30,7 +30,19 @@ def _ollama_base_url() -> str:
 
 
 def embed_text(text: str, timeout: int = 60) -> list[float]:
-    """Return a 768-dim vector from nomic-embed-text via Ollama."""
+    """Return a vector from settings.OLLAMA_EMBED_MODEL via Ollama, sized to
+    documents.models.EMBEDDING_DIMENSIONS.
+
+    Every VectorField this app has (Document/LegacyDocument/NationalLawChunk/
+    DocumentChunk) is a fixed width — pgvector rejects an insert of the wrong
+    size, but only at that point, deep inside whatever view or management
+    command called this. Checking here instead means a misconfigured
+    OLLAMA_EMBED_MODEL (wrong model, or a model that changed its own output
+    size) fails immediately with a clear message, not as an opaque DB error
+    several calls later. See documents/models.py's EMBEDDING_DIMENSIONS
+    docstring — this has already bitten once (migration 0016 had to silently
+    wipe every stored embedding after a dimension change).
+    """
     if not text or not text.strip():
         raise ValueError("embed_text: empty text.")
 
@@ -44,6 +56,14 @@ def embed_text(text: str, timeout: int = 60) -> list[float]:
     vector = resp.json().get("embedding")
     if not vector:
         raise ValueError(f"Ollama returned no embedding for model '{model}'.")
+
+    from documents.models import EMBEDDING_DIMENSIONS
+    if len(vector) != EMBEDDING_DIMENSIONS:
+        raise ValueError(
+            f"embed_text: model '{model}' returned a {len(vector)}-dim vector, "
+            f"but documents.models.EMBEDDING_DIMENSIONS is {EMBEDDING_DIMENSIONS}. "
+            f"OLLAMA_EMBED_MODEL is misconfigured for this database's vector columns."
+        )
     return vector
 
 
