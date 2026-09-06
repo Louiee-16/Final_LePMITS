@@ -273,7 +273,7 @@
             <i data-lucide="globe" style="width:12px;height:12px;vertical-align:middle;"></i> English
         </div>
         <div class="utility-links">
-            <a href="{% url 'gazette_list' %}">Browse Ordinances</a>
+            <a href="{{ gazette_site_url }}/">Browse Ordinances</a>
             <a href="mailto:secretariat@sanjuan.gov.ph">Contact Us</a>
             <a href="{% url 'login' %}" style="color: var(--accent-orange);">
                 Staff Login <i data-lucide="lock" style="width:11px;height:11px;vertical-align:middle;"></i>
@@ -291,8 +291,8 @@
             </div>
         </div>
         <div class="nav-menu">
-            <a href="{% url 'gazette_list' %}">Legislative</a>
-            <a href="{% url 'gazette_list' %}">Ordinances</a>
+            <a href="{{ gazette_site_url }}/">Legislative</a>
+            <a href="{{ gazette_site_url }}/">Ordinances</a>
             <a href="#stats">At a Glance</a>
             <a href="{% url 'login' %}">Staff Portal</a>
         </div>
@@ -304,15 +304,15 @@
             <h1>San Juan City<br>Legislative Archive</h1>
             <p>Access enacted ordinances and approved resolutions from the Sangguniang Panlungsod ng San Juan City.</p>
 
-            <form class="search-box" method="GET" action="{% url 'gazette_list' %}">
-                <input type="text" name="q" placeholder="Search ordinances, resolutions…" autocomplete="off">
+            <form class="search-box" method="GET" action="{{ gazette_site_url }}/">
+                <input type="text" name="search" placeholder="Search ordinances, resolutions…" autocomplete="off">
                 <button type="submit">
                     <i data-lucide="search" style="width:14px;height:14px;vertical-align:middle;margin-right:6px;"></i> Search
                 </button>
             </form>
 
             <div class="btn-group">
-                <a href="{% url 'gazette_list' %}" class="cta-primary">Browse All Legislation</a>
+                <a href="{{ gazette_site_url }}/" class="cta-primary">Browse All Legislation</a>
                 <a href="#services" class="cta-secondary">Learn More ↓</a>
             </div>
         </div>
@@ -336,17 +336,17 @@
 
     <!-- SERVICES -->
     <div id="services" class="services-grid">
-        <a href="{% url 'gazette_list' %}" class="service-card" style="text-decoration:none;color:inherit;">
+        <a href="{{ gazette_site_url }}/" class="service-card" style="text-decoration:none;color:inherit;">
             <i data-lucide="gavel" style="width:28px;height:28px;"></i>
             <h3>Ordinance Tracking</h3>
             <p>Browse and search through the city's enacted ordinances and approved resolutions.</p>
         </a>
-        <a href="{% url 'gazette_list' %}" class="service-card" style="text-decoration:none;color:inherit;">
+        <a href="{{ gazette_site_url }}/" class="service-card" style="text-decoration:none;color:inherit;">
             <i data-lucide="scroll-text" style="width:28px;height:28px;"></i>
             <h3>Legislative Records</h3>
             <p>Access the complete legislative archive including legacy documents from previous councils.</p>
         </a>
-        <a href="{% url 'gazette_list' %}" class="service-card" style="text-decoration:none;color:inherit;">
+        <a href="{{ gazette_site_url }}/" class="service-card" style="text-decoration:none;color:inherit;">
             <i data-lucide="message-square" style="width:28px;height:28px;"></i>
             <h3>Public Participation</h3>
             <p>Share your thoughts on proposed ordinances open for public consultation.</p>
@@ -360,7 +360,7 @@
         <p style="color:#64748b;font-size:14px;margin-bottom:30px;">Latest enacted ordinances and resolutions from the Sangguniang Panlungsod.</p>
         <div style="display:flex;flex-direction:column;gap:12px;">
             {% for doc in recent_docs %}
-            <a href="{% url 'gazette_list' %}"
+            <a href="{{ gazette_site_url }}/"
                style="display:flex;align-items:center;gap:16px;padding:16px 20px;border:1px solid #f1f5f9;border-radius:14px;text-decoration:none;color:inherit;transition:.2s;"
                onmouseenter="this.style.borderColor='#b31d1d';this.style.background='#fef9f9'"
                onmouseleave="this.style.borderColor='#f1f5f9';this.style.background='white'">
@@ -379,7 +379,7 @@
             {% endfor %}
         </div>
         <div style="text-align:center;margin-top:30px;">
-            <a href="{% url 'gazette_list' %}"
+            <a href="{{ gazette_site_url }}/"
                style="display:inline-block;padding:12px 32px;background:#002b5c;color:white;border-radius:10px;font-weight:700;font-size:13px;text-decoration:none;text-transform:uppercase;letter-spacing:1px;">
                 View All Legislation →
             </a>

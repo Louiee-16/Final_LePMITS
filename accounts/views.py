@@ -186,6 +186,7 @@ def index(request):
         'ordinance_count': ordinance_count,
         'resolution_count': resolution_count,
         'recent_docs':     recent_docs,
+        'gazette_site_url': settings.GAZETTE_SITE_URL,
     })
 
 @login_required
