@@ -145,6 +145,11 @@
                             <p id="scanMeta" class="text-[9px] text-slate-400 font-medium mt-0.5"></p>
                         </div>
                         <div class="ml-auto flex items-center gap-2 flex-wrap">
+                            <span id="confidenceBadge" class="hidden text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border whitespace-nowrap"
+                                title="Average Tesseract OCR confidence for this scan">
+                                <i data-lucide="gauge" style="width:9px;height:9px;margin-right:3px;vertical-align:middle;"></i>
+                                <span id="confidenceText"></span>
+                            </span>
                             <span id="suspectBadge" class="hidden text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
                                 <i data-lucide="triangle-alert" style="width:9px;height:9px;margin-right:3px;vertical-align:middle;"></i>
                                 <span id="suspectCount">0</span> possible errors
@@ -194,13 +199,27 @@
                         </span>
                     </div>
 
+                    <!-- Removed-by-AI notice — the AI cleanup prompt is
+                         explicitly told to strip signature blocks and
+                         certification lines; this surfaces what
+                         disappeared instead of leaving it silent. -->
+                    <div id="removedContentBox" class="hidden px-5 py-3 bg-red-50/60 border-b border-red-100 shrink-0">
+                        <button type="button" id="removedContentToggle"
+                            class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-red-700 w-full text-left">
+                            <i data-lucide="triangle-alert" style="width:11px;height:11px;"></i>
+                            <span id="removedContentSummary"></span>
+                            <i data-lucide="chevron-down" id="removedContentChevron" style="width:11px;height:11px;margin-left:auto;"></i>
+                        </button>
+                        <div id="removedContentList" class="hidden mt-2 text-[10px] text-red-800 font-mono leading-relaxed max-h-32 overflow-y-auto"></div>
+                    </div>
+
                     <!-- OCR text body (scrollable) -->
                     <div class="flex-1 overflow-y-auto custom-scrollbar p-5">
                         <div id="scannedTextBody"
                             contenteditable="true"
                             spellcheck="true"
-                            class="ocr-editor w-full text-xs text-slate-700 font-mono leading-relaxed focus:outline-none"
-                            style="min-height:100%;word-break:break-word;white-space:pre-wrap;"></div>
+                            class="ocr-editor w-full text-sm text-slate-700 font-serif focus:outline-none"
+                            style="min-height:100%;word-break:break-word;"></div>
                     </div>
                 </div>
 
@@ -235,23 +254,76 @@ function isSuspiciousWord(word) {
     );
 }
 
-function buildHighlightedHTML(rawText) {
-    let suspectCount = 0;
-    const html = rawText.split('\n').map(line => {
-        if (line.trim() === '--- Page Break ---') {
-            return `<span class="page-break-line">─── Page Break ───</span>`;
-        }
-        return line.split(/(\s+)/).map(token => {
+// ── Legal-document line layout ──────────────────────────────────────────
+// Purely a *display* transformation layered on top of the word-level
+// highlighting below — classifies each raw line by its role in a
+// Philippine ordinance/resolution (header block, ordinance number,
+// section/whereas clauses, sponsor line, plain body text) and wraps it
+// accordingly, so the panel reads like an actual document instead of one
+// flat monospace stream. Never touches the underlying text content: block
+// elements like <p>/<div> each still start their own line in
+// textBody.innerText (what's actually submitted as validated_text), same
+// as the <br>-joined version did.
+function classifyLegalLine(line) {
+    const trimmed = line.trim();
+    if (!trimmed) return 'blank';
+    if (trimmed === '--- Page Break ---') return 'pagebreak';
+    const lettersOnly = trimmed.replace(/[^A-Za-z]/g, '');
+    if (lettersOnly.length >= 3 && lettersOnly === lettersOnly.toUpperCase()) {
+        return 'heading';
+    }
+    // "Series of YYYY" is conventionally mixed-case, not all-caps like the
+    // rest of the header block, but belongs with it visually.
+    if (/^Series\s+of\s+\d{4}$/i.test(trimmed)) return 'heading';
+    if (/^(SECTION|ARTICLE)\s+[\dIVXLC]/i.test(trimmed)) return 'section';
+    if (/^(WHEREAS|NOW,?\s+THEREFORE)\b/i.test(trimmed)) return 'clause';
+    if (/^Sponsored\s+by\b/i.test(trimmed)) return 'sponsor';
+    return 'body';
+}
+
+function wrapLegalLine(cls, innerHTML) {
+    switch (cls) {
+        case 'blank':     return '';
+        case 'pagebreak': return `<div class="page-break-line">─── Page Break ───</div>`;
+        case 'heading':   return `<div class="legal-heading">${innerHTML}</div>`;
+        case 'section':   return `<p class="legal-para legal-section">${innerHTML}</p>`;
+        case 'clause':    return `<p class="legal-para legal-clause">${innerHTML}</p>`;
+        case 'sponsor':   return `<p class="legal-sponsor">${innerHTML}</p>`;
+        default:          return `<p class="legal-para">${innerHTML}</p>`;
+    }
+}
+
+// Shared by buildHighlightedHTML/buildComparisonHTML — markToken(core, token)
+// returns marked-up HTML for a suspicious/inconsistent token, or null to
+// leave it as plain escaped text.
+function renderLegalDocument(text, markToken) {
+    let markedCount = 0;
+    const html = text.split('\n').map(line => {
+        const cls = classifyLegalLine(line);
+        if (cls === 'blank' || cls === 'pagebreak') return wrapLegalLine(cls, '');
+        const innerHTML = line.split(/(\s+)/).map(token => {
             if (/^\s+$/.test(token)) return token;
             const core = token.replace(/^[^\w]+|[^\w]+$/g, '');
-            if (core && isSuspiciousWord(core)) {
-                suspectCount++;
-                return `<mark class="ocr-suspect" title="Possible OCR error — click to edit">${escapeHTML(token)}</mark>`;
+            const marked = core ? markToken(core, token) : null;
+            if (marked !== null) {
+                markedCount++;
+                return marked;
             }
             return escapeHTML(token);
         }).join('');
-    }).join('<br>');
-    return { html, suspectCount };
+        return wrapLegalLine(cls, innerHTML);
+    }).join('');
+    return { html, markedCount };
+}
+
+function buildHighlightedHTML(rawText) {
+    const { html, markedCount } = renderLegalDocument(rawText, (core, token) => {
+        if (isSuspiciousWord(core)) {
+            return `<mark class="ocr-suspect" title="Possible OCR error — click to edit">${escapeHTML(token)}</mark>`;
+        }
+        return null;
+    });
+    return { html, suspectCount: markedCount };
 }
 
 function buildAIHighlightedHTML(cleanText, uncertainWords) {
@@ -279,29 +351,101 @@ let tesseractWordSet = new Set();
 let tesseractRawText = '';
 let compareMode = false;
 let aiRenderedHTML = '';  // saved AI HTML so we can toggle back
+let aiReviewRecommended = true;  // set from extract-legacy-metadata's ai_review_recommended
+
+function showConfidenceBadge(confidence, recommended) {
+    const badge = document.getElementById('confidenceBadge');
+    const text  = document.getElementById('confidenceText');
+    if (!badge || !text) return;
+    const pct = Math.round(confidence);
+    text.textContent = recommended === false
+        ? `${pct}% confidence — AI review skipped`
+        : `${pct}% confidence`;
+    badge.classList.remove('hidden', 'bg-emerald-50', 'text-emerald-700', 'border-emerald-200',
+        'bg-amber-50', 'text-amber-700', 'border-amber-200');
+    if (recommended === false) {
+        badge.classList.add('bg-emerald-50', 'text-emerald-700', 'border-emerald-200');
+    } else {
+        badge.classList.add('bg-amber-50', 'text-amber-700', 'border-amber-200');
+    }
+}
+
+// Applies the same suspicious-word highlighting AI review would apply to
+// its cleaned output, but directly to the raw Tesseract text — used when
+// OCR confidence is high enough that the AI pass was skipped.
+function skipAIReview(rawText) {
+    const textBody = document.getElementById('scannedTextBody');
+    const { html, suspectCount } = buildHighlightedHTML(rawText || '(no text extracted)');
+    textBody.innerHTML = html;
+    if (suspectCount > 0) {
+        document.getElementById('suspectCount').textContent = suspectCount;
+        document.getElementById('suspectBadge').classList.remove('hidden');
+        document.getElementById('cleanBadge').classList.add('hidden');
+    } else {
+        document.getElementById('cleanBadge').classList.remove('hidden');
+        document.getElementById('suspectBadge').classList.add('hidden');
+    }
+    // No AI cleanup ran, so nothing could have been removed by it.
+    showRemovedContent([]);
+    lucide.createIcons();
+}
 
 function normalizeWord(w) {
     return w.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
 function buildComparisonHTML(text) {
-    let inconsistentCount = 0;
-    const html = text.split('\n').map(line => {
-        if (line.trim() === '--- Page Break ---') {
-            return `<span class="page-break-line">─── Page Break ───</span>`;
+    const { html, markedCount } = renderLegalDocument(text, (core, token) => {
+        const norm = normalizeWord(core);
+        if (norm.length > 2 && !tesseractWordSet.has(norm)) {
+            return `<mark class="ocr-inconsistent" title="Not found in Tesseract scan — possible hallucination or OCR difference">${escapeHTML(token)}</mark>`;
         }
-        return line.split(/(\s+)/).map(token => {
-            if (/^\s+$/.test(token)) return token;
-            const core = token.replace(/^[^\w]+|[^\w]+$/g, '');
-            const norm = normalizeWord(core);
-            if (norm.length > 2 && !tesseractWordSet.has(norm)) {
-                inconsistentCount++;
-                return `<mark class="ocr-inconsistent" title="Not found in Tesseract scan — possible hallucination or OCR difference">${escapeHTML(token)}</mark>`;
-            }
-            return escapeHTML(token);
-        }).join('');
-    }).join('<br>');
-    return { html, inconsistentCount };
+        return null;
+    });
+    return { html, inconsistentCount: markedCount };
+}
+
+// ── Removed-by-AI detection ─────────────────────────────────────────────
+// The AI cleanup prompt explicitly instructs the model to strip signature
+// blocks, councilor names, and everything from "ENACTED BY THE COUNCIL"
+// onward — real content, not noise. The existing "Compare" feature only
+// catches words the AI *added* that aren't in the raw scan (hallucination);
+// it has no way to show what disappeared. This does a line-level check
+// instead of a real diff: a raw-text line whose significant words mostly
+// don't appear anywhere in the cleaned text is very likely a line the AI
+// dropped outright, not just reworded.
+function findRemovedContent(rawText, cleanedText) {
+    const cleanedWords = new Set(
+        cleanedText.split(/\s+/).map(w => normalizeWord(w)).filter(w => w.length > 2)
+    );
+    const removed = [];
+    (rawText || '').split('\n').forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed === '--- Page Break ---') return;
+        const words = trimmed.split(/\s+/).map(w => normalizeWord(w)).filter(w => w.length > 2);
+        if (words.length === 0) return;
+        const matched = words.filter(w => cleanedWords.has(w)).length;
+        if (matched / words.length < 0.3) {
+            removed.push(trimmed);
+        }
+    });
+    return removed;
+}
+
+function showRemovedContent(removedLines) {
+    const box = document.getElementById('removedContentBox');
+    const summary = document.getElementById('removedContentSummary');
+    const list = document.getElementById('removedContentList');
+    if (!box || !removedLines || removedLines.length === 0) {
+        if (box) box.classList.add('hidden');
+        return;
+    }
+    summary.textContent = `${removedLines.length} line${removedLines.length !== 1 ? 's' : ''} of the original scan appear to have been removed by AI cleanup — review before uploading`;
+    list.innerHTML = removedLines.map(line => `<div class="py-0.5 border-b border-red-100/60">${escapeHTML(line)}</div>`).join('');
+    list.classList.add('hidden');
+    document.getElementById('removedContentChevron')?.setAttribute('style', 'width:11px;height:11px;margin-left:auto;transform:rotate(0deg);');
+    box.classList.remove('hidden');
+    lucide.createIcons();
 }
 
 function toggleCompare() {
@@ -385,6 +529,9 @@ function exitComparisonMode() {
     document.getElementById('scanMeta').textContent = '';
     document.getElementById('suspectBadge').classList.add('hidden');
     document.getElementById('cleanBadge').classList.add('hidden');
+    document.getElementById('confidenceBadge').classList.add('hidden');
+    document.getElementById('removedContentBox').classList.add('hidden');
+    aiReviewRecommended = true;
     const ib = document.getElementById('inconsistentBadge');
     if (ib) ib.classList.add('hidden');
     const cb = document.getElementById('compareBtn');
@@ -450,6 +597,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     );
                     document.getElementById('compareBtn').classList.remove('hidden');
                 }
+                if (typeof data.ocr_confidence === 'number') {
+                    showConfidenceBadge(data.ocr_confidence, data.ai_review_recommended);
+                }
+                aiReviewRecommended = data.ai_review_recommended !== false;
                 showStatus(
                     filled.length > 0
                         ? `✅ Auto-filled: ${filled.join(', ')} — please review before saving.`
@@ -461,8 +612,16 @@ document.addEventListener('DOMContentLoaded', function () {
             showStatus('⚠️ Could not read PDF — fill in manually.', 'error');
         }
 
-        // Step 2 — send Tesseract text to AI (no second PDF scan)
-        await runAIReview(tesseractText, titleField.value.trim());
+        // Step 2 — send Tesseract text to AI (no second PDF scan), unless
+        // OCR confidence was already high enough that the extraction step
+        // recommended skipping it. Experimental (AI_REVIEW_CONFIDENCE_
+        // THRESHOLD in documents/views.py) — the "AI Review" button stays
+        // enabled either way so staff can still run it manually.
+        if (aiReviewRecommended) {
+            await runAIReview(tesseractText, titleField.value.trim());
+        } else {
+            skipAIReview(tesseractText);
+        }
     });
 
     // ── AI review ────────────────────────────────────────────────────────
@@ -476,12 +635,39 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         textBody.innerHTML = `
-            <div style="display:flex;align-items:center;justify-content:center;gap:10px;padding:60px 0;color:#7C0D0E;">
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:60px 0;color:#7C0D0E;">
                 <svg style="width:18px;height:18px;animation:spin 1s linear infinite;flex-shrink:0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-                <span style="font-size:12px;font-weight:700;">AI is reviewing the scanned text…</span>
+                <span id="aiReviewingText" style="font-size:12px;font-weight:700;">AI is reviewing the scanned text… (0s)</span>
+                <span style="font-size:10px;color:#94a3b8;font-weight:600;">Typically 15-20s for a multi-page scan</span>
             </div>`;
         aiBtn.disabled = true;
         aiBtn.innerHTML = '<svg style="width:9px;height:9px;animation:spin 1s linear infinite;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Reviewing…';
+
+        // No true progress is available here (the AI call is one blocking
+        // request — see documents/views.py::validate_ocr_with_ai for why
+        // token streaming was tried and reverted), so this is a plain
+        // elapsed-time counter, not a real completion percentage.
+        const reviewStart = performance.now();
+        const progressTimer = setInterval(() => {
+            const label = document.getElementById('aiReviewingText');
+            if (!label) return;
+            const elapsed = Math.round((performance.now() - reviewStart) / 1000);
+            label.textContent = `AI is reviewing the scanned text… (${elapsed}s)`;
+        }, 1000);
+
+        function applyHighlighting(text) {
+            const { html, suspectCount } = buildHighlightedHTML(text);
+            textBody.innerHTML = html;
+            if (suspectCount > 0) {
+                document.getElementById('suspectCount').textContent = suspectCount;
+                document.getElementById('suspectBadge').classList.remove('hidden');
+                document.getElementById('cleanBadge').classList.add('hidden');
+            } else {
+                document.getElementById('cleanBadge').classList.remove('hidden');
+                document.getElementById('suspectBadge').classList.add('hidden');
+            }
+            lucide.createIcons();
+        }
 
         try {
             const fd = new FormData();
@@ -498,35 +684,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 throw new Error(err.error || `Server error ${resp.status}`);
             }
 
-            const data        = await resp.json();
+            const data = await resp.json();
             const cleanedText = data.cleaned_text || rawText;
-
-            const { html, suspectCount } = buildHighlightedHTML(cleanedText);
-            textBody.innerHTML = html;
-
-            if (suspectCount > 0) {
-                document.getElementById('suspectCount').textContent = suspectCount;
-                document.getElementById('suspectBadge').classList.remove('hidden');
-                document.getElementById('cleanBadge').classList.add('hidden');
-            } else {
-                document.getElementById('cleanBadge').classList.remove('hidden');
-                document.getElementById('suspectBadge').classList.add('hidden');
-            }
-            lucide.createIcons();
+            applyHighlighting(cleanedText);
+            showRemovedContent(findRemovedContent(rawText, cleanedText));
 
         } catch (err) {
-            const { html, suspectCount } = buildHighlightedHTML(rawText);
-            textBody.innerHTML = html;
-            if (suspectCount > 0) {
-                document.getElementById('suspectCount').textContent = suspectCount;
-                document.getElementById('suspectBadge').classList.remove('hidden');
-                document.getElementById('cleanBadge').classList.add('hidden');
-            } else {
-                document.getElementById('cleanBadge').classList.remove('hidden');
-                document.getElementById('suspectBadge').classList.add('hidden');
-            }
-            lucide.createIcons();
+            applyHighlighting(rawText);
+            showRemovedContent([]);
         } finally {
+            clearInterval(progressTimer);
             aiBtn.disabled = false;
             aiBtn.innerHTML = '<i data-lucide="sparkles" style="width:9px;height:9px;"></i> AI Review';
             lucide.createIcons();
@@ -551,6 +718,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Compare toggle
     document.getElementById('compareBtn').addEventListener('click', toggleCompare);
+
+    // Removed-content notice expand/collapse
+    document.getElementById('removedContentToggle').addEventListener('click', () => {
+        const list = document.getElementById('removedContentList');
+        const chevron = document.getElementById('removedContentChevron');
+        const expanded = !list.classList.contains('hidden');
+        list.classList.toggle('hidden');
+        if (chevron) chevron.style.transform = expanded ? 'rotate(0deg)' : 'rotate(180deg)';
+    });
 
     // Copy text
     document.getElementById('copyScannedText').addEventListener('click', () => {
@@ -665,12 +841,44 @@ document.addEventListener('DOMContentLoaded', function () {
         color: #94a3b8;
         font-size: 10px;
         padding: 8px 0;
+        margin: 16px 0;
         letter-spacing: 0.15em;
         pointer-events: none;
         user-select: none;
     }
 
+    .ocr-editor {
+        line-height: 1.9;
+    }
     .ocr-editor:focus { outline: none; }
+
+    /* Legal-document line styling — see classifyLegalLine/wrapLegalLine.
+       Display only; the underlying text read back via .innerText is
+       unaffected by which wrapper element each line gets. */
+    .legal-heading {
+        text-align: center;
+        font-weight: 800;
+        letter-spacing: 0.02em;
+        color: #1e293b;
+        margin: 4px 0;
+    }
+    .legal-para {
+        margin: 0 0 16px 0;
+        text-align: justify;
+    }
+    .legal-section {
+        margin-top: 22px;
+        padding-left: 12px;
+        border-left: 3px solid #f1f5f9;
+    }
+    .legal-clause {
+        margin-top: 16px;
+    }
+    .legal-sponsor {
+        margin: 12px 0;
+        font-style: italic;
+        color: #64748b;
+    }
 
     @keyframes spin {
         from { transform: rotate(0deg); }

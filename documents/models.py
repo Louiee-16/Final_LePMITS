@@ -188,7 +188,12 @@ class LegacyDocument(models.Model):
     ]
 
     title = models.CharField(max_length=1000)
-    reference_no = models.CharField(max_length=100, blank=True)
+    # unique=True: the upload view already required this to be non-empty,
+    # but nothing stopped two uploads from silently sharing the same
+    # reference number — both would then show up as valid citations in
+    # Gazette search and the AI Legal Basis assistant's retrieval with no
+    # way to tell them apart.
+    reference_no = models.CharField(max_length=100, unique=True)
     doc_type = models.CharField(max_length=20, choices=DOC_TYPE_CHOICES)
     year = models.IntegerField(null=True, blank=True)
     pdf_file = models.FileField(upload_to='legacy_documents/%Y/', max_length = 500)

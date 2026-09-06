@@ -90,6 +90,34 @@ _MAX_TOKENS = 1024
 # Prompt builder
 # ---------------------------------------------------------------------------
 
+# Floor on cosine-similarity score (0-1) below which a retrieved law is
+# dropped before ever reaching the LLM as a candidate. Calibrated against
+# this corpus directly, not guessed: a pure-gibberish query still scores
+# ~0.69-0.71 against the closest (entirely coincidental) matches, while
+# genuinely on-topic queries score ~0.79+. 0.72 sits just above that noise
+# floor with a small margin.
+#
+# What this does NOT fix: a real false-positive citation (RA 538, "insure
+# the lives of barrio lieutenants against accidents", cited against a
+# public accident-assistance ordinance) scored 0.7999 on real data —
+# solidly inside the "genuinely relevant" band alongside the correct
+# citations (0.79-0.81), not a low-scoring outlier. This threshold is a
+# floor against clearly-irrelevant noise on off-corpus topics, not a
+# substitute for the LLM's own relevance judgment — telling "insures an
+# official's life" apart from "assists an injured member of the public"
+# needs actual comprehension, which is exactly why a weaker model
+# accepting that citation and a stronger one rejecting it produced
+# different results at the same retrieval scores.
+MIN_ENACTED_LAW_SIMILARITY = 0.72
+
+
+def filter_by_similarity(chunks: list[dict], min_score: float = MIN_ENACTED_LAW_SIMILARITY) -> list[dict]:
+    """Drop retrieved chunks below the similarity floor. Split out from
+    _retrieve_national_law_chunks so the filtering logic itself is testable
+    without a live DB/pgvector connection."""
+    return [c for c in chunks if c.get("score", 0) >= min_score]
+
+
 def _retrieve_national_law_chunks(title: str, top_k: int = 5) -> list[dict]:
     """Search NationalLawChunk by cosine similarity to the draft title."""
     try:
@@ -105,7 +133,7 @@ def _retrieve_national_law_chunks(title: str, top_k: int = 5) -> list[dict]:
             .annotate(distance=CosineDistance('embedding', query_vec))
             .order_by('distance')[:top_k]
         )
-        return [
+        results = [
             {
                 "law_number": c.law.law_number,
                 "law_title":  c.law.title,
@@ -114,6 +142,7 @@ def _retrieve_national_law_chunks(title: str, top_k: int = 5) -> list[dict]:
             }
             for c in chunks
         ]
+        return filter_by_similarity(results)
     except Exception:
         return []
 

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List
 
 import requests
@@ -25,7 +26,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 def _ollama_base_url() -> str:
-    endpoint = getattr(settings, 'OLLAMA_ENDPOINT', 'http://localhost:11434/api/generate')
+    endpoint = getattr(settings, 'OLLAMA_ENDPOINT', 'http://100.74.22.65:11434/api/generate')
     return endpoint.rsplit('/api/', 1)[0]
 
 
@@ -177,27 +178,38 @@ def embed_document_chunks(doc, source_type: str = "document") -> List[Dict]:
         logger.warning("embed_document_chunks: no chunks for %s pk=%s.", source_type, doc.pk)
         return []
 
-    results: List[Dict] = []
-    for chunk in chunks:
+    def _embed_one(chunk: Dict) -> Dict:
         chunk_input = f"{doc.title}. {chunk['chunk_text']}".strip()
-        try:
-            embedding = embed_text(chunk_input)
-        except Exception as exc:
-            logger.warning(
-                "embed_document_chunks: embed failed for %s pk=%s chunk %d: %s",
-                source_type, doc.pk, chunk["chunk_index"], exc,
-            )
-            continue
-
-        results.append({
+        return {
             "source_type":     source_type,
             "document_pk":     doc.pk,
             "document_title":  doc.title,
             "chunk_index":     chunk["chunk_index"],
             "chunk_type":      chunk["chunk_type"],
             "chunk_text":      chunk["chunk_text"],
-            "embedding":       embedding,
-        })
+            "embedding":       embed_text(chunk_input),
+        }
+
+    # Each embed_text call is a blocking HTTP request to Ollama — running
+    # them concurrently instead of one at a time is what actually cuts the
+    # wall-clock time here, since the wait is on network/inference, not CPU.
+    results: List[Dict] = []
+    with ThreadPoolExecutor(max_workers=min(4, len(chunks))) as executor:
+        future_to_chunk = {executor.submit(_embed_one, chunk): chunk for chunk in chunks}
+        for future in as_completed(future_to_chunk):
+            chunk = future_to_chunk[future]
+            try:
+                results.append(future.result())
+            except Exception as exc:
+                logger.warning(
+                    "embed_document_chunks: embed failed for %s pk=%s chunk %d: %s",
+                    source_type, doc.pk, chunk["chunk_index"], exc,
+                )
+
+    # Concurrent completion order isn't chunk order — restore it so
+    # downstream bulk_create/logging behaves the same as the old
+    # sequential loop, even though chunk_index is stored explicitly either way.
+    results.sort(key=lambda r: r["chunk_index"])
 
     logger.info(
         "embed_document_chunks: %d/%d chunks embedded for %s pk=%s.",
