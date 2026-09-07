@@ -13,6 +13,7 @@ class AuditLog(models.Model):
         ('FILE',         'Filed'),
         ('MOVE',         'Status Change'),
         ('RETURN',       'Returned'),
+        ('PASSWORD_CHANGE', 'Password Changed'),
     ]
 
     SEVERITY_CHOICES = [

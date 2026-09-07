@@ -1454,6 +1454,17 @@ _SIMILARITY_STOP_WORDS = {
     'sangguniang', 'panlungsod', 'barangay', 'pursuant', 'under',
     'directly', 'indirectly', 'thereby', 'resulting', 'cause', 'effect',
     'duly', 'enacted', 'ordained', 'resolved', 'government', 'local',
+    # Standard closing/authority-clause vocabulary ("subject to and
+    # conditioned upon full compliance with existing laws, circulars,
+    # issuances, memoranda and rules and regulations") — near-verbatim in
+    # most ordinances' closing sections regardless of subject matter, so
+    # without these the keyword-overlap gate passed on boilerplate alone
+    # and flagged unrelated ordinances as "similar" (e.g. an accident-
+    # assistance ordinance vs. an anniversary-bonus one, sharing nothing
+    # but this clause).
+    'existing', 'laws', 'rules', 'regulations', 'compliance', 'authority',
+    'issuance', 'issuances', 'approval', 'conditioned', 'circulars',
+    'memoranda', 'subject', 'full', 'upon',
 }
 
 

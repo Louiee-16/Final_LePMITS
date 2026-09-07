@@ -1364,3 +1364,76 @@ class FilterBySimilarityTests(TestCase):
         from documents.rag.generator import filter_by_similarity
         result = filter_by_similarity([{"law_number": "RA 1"}], min_score=0.72)
         self.assertEqual(result, [])
+
+
+# ---------------------------------------------------------------------------
+# generate_legal_basis() result caching. The GPU behind this feature
+# serializes requests (confirmed directly: two concurrent calls take ~2x
+# one call's time, not the same time), so a councilor re-checking the same
+# still-unedited draft — a plausible, common pattern — previously re-ran
+# the full ~15-25s retrieval+LLM pipeline for identical input every time.
+# Cache key is a hash of (title, doc_type, content), so any real edit
+# misses the cache automatically; this locks in that behavior specifically,
+# not the citation-parsing logic itself (covered elsewhere).
+# ---------------------------------------------------------------------------
+class GenerateLegalBasisCachingTests(TestCase):
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+        self.addCleanup(cache.clear)
+
+    def _fake_law(self):
+        return {"ra_number": "RA 1", "description": "Test law", "date": None, "url": None}
+
+    def test_second_identical_call_hits_cache_not_backend(self):
+        from django.test import override_settings
+        from documents.rag import generator
+
+        with override_settings(RAG_EXTERNAL_LAW_SEARCH_ENABLED=False), \
+             patch.object(generator, '_local_enacted_laws', return_value=[self._fake_law()]), \
+             patch.object(generator, '_foundational_laws', return_value=[]), \
+             patch.object(generator, '_dispatch_to_backend') as mock_dispatch:
+            mock_dispatch.return_value = '[{"ref": "RA 1", "law_title": "Test Law", "reason": "relevant"}]'
+
+            result1 = generator.generate_legal_basis(title='Test Draft', doc_type='ORDINANCE', content='some content')
+            result2 = generator.generate_legal_basis(title='Test Draft', doc_type='ORDINANCE', content='some content')
+
+        self.assertEqual(mock_dispatch.call_count, 1)
+        self.assertEqual(result1, result2)
+        self.assertEqual(len(result1), 1)
+        self.assertEqual(result1[0]['ref'], 'RA 1')
+
+    def test_changed_content_misses_cache(self):
+        from django.test import override_settings
+        from documents.rag import generator
+
+        with override_settings(RAG_EXTERNAL_LAW_SEARCH_ENABLED=False), \
+             patch.object(generator, '_local_enacted_laws', return_value=[self._fake_law()]), \
+             patch.object(generator, '_foundational_laws', return_value=[]), \
+             patch.object(generator, '_dispatch_to_backend') as mock_dispatch:
+            mock_dispatch.return_value = '[{"ref": "RA 1", "law_title": "Test Law", "reason": "relevant"}]'
+
+            generator.generate_legal_basis(title='Test Draft', doc_type='ORDINANCE', content='version one')
+            generator.generate_legal_basis(title='Test Draft', doc_type='ORDINANCE', content='version two')
+
+        self.assertEqual(mock_dispatch.call_count, 2)
+
+    def test_empty_result_is_still_cached(self):
+        # An empty citations list ("nothing relevant found") is a valid,
+        # cacheable answer, not a miss — re-checking shouldn't re-run the
+        # LLM just to get "no citations" again.
+        from django.test import override_settings
+        from documents.rag import generator
+
+        with override_settings(RAG_EXTERNAL_LAW_SEARCH_ENABLED=False), \
+             patch.object(generator, '_local_enacted_laws', return_value=[self._fake_law()]), \
+             patch.object(generator, '_foundational_laws', return_value=[]), \
+             patch.object(generator, '_dispatch_to_backend') as mock_dispatch:
+            mock_dispatch.return_value = '[]'
+
+            result1 = generator.generate_legal_basis(title='Empty Draft', doc_type='ORDINANCE', content='x')
+            result2 = generator.generate_legal_basis(title='Empty Draft', doc_type='ORDINANCE', content='x')
+
+        self.assertEqual(mock_dispatch.call_count, 1)
+        self.assertEqual(result1, [])
+        self.assertEqual(result2, [])

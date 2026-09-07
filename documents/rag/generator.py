@@ -515,6 +515,9 @@ def _clean_content_excerpt(content: str | None) -> str:
     return text[:_CONTENT_EXCERPT_LIMIT]
 
 
+_LEGAL_BASIS_CACHE_TIMEOUT = 3600  # seconds — same reasoning as _KEYWORD_CACHE_TIMEOUT: covers a typical drafting session
+
+
 def generate_legal_basis(title: str, doc_type: str | None = None, content: str | None = None) -> list[dict]:
     """
     Searches two sources for national legislation related to this draft —
@@ -549,9 +552,28 @@ def generate_legal_basis(title: str, doc_type: str | None = None, content: str |
     Local-ordinance precedent is a separate concern already surfaced by
     the inline drafting check (ai_inline_check /
     documents.rag.retriever.retrieve), so this doesn't duplicate that.
+
+    Result is cached for _LEGAL_BASIS_CACHE_TIMEOUT, keyed on a hash of
+    (title, doc_type, content) — same pattern as _extract_search_keywords.
+    The actual bottleneck here is the ~15-25s LLM judgment call on a GPU
+    that serializes requests one at a time (measured directly — 2
+    concurrent calls take ~2x one call's time, not the same time); a
+    councilor re-checking the same still-unedited draft is a plausible,
+    common repeat-call pattern, and re-running the full retrieval+LLM
+    pipeline for unchanged input is pure waste on that shared resource.
+    Any real edit to title/doc_type/content changes the hash and misses
+    the cache automatically — no explicit invalidation needed.
     """
     if not title or not title.strip():
         raise ValueError("generate_legal_basis() requires a non-empty document title.")
+
+    cache_key = "legal_basis_result_v1:" + hashlib.sha256(
+        f"{title}\x00{doc_type or ''}\x00{content or ''}".encode()
+    ).hexdigest()
+    cached = cache.get(cache_key)
+    if cached is not None:
+        logger.info("generate_legal_basis: cache hit for title %r.", title)
+        return cached
 
     content_excerpt = _clean_content_excerpt(content)
 
@@ -602,7 +624,9 @@ def generate_legal_basis(title: str, doc_type: str | None = None, content: str |
     )
     raw = _dispatch_to_backend(prompt, _resolve_backend())
 
-    return _parse_citations(raw, national_laws, enacted_laws + foundational_laws)
+    result = _parse_citations(raw, national_laws, enacted_laws + foundational_laws)
+    cache.set(cache_key, result, _LEGAL_BASIS_CACHE_TIMEOUT)
+    return result
 
 
 def _build_prompt(title: str, doc_type: str | None, national_laws: list, enacted_laws: list, foundational_laws: list | None = None, content_excerpt: str = "") -> str:

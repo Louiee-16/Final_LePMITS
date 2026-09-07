@@ -3,8 +3,10 @@ import time
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.forms import AuthenticationForm
-from django.contrib.auth import authenticate, login as auth_login
+from django.contrib.auth import authenticate, login as auth_login, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from django.http import JsonResponse
 from django.views.decorators.csrf import ensure_csrf_cookie, csrf_protect
 from django.core.mail import send_mail
@@ -157,6 +159,39 @@ def verify_otp(request):
         'masked_email': masked,
         'error': error,
     })
+
+
+@login_required
+def change_password_required(request):
+    if not request.user.must_change_password:
+        return redirect('dashboard')
+
+    error = None
+    if request.method == 'POST':
+        new_password = request.POST.get('new_password', '')
+        confirm = request.POST.get('confirm_password', '')
+
+        if new_password != confirm:
+            error = 'Passwords do not match.'
+        else:
+            try:
+                validate_password(new_password, user=request.user)
+            except ValidationError as exc:
+                error = ' '.join(exc.messages)
+
+        if not error:
+            request.user.set_password(new_password)
+            request.user.must_change_password = False
+            request.user.save()
+            update_session_auth_hash(request, request.user)
+            log_action(
+                request, 'PASSWORD_CHANGE',
+                target=request.user.username,
+                detail='Mandatory password change completed after admin provisioning/reset.',
+            )
+            return redirect('dashboard')
+
+    return render(request, 'accounts/change_password_required.html', {'error': error})
 
 
 # Keep this alias so config/urls.py import doesn't break while we update it

@@ -146,6 +146,7 @@ def create_user(request):
             email=email,
             role=role,
             is_active=is_active,
+            must_change_password=True,
         )
         user.set_password(password)
         user.save()
@@ -285,6 +286,7 @@ def reset_password(request, user_id):
         target_user = get_object_or_404(User, id=user_id)
         temp_pass = get_random_string(length=12)
         target_user.set_password(temp_pass)
+        target_user.must_change_password = True
         target_user.save()
         log_action(request, action='UPDATE', target=f"Reset password for {target_user.username}", severity='HIGH')
         messages.warning(request, f"Password for {target_user.username} reset to: {temp_pass}. Provide to user securely.")

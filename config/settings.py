@@ -126,6 +126,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'systemadmin.middleware.SessionIdleTimeoutMiddleware',
     'systemadmin.middleware.MaintenanceModeMiddleware',
+    'accounts.middleware.ForcePasswordChangeMiddleware',
     'systemadmin.middleware.SystemErrorLoggingMiddleware',
 ]
 

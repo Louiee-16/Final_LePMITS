@@ -15,6 +15,7 @@ class User(AbstractUser):
     )
     role = models.CharField(max_length=20, choices=ROLES, default='STAFF')
     office_or_district = models.CharField(max_length=100, blank=True) # e.g. "District 1" or "Brgy. San Jose"
+    must_change_password = models.BooleanField(default=False)
     def get_councilor_name(self):
         try:
             return self.councilor_profile.name
