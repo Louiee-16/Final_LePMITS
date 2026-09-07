@@ -56,6 +56,15 @@ def make_document(author, status='DRAFT', **extra):
     return Document.objects.create(**defaults)
 
 
+def make_client_for(user):
+    """Logged-in test Client for `user`. Previously redefined identically
+    (as either _client_for(self, user) or _client(self) closing over one
+    fixed user) in 7 separate test classes."""
+    c = Client()
+    c.force_login(user)
+    return c
+
+
 # ---------------------------------------------------------------------------
 # _can_view_document / _can_edit_document — the actual authorization policy
 # for every document-editing/viewing surface in the app.
@@ -138,9 +147,7 @@ class WopiEndpointPermissionTests(TestCase):
         self.secretariat = make_user('wopi_secretariat', 'SECRETARIAT')
 
     def _client_for(self, user):
-        c = Client()
-        c.force_login(user)
-        return c
+        return make_client_for(user)
 
     def test_file_bytes_blocked_for_non_owner_of_draft(self):
         doc = make_document(self.author, status='DRAFT')
@@ -460,9 +467,7 @@ class CreateDraftStripsAiCommentsAtFilingTests(TestCase):
         self.author = make_user('filing_author', 'COUNCILOR')
 
     def _client(self):
-        c = Client()
-        c.force_login(self.author)
-        return c
+        return make_client_for(self.author)
 
     def _seed_docx(self, doc_id, author):
         path = _onlyoffice_saved_docx_path(doc_id)
@@ -548,9 +553,7 @@ class MoveToThirdReadingAmendmentStatusTests(TestCase):
         self.author = make_user('m2t_author', 'COUNCILOR')
 
     def _client(self):
-        c = Client()
-        c.force_login(self.secretariat)
-        return c
+        return make_client_for(self.secretariat)
 
     def test_allowed_when_amendment_status_untouched(self):
         doc = make_document(self.author, status='SECOND_READING', amendment_status=None)
@@ -589,9 +592,7 @@ class BrokenRedirectNameRegressionTests(TestCase):
         self.other_councilor = make_user('redir_other', 'COUNCILOR')
 
     def _client_for(self, user):
-        c = Client()
-        c.force_login(user)
-        return c
+        return make_client_for(user)
 
     def test_floor_amendments_permission_denied_redirects(self):
         doc = make_document(self.author, status='SECOND_READING')
@@ -680,9 +681,7 @@ class MoveToFirstAssignsReferenceNumberTests(TestCase):
         self.secretariat = make_user('m2f_secretariat', 'SECRETARIAT')
 
     def _client(self):
-        c = Client()
-        c.force_login(self.secretariat)
-        return c
+        return make_client_for(self.secretariat)
 
     def test_filing_no_longer_assigns_a_number(self):
         doc = make_document(self.author, status='DRAFT', title='Real Title', doc_type='ORDINANCE')
@@ -820,9 +819,7 @@ class LegacyUploadPermissionTests(TestCase):
         self.admin = make_user('legacyup_admin', 'ADMIN')
 
     def _client_for(self, user):
-        c = Client()
-        c.force_login(user)
-        return c
+        return make_client_for(user)
 
     def test_upload_legacy_page_denied_for_councilor(self):
         resp = self._client_for(self.councilor).get(reverse('UPLOAD-LEGACY'))
@@ -993,26 +990,26 @@ class EmbedDocumentChunksConcurrencyTests(TestCase):
 # ---------------------------------------------------------------------------
 class PageOcrConfidenceTests(TestCase):
     def test_averages_only_non_negative_confidences(self):
-        with patch('documents.views.pytesseract.image_to_data', return_value={
+        with patch('documents.legacy_upload.pytesseract.image_to_data', return_value={
             'conf': ['-1', '-1', '95', '90', '-1', '85'],
         }):
             result = _page_ocr_confidence(object())
         self.assertAlmostEqual(result, (95 + 90 + 85) / 3)
 
     def test_all_negative_confidences_returns_none(self):
-        with patch('documents.views.pytesseract.image_to_data', return_value={
+        with patch('documents.legacy_upload.pytesseract.image_to_data', return_value={
             'conf': ['-1', '-1', '-1'],
         }):
             result = _page_ocr_confidence(object())
         self.assertIsNone(result)
 
     def test_tesseract_failure_returns_none_not_an_exception(self):
-        with patch('documents.views.pytesseract.image_to_data', side_effect=RuntimeError('tesseract crashed')):
+        with patch('documents.legacy_upload.pytesseract.image_to_data', side_effect=RuntimeError('tesseract crashed')):
             result = _page_ocr_confidence(object())
         self.assertIsNone(result)
 
     def test_malformed_conf_values_are_skipped_not_fatal(self):
-        with patch('documents.views.pytesseract.image_to_data', return_value={
+        with patch('documents.legacy_upload.pytesseract.image_to_data', return_value={
             'conf': ['not-a-number', '80', None, '70'],
         }):
             result = _page_ocr_confidence(object())
@@ -1033,9 +1030,7 @@ class LegacyDocumentReferenceNoUniquenessTests(TestCase):
         self.staff = make_user('refuniq_staff', 'STAFF')
 
     def _client(self):
-        c = Client()
-        c.force_login(self.staff)
-        return c
+        return make_client_for(self.staff)
 
     def _payload(self, reference_no, **overrides):
         data = {
@@ -1089,7 +1084,7 @@ class LegacyDocumentReferenceNoUniquenessTests(TestCase):
             title='Raced in first', reference_no='CO-4-2026', doc_type='ORDINANCE',
             year=2026, pdf_file='',
         )
-        with patch('documents.views.LegacyDocument.objects.filter') as mock_filter:
+        with patch('documents.legacy_upload.LegacyDocument.objects.filter') as mock_filter:
             mock_filter.return_value.exists.return_value = False
             resp = self._client().post(reverse('UPLOAD-LEGACY-DOCUMENT'), self._payload('CO-4-2026'))
 

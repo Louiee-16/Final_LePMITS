@@ -11,6 +11,7 @@ from django.core.mail import EmailMessage
 from django.contrib import messages
 from django.conf import settings
 from audit.utils import log_action
+from documents.models import LegacyDocument
 
 
 @login_required
@@ -54,6 +55,7 @@ def Secretariat_dashboard(request):
         'first_reading_count': Document.objects.filter(status='FIRST_READING').count(),
         'in_committee':        Document.objects.filter(status__in=['REFERRED', 'COMMITTEE']).count(),
         'approved_count':      Document.objects.filter(status='APPROVED').count(),
+        'total_approved':      Document.objects.filter(status='APPROVED').count() + LegacyDocument.objects.count(),
         'pipeline': [
             {'label': 'First Reading',    'count': Document.objects.filter(status='FIRST_READING').count(),    'color': 'bg-slate-400'},
             {'label': 'In Committee',     'count': Document.objects.filter(status__in=['REFERRED','COMMITTEE']).count(), 'color': 'bg-slate-500'},

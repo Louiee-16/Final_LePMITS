@@ -154,7 +154,7 @@
                 <tr class="hover:bg-amber-50/40 transition-colors cursor-pointer group"
                     data-doc-id="{{ doc.id }}"
                     data-source="legacy"
-                    data-type="legacy"
+                    data-type="{{ doc.doc_type }}"
                     data-year="{{ doc.year|default:'' }}"
                     data-search="{{ doc.title|lower }} {{ doc.reference_no|lower }}">
 
@@ -246,7 +246,15 @@ function filterTable() {
     let visible  = 0;
 
     rows.forEach(row => {
-        const matchType   = activeType === 'all' || row.dataset.type === activeType;
+        let matchType;
+
+        if (activeType === 'all') {
+            matchType = true;
+        } else if (activeType === 'legacy') {
+            matchType = row.dataset.source === 'legacy';
+        } else {
+            matchType = row.dataset.type === activeType;
+        }
         const matchSearch = !search || (row.dataset.search || '').includes(search);
         const matchYear   = !year   || row.dataset.year === year;
         const show = matchType && matchSearch && matchYear;
