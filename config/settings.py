@@ -54,7 +54,6 @@ INSTALLED_APPS = [
     'archives',
     'committee_level',
     'barangay',
-    'OfficialGazette',
     'secretariat',
     'systemadmin',
     'audit',
@@ -391,13 +390,14 @@ TESSERACT_PATH = os.getenv(
 DATA_UPLOAD_MAX_MEMORY_SIZE = 25 * 1024 * 1024
 
 # Base URL of the separate ~/Gazette Django project (own git repo,
-# github.com/Louiee-16/Gazette) — a fuller public-facing gazette site that
-# reads this same database directly via unmanaged shadow models (see
-# CLAUDE.md's Architecture section). The homepage's own "Browse Ordinances"
-# links and search bar point out to that site rather than this repo's own
-# smaller OfficialGazette app, since that project already has richer
-# features (public comments, legacy-bill merging, a hearings page) this
-# repo's own copy doesn't. Same hardcoded-URL-for-a-sibling-service pattern
-# already used the other direction in that project's own settings
-# (LEPMITS_MEDIA_BASE_URL) — no service discovery between the two exists.
+# github.com/Louiee-16/Gazette) — the public-facing gazette site (public
+# comments, legacy-bill merging, a hearings page), reading this same
+# database directly via unmanaged shadow models (see CLAUDE.md's
+# Architecture section). The homepage's "Browse Ordinances" links and
+# search bar point out to that site — an earlier in-repo OfficialGazette
+# app duplicating a smaller slice of the same idea was removed once this
+# became the sole intended public surface. Same hardcoded-URL-for-a-
+# sibling-service pattern already used the other direction in that
+# project's own settings (LEPMITS_MEDIA_BASE_URL) — no service discovery
+# between the two exists.
 GAZETTE_SITE_URL = os.getenv('GAZETTE_SITE_URL', 'http://localhost:1625').rstrip('/')

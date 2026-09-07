@@ -76,7 +76,7 @@ SECRETARIAT/STAFF/COUNCILOR/BARANGAY/ADMIN — no separate permissions framework
 `request.user.role`), `documents` (the core legislative-document model and workflow, plus the RAG
 subpackage), `councilors`, `committees`, `archives`, `committee_level` (committee-hearing records
 and DOCX committee reports), `barangay` (barangay-originated measure uploads/referrals),
-`OfficialGazette`, `secretariat`, `systemadmin` (maintenance mode, session-idle-timeout and
+`secretariat`, `systemadmin` (maintenance mode, session-idle-timeout and
 error-logging middleware), `audit` (append-only audit log via signals).
 
 **Document lifecycle** (`documents/models.py`'s `Document.STATUS_CHOICES`): `GHOST` (WIP,
@@ -114,19 +114,21 @@ The AI Legal Basis Assistant additionally calls the public Open Congress API (be
 LawPhil.net for national-law lookups, gated by `RAG_EXTERNAL_LAW_SEARCH_ENABLED` so unpublished
 draft titles can be kept from leaving the system entirely.
 
-**Public Gazette site is a separate project, sharing this DB.** `templates/index.html` links this
-repo's own `OfficialGazette` app (Browse Ordinances, homepage search) — but there is *also* a fully
-separate Django project, a sibling directory at `~/Gazette` (own git repo, github.com/Louiee-16/Gazette),
-that connects directly to this same Postgres database via unmanaged shadow models
-(`managed = False`, hand-matched column-for-column to `documents_document`,
-`documents_legacydocument`, `committees_committee`, `accounts_user`, `secretariat_session`) and adds
-its own public-comments/replies table. Both surfaces are live; neither supersedes the other. There is
-no automated signal here if they drift — Gazette has its own separate test suite that never runs
-against changes made in this repo. **Before renaming, dropping, or changing the type of any column
-on `Document`, `LegacyDocument`, `Committee`, or `User`, check `~/Gazette/gazette/models.py` and
-`~/Gazette/councilors/models.py` for a matching shadow model field and flag the break to the user**
-— a migration here can silently take down the sibling site with nothing in this repo's checks or
-tests catching it.
+**Public Gazette site is a separate project, sharing this DB.** `templates/index.html`'s "Browse
+Ordinances" links and homepage search bar point at `settings.GAZETTE_SITE_URL`
+(`http://localhost:1625` by default) — a fully separate Django project, a sibling directory at
+`~/Gazette` (own git repo, github.com/Louiee-16/Gazette), that connects directly to this same
+Postgres database via unmanaged shadow models (`managed = False`, hand-matched column-for-column to
+`documents_document`, `documents_legacydocument`, `committees_committee`, `accounts_user`,
+`secretariat_session`) and adds its own public-comments/replies table. An earlier in-repo
+`OfficialGazette` app duplicating a smaller slice of the same idea (local-ordinance + national-law
+search) was removed once this became the sole intended public surface — don't recreate it; extend
+the sibling project instead. There is no automated signal here if the two drift — Gazette has its
+own separate test suite that never runs against changes made in this repo. **Before renaming,
+dropping, or changing the type of any column on `Document`, `LegacyDocument`, `Committee`, or
+`User`, check `~/Gazette/gazette/models.py` and `~/Gazette/councilors/models.py` for a matching
+shadow model field and flag the break to the user** — a migration here can silently take down the
+sibling site with nothing in this repo's checks or tests catching it.
 
 **Security posture already in place** (don't rediscover/re-fix without checking first):
 non-default cookie names (`csrftoken_mgmt`/`sessionid_mgmt`), `SESSION_COOKIE_SECURE`/

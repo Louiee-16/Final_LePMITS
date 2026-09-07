@@ -36,16 +36,6 @@ urlpatterns = [
     path('',include('councilors.urls')),
     path('',include('committee_level.urls')),
     path('',include('barangay.urls')),
-    # Prefixed, not '' — OfficialGazette.urls registers its own 'gazette_list'
-    # at '' too, which an earlier '' path always wins over regardless of
-    # query string. That silently made gazette_list (and its search) dead
-    # code behind the homepage: every request to '/' — including
-    # '/?q=...' from the homepage's own search form — resolved to
-    # accounts.views.index instead, no matter what gazette_list did.
-    # {% url %} names elsewhere (index.html, gazette/*.html) resolve to
-    # whatever path this prefix puts them at, so this is the only change
-    # needed to make those links/forms reach the right view.
-    path('gazette/',include('OfficialGazette.urls')),
     path('',include('secretariat.urls')),
     path('',include('systemadmin.urls')),
 ]
