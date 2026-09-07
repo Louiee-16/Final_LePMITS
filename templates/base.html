@@ -9,6 +9,8 @@
     <link rel="stylesheet" href="{% static 'css/tailwind.min.css' %}">
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- TEMP: observing Geist as a body-font swap, revert by dropping this link and the body rule below -->
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@100;200;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <!-- EB Garamond backs the drafting editor's "printed document" look
          (draft.html, document_pdf.html, and other document-viewing
          templates all reference it in CSS) but was never actually linked
@@ -18,9 +20,14 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/shepherd.js@11.2.0/dist/css/shepherd.css">
     <script src="https://cdn.jsdelivr.net/npm/shepherd.js@11.2.0/dist/js/shepherd.min.js"></script>
     <script>const USER_ROLE = "{{ user.role }}";</script>
-    <script src="{%static 'onboard/js/tour.js'%}"></script>
+    <script src="{%static 'onboard/js/tour.js'%}?v=2"></script>
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
+        body { font-family: 'Geist', sans-serif; font-weight: 300; background-color: #f8fafc; }
+
+        /* TEMP: observing an app-wide de-bolding, revert by deleting this rule */
+        .font-black, .font-extrabold, .font-bold, .font-semibold, .font-medium, .font-\[900\] {
+            font-weight: 400 !important;
+        }
 
         /* ── Shepherd Tour Styles ── */
         .shepherd-element { border-radius: 1.25rem !important; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25) !important; border: 1px solid #e2e8f0 !important; }
@@ -48,6 +55,42 @@
         }
         #sidebar.collapsed { width: 64px; }
 
+        /* Collapsed logo + collapse button used to fight over the same
+           ~32px of space under justify-content:space-between (the logo box
+           alone is wider than that), so the toggle button ended up rendered
+           almost exactly on top of the logo — effectively invisible.
+           Stacking them instead guarantees both are always fully visible. */
+        #sidebar.collapsed .sidebar-header {
+            flex-direction: column;
+            justify-content: center;
+            gap: 10px;
+            padding: 14px 0 12px;
+        }
+
+        /* Measured live: sidebar center is x:32 in the 64px collapsed rail,
+           but the logo icon sat at x:25.5 and the avatar at x:25.5 too —
+           both 6.5px left of center. Both sit in a `flex items-center
+           gap-3` row alongside a label/info block that collapses to
+           width:0 but keeps reserving its gap-3 (12px), which shifts the
+           icon left instead of letting it sit dead-center. Killing that
+           gap fixes both. The collapse button was off the other way
+           (x:35.5, +3.5px) — it carries `ml-2` for when it sits next to
+           the logo horizontally, which no longer applies once the header
+           stacks vertically above. */
+        #sidebar.collapsed .sidebar-header > div:first-child,
+        #sidebar.collapsed #userCard > div:first-child {
+            gap: 0;
+        }
+        #sidebar.collapsed #collapseBtn { margin-left: 0; }
+
+        /* #userCard stacks the avatar row above the (hidden) logout button
+           with its own gap-3 — same leftover-gap issue as above, plus the
+           logout <form> is block-level and, unlike the label <span>s this
+           rule normally hides, doesn't lose its height just because its
+           width/opacity are zeroed. Both together were leaving visibly
+           dead space below the avatar in the collapsed card. */
+        #sidebar.collapsed #userCard { gap: 0; }
+
         /* Hide labels when collapsed */
         #sidebar.collapsed .sidebar-label,
         #sidebar.collapsed .sidebar-section-label,
@@ -58,8 +101,23 @@
             opacity: 0;
             pointer-events: none;
             width: 0;
+            height: 0;
             overflow: hidden;
             white-space: nowrap;
+        }
+
+        /* .sidebar-section-label ("MAIN", "TRACKING STAGES", ...) is a block
+           <p> on its own line above each nav group, not inline next to an
+           icon — collapsing it to width:0 above still left its line-height
+           and margin-bottom standing, showing up as a stray dead gap above
+           every section once collapsed (confirmed live: a visibly bigger
+           blank strip above "Tracking Stages" than any gap between the dot
+           rows themselves). Zero out its box entirely instead. */
+        #sidebar.collapsed .sidebar-section-label {
+            height: 0;
+            margin: 0;
+            padding: 0;
+            line-height: 0;
         }
 
         /* Center icons when collapsed */
@@ -70,7 +128,21 @@
         }
         #sidebar.collapsed .sidebar-item .nav-icon,
         #sidebar.collapsed .sidebar-item svg.nav-icon { margin-right: 0; }
-        #sidebar.collapsed .dot-wrap { margin-right: 0; }
+
+        /* A bare 7px dot floating alone in a 32px-wide collapsed rail reads
+           as an unstyled placeholder next to the icon-based nav rows above
+           it. Giving it its own chip (same radius/scale as a would-be icon)
+           makes the Tracking Stages section read as part of the same
+           designed rail instead of an afterthought. */
+        #sidebar.collapsed .dot-wrap {
+            margin-right: 0;
+            width: 22px;
+            height: 22px;
+            border-radius: 7px;
+            background: rgba(255,255,255,0.04);
+        }
+        #sidebar.collapsed .dot { width: 8px; height: 8px; min-width: 8px; }
+        #sidebar.collapsed .sidebar-active .dot-wrap { background: rgba(255,255,255,0.14); }
 
         /* User card collapsed */
         #sidebar.collapsed #userCard {
@@ -240,7 +312,7 @@
     <aside id="sidebar" class="flex flex-col shrink-0 relative">
 
         <!-- Logo + collapse -->
-        <div class="p-4 flex items-center justify-between border-b border-white/[0.06]">
+        <div class="sidebar-header p-4 flex items-center justify-between border-b border-white/[0.06]">
             <div class="flex items-center gap-3 min-w-0">
                 {% if settings.system_logo %}
                 <div class="p-1 rounded-xl shadow-lg shadow-slate-900/60 shrink-0" style="background:#7C0D0E;">
@@ -267,7 +339,7 @@
 
             <!-- SYSTEM ADMIN -->
             {% if user.role == 'ADMIN' %}
-            <div>
+            <div id="admin-section">
                 <p class="sidebar-section-label text-[9px] font-black text-slate-600 uppercase tracking-[0.2em] px-2 mb-2">
                     System Administration
                 </p>
@@ -356,7 +428,7 @@
             {% endif %}
 
             {% if user.role == 'BARANGAY' %}
-            <div>
+            <div id="barangay-section">
                 <a href="{% url 'dashboard' %}" data-tooltip="Filed Measures"
                    class="sidebar-item">
                     <i data-lucide="file-text" class="nav-icon"></i>
@@ -584,11 +656,13 @@
                 <h2 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Legislative Tracking System</h2>
             </div>
             <div class="flex items-center gap-5">
+                {% if user.role != 'ADMIN' %}
                 <button onclick="startTour()"
                     class="flex items-center gap-2 px-4 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-wider transition-all">
                     <i data-lucide="compass" style="width:12px;height:12px;"></i>
                     Take a Tour
                 </button>
+                {% endif %}
                 <div class="text-right">
                     <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Current Date</p>
                     <p class="text-xs font-bold text-slate-700">{% now "F d, Y" %}</p>
